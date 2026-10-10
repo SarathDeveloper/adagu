@@ -201,7 +201,7 @@ test('maturity payout pays cash and prints the voucher', async ({ window }) => {
     .fill('Ravi Kumar')
   await window.locator('.billing-customer-option').filter({ hasText: 'Ravi Kumar' }).first().click()
 
-  await expect(window.getByRole('heading', { name: 'Payout' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Payout', exact: true })).toBeVisible()
   const payoutButton = window.getByRole('button', { name: /^Pay out ₹/ })
   await expect(payoutButton).toBeEnabled()
   await payoutButton.click()
