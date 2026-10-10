@@ -20,3 +20,7 @@ playwright-report
 .DS_Store
 .env
 .env.local
+
+# Generated build artifacts
+*.zip
+*.tsbuildinfo
