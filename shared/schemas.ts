@@ -1,80 +1,8 @@
 import { z } from 'zod'
 import { DEFAULT_ADAGU_REMINDER_TEMPLATE } from './adagu/reminders'
 import { DEFAULT_CASH_VISIBILITY, DEFAULT_TAX_VISIBILITY } from './billTemplate'
-import { GOLD_PURITIES, SILVER_PURITIES, STOCK_METALS } from './itemTypes'
 
 export const idSchema = z.number().int().positive()
-
-export const productMetalSchema = z.enum(STOCK_METALS)
-
-export const productAttributesSchema = z.record(z.string().trim().min(1).max(80), z.string().max(200))
-
-export const huidSchema = z
-  .string()
-  .trim()
-  .toUpperCase()
-  .regex(/^[0-9A-Z]+$/, 'HUID can only be letters and digits')
-
-export const productInputSchema = z
-  .object({
-    name: z.string().min(1).max(200),
-    category: z.string().trim().min(1).max(100),
-    metal: productMetalSchema,
-    purity: z.string().trim().min(1).max(50),
-    grossWeight: z.number().nonnegative(),
-    netWeight: z.number().nonnegative(),
-    makingCharges: z.number().nonnegative(),
-    stockQty: z.number().int().nonnegative(),
-    imagePath: z.string().max(500),
-    parentId: z.number().int().positive().nullable().optional(),
-    variantCode: z.string().trim().max(80).optional().default(''),
-    size: z.string().trim().max(50).optional().default(''),
-    stoneWeight: z.number().nonnegative().optional().default(0),
-    stoneDetails: z.string().trim().max(500).optional().default(''),
-    attributes: productAttributesSchema.optional().default({}),
-    isActive: z.boolean().optional().default(true),
-    huids: z.array(huidSchema).max(500).optional().default([]),
-  })
-  .refine((data) => data.netWeight <= data.grossWeight, {
-    message: 'Net weight cannot exceed gross weight',
-    path: ['netWeight'],
-  })
-  .refine((data) => (data.stoneWeight ?? 0) <= data.grossWeight, {
-    message: 'Stone weight cannot exceed gross weight',
-    path: ['stoneWeight'],
-  })
-  .superRefine((data, ctx) => {
-    const allowed = data.metal === 'Silver' ? SILVER_PURITIES : GOLD_PURITIES
-    if (!allowed.includes(data.purity as (typeof allowed)[number])) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Purity must be one of ${allowed.join(', ')} for ${data.metal}`,
-        path: ['purity'],
-      })
-    }
-
-    const seen = new Map<string, number>()
-    data.huids.forEach((huid, index) => {
-      const previous = seen.get(huid)
-      if (previous !== undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `HUID ${huid} is duplicated`,
-          path: ['huids', index],
-        })
-        return
-      }
-      seen.set(huid, index)
-    })
-
-    if (data.huids.length > data.stockQty) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'A product cannot have more HUIDs than pieces in stock',
-        path: ['huids'],
-      })
-    }
-  })
 
 const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]$/
 
@@ -105,9 +33,6 @@ export const customerInputSchema = z.object({
   idProofType: z.string().trim().max(50).optional().default(''),
 })
 
-export const billFormatSchema = z.enum(['cash_bill', 'tax_invoice'])
-export const paymentModeSchema = z.enum(['cash', 'upi', 'card', 'mixed'])
-export const purchasePaymentModeSchema = z.enum(['cash', 'upi', 'card'])
 export const pledgePaymentModeSchema = z.enum([
   'cash',
   'upi',
@@ -117,184 +42,7 @@ export const pledgePaymentModeSchema = z.enum([
   'auction',
 ])
 export const paperSizeSchema = z.enum(['a5', 'a4', 'thermal'])
-export const printerRoleSchema = z.enum(['cash', 'tax'])
 export const printCopiesSchema = z.number().int().min(1).max(5)
-export const invoiceLineKindSchema = z.enum(['sale', 'exchange'])
-export const mixedPaymentModeSchema = z.enum(['cash', 'upi', 'card'])
-
-export const oldGoldItemInputSchema = z
-  .object({
-    description: z.string().max(200).optional().default(''),
-    grossWeight: z.number().positive(),
-    stoneWeight: z.number().nonnegative().optional().default(0),
-    netWeight: z.number().positive(),
-    purity: z.string().max(50).optional().default(''),
-    ratePerGram: z.number().nonnegative(),
-    deductionPct: z.number().nonnegative().max(100).optional().default(0),
-    touchPct: z.number().nonnegative().max(100).optional().default(0),
-    fineWeight: z.number().nonnegative().optional(),
-    metal: z.enum(['Gold', 'Silver']).optional(),
-  })
-  .refine((data) => (data.stoneWeight ?? 0) <= data.grossWeight, {
-    message: 'Stone/deduction weight cannot exceed gross weight',
-    path: ['stoneWeight'],
-  })
-  .refine((data) => data.netWeight <= data.grossWeight, {
-    message: 'Net weight cannot exceed gross weight',
-    path: ['netWeight'],
-  })
-
-export const mixedPaymentPartSchema = z.object({
-  mode: mixedPaymentModeSchema,
-  amount: z.number().positive(),
-})
-
-export const invoicePaymentInputSchema = z.object({
-  amount: z.number().positive(),
-  entryDate: z.string().min(1),
-  note: z.string().max(500).optional().default(''),
-  mode: mixedPaymentModeSchema.optional(),
-})
-
-export const invoiceCancelInputSchema = z.object({
-  reason: z.string().trim().min(3, 'Enter a reason for cancelling this bill').max(500),
-})
-
-export const invoiceItemInputSchema = z
-  .object({
-    productId: z.number().int().positive().nullable().optional(),
-    qty: z.number().int().positive(),
-    rate: z.number().nonnegative(),
-    grossWeight: z.number().nonnegative().optional(),
-    netWeight: z.number().nonnegative().optional(),
-    stoneWeight: z.number().nonnegative().optional(),
-    metalRate: z.number().nonnegative().optional(),
-    makingCharges: z.number().nonnegative().optional(),
-    wastagePct: z.number().nonnegative().optional(),
-    stoneRate: z.number().nonnegative().optional(),
-    otherCharges: z.number().nonnegative().optional(),
-    hsnCode: z.string().max(16).optional(),
-    lineKind: invoiceLineKindSchema.optional(),
-    description: z.string().max(200).optional(),
-    metal: z.string().max(50).optional(),
-    category: z.string().max(100).optional(),
-    purity: z.string().max(50).optional(),
-    huid: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .regex(/^[0-9A-Z]*$/, 'HUID can only be letters and digits')
-      .optional(),
-  })
-  .superRefine((data, ctx) => {
-    const kind = data.lineKind ?? 'sale'
-    if (kind === 'sale' && (data.productId == null || data.productId <= 0) && !data.description?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Sale lines require a product or a description',
-        path: ['productId'],
-      })
-    }
-    if (kind === 'sale' && data.huid?.trim() && (data.productId == null || data.productId <= 0)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'HUID can only be set on a saved product line',
-        path: ['huid'],
-      })
-    }
-    if (kind === 'sale' && (data.wastagePct ?? 0) > 0 && (data.makingCharges ?? 0) > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'VA/MC accepts either a wastage percent or a labour amount, not both',
-        path: ['wastagePct'],
-      })
-    }
-    if (kind === 'exchange') {
-      if ((data.netWeight ?? 0) <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Exchange lines require net weight',
-          path: ['netWeight'],
-        })
-      }
-      if ((data.metalRate ?? data.rate ?? 0) <= 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Exchange lines require a metal rate',
-          path: ['metalRate'],
-        })
-      }
-    }
-  })
-
-const invoiceBaseSchema = z.object({
-  customerId: z.number().int().positive(),
-  invoiceDate: z.string().min(1),
-  tax: z.number().nonnegative(),
-  items: z.array(invoiceItemInputSchema).min(1),
-  billFormat: billFormatSchema.optional(),
-  paymentMode: paymentModeSchema.optional(),
-  amountPaid: z.number().nonnegative().optional(),
-  discount: z.number().nonnegative().optional(),
-  autoTax: z.boolean().optional(),
-  useIgst: z.boolean().optional(),
-  isEstimate: z.boolean().optional(),
-  oldGold: z.array(oldGoldItemInputSchema).optional(),
-  oldGoldLinks: z.array(z.object({ purchaseId: idSchema, amount: z.number().positive().optional() })).optional(),
-  goldSavingLinks: z.array(z.object({ accountId: idSchema })).optional(),
-  acceptRateDate: z.boolean().optional(),
-  roundOff: z.number().optional(),
-  mixedPayments: z.array(mixedPaymentPartSchema).optional(),
-})
-
-function refineInvoicePayments(
-  data: z.infer<typeof invoiceBaseSchema>,
-  ctx: z.RefinementCtx,
-) {
-  const mixed = data.mixedPayments ?? []
-  if (data.paymentMode === 'mixed' && mixed.length > 0) {
-    const mixedTotal = mixed.reduce((sum, part) => sum + part.amount, 0)
-    if (data.amountPaid != null && mixedTotal - data.amountPaid > 0.009) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Mixed payment parts cannot exceed amount paid',
-        path: ['mixedPayments'],
-      })
-    }
-  }
-  if (mixed.length > 0 && data.paymentMode !== 'mixed' && data.paymentMode != null) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Mixed payment parts require payment mode Mixed',
-      path: ['mixedPayments'],
-    })
-  }
-}
-
-export const invoiceInputSchema = invoiceBaseSchema.superRefine(refineInvoicePayments)
-
-export const historicalInvoiceInputSchema = z.object({
-  invoiceNo: z.string().trim().min(1).max(40),
-  customerId: z.number().int().positive(),
-  invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  billFormat: billFormatSchema,
-  paymentMode: paymentModeSchema,
-  subtotal: z.number().nonnegative(),
-  discount: z.number().nonnegative().optional(),
-  autoTax: z.boolean().optional(),
-  useIgst: z.boolean().optional(),
-  tax: z.number().nonnegative().optional(),
-  amountPaid: z.number().nonnegative(),
-  goldWeight: z.number().nonnegative().optional(),
-  silverWeight: z.number().nonnegative().optional(),
-  makingCharges: z.number().nonnegative().optional(),
-})
-
-export const invoiceUpdateInputSchema = invoiceBaseSchema
-  .extend({
-    id: z.number().int().positive(),
-  })
-  .superRefine(refineInvoicePayments)
 
 const billLabel = z.string().max(80)
 
@@ -338,8 +86,6 @@ export const billTemplateSchema = z.object({
   goodsReceivedLabel: z.string().max(200),
   thanksLabel: z.string().max(200),
 })
-
-export const templatePresetSchema = z.enum(['detailed', 'compact', 'thermal', 'custom'])
 
 export const cashVisibilitySchema = z.object({
   showLogo: z.boolean(),
@@ -393,19 +139,11 @@ export const shopSettingsSchema = z.object({
   qrCodePath: z.string().max(500).default(''),
   passbookBannerPath: z.string().max(500).default(''),
   passbookSideImagePath: z.string().max(500).default(''),
-  defaultPrinterCash: z.string().max(200),
-  defaultPrinterTax: z.string().max(200),
   paperSizeCash: paperSizeSchema,
-  paperSizeTax: paperSizeSchema,
   copiesCash: printCopiesSchema,
-  copiesTax: printCopiesSchema,
-  openCashDrawer: z.boolean(),
   billTemplate: billTemplateSchema,
-  cashPreset: templatePresetSchema.default('detailed'),
-  taxPreset: templatePresetSchema.default('detailed'),
   cashVisibility: cashVisibilitySchema.default(DEFAULT_CASH_VISIBILITY),
   taxVisibility: taxVisibilitySchema.default(DEFAULT_TAX_VISIBILITY),
-  quickProductIds: z.array(z.number().int().positive()).max(12).default([]),
   pledgeLtvPct: z.number().nonnegative().max(100).default(75),
   adaguInterestPct: z.number().nonnegative().max(100).default(2.1),
   adaguAuctionNoticeDays: z.number().int().nonnegative().max(365).default(14),
@@ -443,16 +181,13 @@ export const restoreDbSchema = z.object({
 
 export const FEATURE_KEY_VALUES = [
   'dashboard',
-  'billing',
-  'products',
-  'stock',
-  'inward',
+  'adagu',
+  'gold_savings',
   'customers',
   'dues',
   'reports',
   'rates',
   'settings',
-  'gold_savings',
 ] as const
 
 export const featureKeySchema = z.enum(FEATURE_KEY_VALUES)
@@ -485,270 +220,6 @@ export const updatePermissionsSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   newPassword: z.string().min(6).max(200),
-})
-
-const stockMetalSchema = z.enum(STOCK_METALS)
-const stockItemNameSchema = z.string().trim().min(1).max(80)
-
-export const itemStockListSchema = z.object({
-  stockDate: z.string().min(1),
-  metal: stockMetalSchema,
-})
-
-export const itemStockUpsertSchema = z
-  .object({
-    stockDate: z.string().min(1),
-    metal: stockMetalSchema,
-    itemName: stockItemNameSchema,
-    openingWeight: z.number().nonnegative().optional(),
-    salesOverride: z.number().nonnegative().nullable().optional(),
-    overrideReason: z.string().trim().max(500).optional(),
-    overrideReferenceId: z.number().int().positive().nullable().optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.salesOverride != null && !data.overrideReason) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Sales override requires a reason',
-        path: ['overrideReason'],
-      })
-    }
-  })
-
-export const stockCategoryCreateSchema = z.object({
-  name: stockItemNameSchema,
-  stockDate: z.string().min(1).optional(),
-  metal: stockMetalSchema.optional(),
-  openingWeight: z.number().nonnegative().optional(),
-})
-
-export const stockCategoryUpdateSchema = z.object({
-  currentName: stockItemNameSchema,
-  newName: stockItemNameSchema,
-})
-
-export const stockCategoryDeleteSchema = z.object({
-  name: stockItemNameSchema,
-})
-
-export const stockClearOverridesSchema = z.object({
-  stockDate: z.string().min(1),
-  metal: stockMetalSchema,
-})
-
-export const stockHistorySchema = z.object({
-  metal: stockMetalSchema,
-})
-
-export const stockDayLineKindSchema = z.enum(['inward', 'sales'])
-
-export const stockDayLinesSchema = z.object({
-  stockDate: z.string().min(1),
-  metal: stockMetalSchema,
-  itemName: stockItemNameSchema,
-  kind: stockDayLineKindSchema,
-})
-
-export const metalDayClosingGetSchema = z.object({
-  businessDate: z.string().min(1),
-  metal: stockMetalSchema,
-})
-
-export const metalDayCloseSchema = z.object({
-  businessDate: z.string().min(1),
-  metal: stockMetalSchema,
-  operatorName: z.string().trim().min(1).max(120),
-  note: z.string().max(1000).optional(),
-})
-
-export const metalDayReopenSchema = z.object({
-  businessDate: z.string().min(1),
-  metal: stockMetalSchema,
-  reason: z.string().trim().min(1).max(1000),
-})
-
-export const stockReconciliationSchema = z.object({
-  date: z.string().min(1),
-})
-
-export const stockAdjustmentLineInputSchema = z.object({
-  productId: z.number().int().positive().nullable().optional(),
-  metal: z.string().trim().min(1).max(50),
-  category: z.string().trim().min(1).max(100),
-  qtyDelta: z.number().int().default(0),
-  weightDelta: z.number().default(0),
-  reason: z.string().trim().max(200).optional(),
-  huids: z.array(huidSchema).max(500).optional().default([]),
-})
-
-export const stockAdjustmentInputSchema = z.object({
-  adjustmentDate: z.string().min(1),
-  reason: z.string().trim().min(1).max(200),
-  note: z.string().max(1000).optional(),
-  lines: z.array(stockAdjustmentLineInputSchema).min(1),
-})
-
-export const stocktakeCreateSchema = z.object({
-  businessDate: z.string().min(1),
-  metal: stockMetalSchema,
-  operatorName: z.string().trim().min(1).max(120),
-  note: z.string().max(1000).optional(),
-})
-
-export const stocktakeLineUpdateItemSchema = z.object({
-  id: z.number().int().positive(),
-  countedWeight: z.number().nullable().optional(),
-  countedQty: z.number().int().nullable().optional(),
-  productId: z.number().int().positive().nullable().optional(),
-})
-
-export const stocktakeLineUpdateSchema = z.object({
-  lines: z.array(stocktakeLineUpdateItemSchema).min(1),
-})
-
-export const stocktakePostSchema = z.object({
-  id: z.number().int().positive(),
-})
-
-export const supplierInputSchema = z.object({
-  name: z.string().min(1).max(200),
-  phone: z.string().max(30),
-  address: z.string().max(500),
-  notes: z.string().max(1000),
-  gstin: z
-    .string()
-    .max(20)
-    .optional()
-    .default('')
-    .transform((value) => value.trim().toUpperCase()),
-})
-
-export const inwardItemInputSchema = z
-  .object({
-    productId: z.number().int().positive().nullable().optional(),
-    metal: z.string().trim().min(1).max(50),
-    category: z.string().trim().min(1).max(100),
-    purity: z.string().max(50).default(''),
-    qty: z.number().int().positive(),
-    grossWeight: z.number().nonnegative().optional().default(0),
-    netWeight: z.number().positive(),
-    rate: z.number().nonnegative().default(0),
-    makingCharges: z.number().nonnegative().optional().default(0),
-    hsnCode: z.string().trim().max(20).optional().default('7113'),
-    huids: z.array(huidSchema).max(500).optional().default([]),
-  })
-  .superRefine((data, ctx) => {
-    const seen = new Map<string, number>()
-    data.huids.forEach((huid, index) => {
-      const previous = seen.get(huid)
-      if (previous !== undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `HUID ${huid} is duplicated`,
-          path: ['huids', index],
-        })
-        return
-      }
-      seen.set(huid, index)
-    })
-    if (data.productId != null && data.huids.length > data.qty) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'A line cannot have more HUIDs than pieces',
-        path: ['huids'],
-      })
-    }
-    if (data.productId == null && data.huids.length > 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Raw metal lines cannot have HUIDs',
-        path: ['huids'],
-      })
-    }
-  })
-
-const inwardBaseSchema = z.object({
-  supplierId: z.number().int().positive(),
-  inwardDate: z.string().min(1),
-  notes: z.string().max(1000).optional(),
-  paymentMode: purchasePaymentModeSchema.optional().default('cash'),
-  roundOff: z.number().optional(),
-  items: z.array(inwardItemInputSchema).min(1),
-})
-
-export const inwardInputSchema = inwardBaseSchema
-
-export const inwardUpdateInputSchema = inwardBaseSchema.extend({
-  id: idSchema,
-})
-
-export const oldGoldPurchaseItemInputSchema = oldGoldItemInputSchema
-
-const oldGoldPurchaseBaseSchema = z.object({
-  customerId: z.number().int().positive().nullable().optional(),
-  customerName: z.string().trim().min(1).max(200),
-  customerPhone: z.string().max(30).optional().default(''),
-  purchaseDate: z.string().min(1),
-  notes: z.string().max(1000).optional().default(''),
-  items: z.array(oldGoldPurchaseItemInputSchema).min(1),
-})
-
-export const oldGoldPurchaseInputSchema = oldGoldPurchaseBaseSchema
-
-export const oldGoldPurchaseUpdateInputSchema = oldGoldPurchaseBaseSchema.extend({
-  id: idSchema,
-})
-
-export const oldGoldPurchaseCancelInputSchema = z.object({
-  reason: z.string().trim().min(1).max(500),
-})
-
-export const oldGoldPayoutModeSchema = z.enum(['cash', 'upi', 'bank'])
-
-export const oldGoldPayoutInputSchema = z.object({
-  payoutDate: z.string().min(1),
-  amount: z.number().positive(),
-  mode: oldGoldPayoutModeSchema.optional().default('cash'),
-  note: z.string().max(500).optional().default(''),
-  invoiceId: idSchema.nullable().optional(),
-})
-
-export const oldGoldPayoutVoidInputSchema = z.object({
-  reason: z.string().trim().min(1).max(500),
-})
-
-export const oldGoldSettlementModeSchema = z.enum(['cash', 'bank', 'fine'])
-
-export const oldGoldBatchCreateInputSchema = z.object({
-  itemIds: z.array(idSchema).min(1),
-  createdDate: z.string().min(1),
-  supplierId: idSchema.nullable().optional(),
-  notes: z.string().max(1000).optional().default(''),
-})
-
-export const oldGoldBatchMeltInputSchema = z.object({
-  meltDate: z.string().min(1),
-  meltedWeight: z.number().nonnegative(),
-  notes: z.string().max(1000).optional(),
-})
-
-export const oldGoldBatchSendInputSchema = z.object({
-  sentDate: z.string().min(1),
-  sentWeight: z.number().nonnegative(),
-  notes: z.string().max(1000).optional(),
-})
-
-export const oldGoldBatchSettleInputSchema = z.object({
-  settledDate: z.string().min(1),
-  fineWeightReceived: z.number().nonnegative(),
-  fineRate: z.number().nonnegative(),
-  cashReceived: z.number().nonnegative(),
-  settlementMode: oldGoldSettlementModeSchema.optional().default('cash'),
-  notes: z.string().max(1000).optional(),
-})
-
-export const oldGoldBatchCancelInputSchema = z.object({
-  reason: z.string().trim().min(1).max(500),
 })
 
 export const dueEntryKindSchema = z.enum(['due', 'payment'])
@@ -784,22 +255,6 @@ export const reportErrorSchema = z.object({
 })
 
 export const businessDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
-
-export const dayClosingGetSchema = z.object({
-  businessDate: businessDateSchema,
-})
-
-export const dayClosingSetOpeningSchema = z.object({
-  businessDate: businessDateSchema,
-  openingCash: z.number().nonnegative(),
-})
-
-export const dayClosingCloseSchema = z.object({
-  businessDate: businessDateSchema,
-  actualCash: z.number().nonnegative(),
-  operatorName: z.string().trim().min(1).max(80),
-  note: z.string().max(500).optional(),
-})
 
 export const pledgeStatusSchema = z.enum(['draft', 'active', 'redeemed', 'forfeited', 'renewed'])
 
@@ -903,15 +358,6 @@ export const pledgeAuctionInputSchema = z.object({
   saleAmount: z.number().nonnegative(),
   writeOffShortfall: z.boolean().optional().default(false),
   note: z.string().max(500).optional().default(''),
-  items: z
-    .array(
-      z.object({
-        pledgeItemId: z.number().int().positive(),
-        category: z.string().trim().min(1).max(100),
-      }),
-    )
-    .optional()
-    .default([]),
 })
 
 export const pledgeAuctionSurplusInputSchema = z.object({
@@ -954,7 +400,8 @@ export const goldSavingBonusTypeSchema = z.enum(['none', 'fixed_amount', 'percen
 export const goldSavingRedemptionTypeSchema = z.enum(['gold', 'jewellery', 'configurable'])
 export const goldSavingSchemeStatusSchema = z.enum(['active', 'inactive'])
 export const goldSavingPaymentModeSchema = z.enum(['cash', 'upi', 'card', 'bank_transfer', 'other'])
-export const goldSavingRedemptionKindSchema = z.enum(['gold', 'jewellery', 'invoice'])
+/** Maturity is paid out in cash/UPI/bank. The old kinds are read-only history. */
+export const goldSavingRedemptionKindSchema = z.enum(['gold', 'jewellery', 'invoice', 'payout'])
 export const goldSavingDeductionTypeSchema = z.enum(['none', 'percentage', 'fixed'])
 export const goldSavingLateFeeTypeSchema = z.enum(['none', 'fixed', 'per_day'])
 export const goldSavingReportIdSchema = z.enum([
@@ -1122,13 +569,11 @@ export const goldSavingCancelAccountSchema = z.object({
 export const goldSavingRedemptionInputSchema = z.object({
   accountId: z.number().int().positive(),
   redemptionDate: isoDateSchema,
-  redemptionKind: goldSavingRedemptionKindSchema,
+  redemptionKind: z.literal('payout'),
   goldWeight: z.number().positive().optional(),
-  invoiceId: z.number().int().positive().nullable().optional(),
-  makingCharges: z.number().nonnegative().optional().default(0),
-  wastage: z.number().nonnegative().optional().default(0),
-  taxes: z.number().nonnegative().optional().default(0),
-  invoiceValue: z.number().nonnegative().optional().default(0),
+  paymentMode: z.enum(['cash', 'upi', 'bank_transfer']),
+  transactionRef: z.string().max(120).optional().default(''),
+  acceptRateDate: z.boolean().optional().default(false),
   notes: z.string().max(1000).optional().default(''),
 })
 
@@ -1150,13 +595,6 @@ export const reportQuerySchema = z.object({
     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid to date').optional(),
   ),
   customerId: optionalPositiveId,
-  supplierId: optionalPositiveId,
-  productId: optionalPositiveId,
-  metal: z.preprocess(emptyToUndefined, z.string().trim().max(40).optional()),
-  qtyCutoff: z.preprocess(
-    emptyToUndefined,
-    z.coerce.number().int().min(0).max(100000).optional(),
-  ),
 })
 
 /**

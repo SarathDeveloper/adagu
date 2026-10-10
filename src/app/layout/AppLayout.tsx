@@ -4,12 +4,11 @@ import {
   BarChart3,
   ChartNoAxesCombined,
   Gem,
+  Handshake,
   House,
   LogOut,
   Menu,
-  Package,
   PiggyBank,
-  Receipt,
   Settings,
   Users,
   UserCog,
@@ -19,10 +18,9 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import type { FeatureKey } from '@shared/types'
 import { useAuth } from '../../features/auth/authContext'
-import { canAccessInventory } from '../../features/inventory/inventoryTabs'
 import { useShopBranding } from '../../features/settings/shopBrandingContext'
 import { BackupHealthBanner } from '../../features/settings/BackupHealthBanner'
-import { localImageSrc } from '../../features/invoices/mapShopDisplay'
+import { localImageSrc } from '../../features/print/mapShopDisplay'
 import { LoadingState } from '../../components/LoadingState'
 import { warmPrintPreview } from '../../print/warmPrint'
 
@@ -32,13 +30,12 @@ const links: {
   to: string
   label: string
   icon: LucideIcon
-  feature: FeatureKey | 'inventory' | 'users'
+  feature: FeatureKey | 'users'
   adminOnly?: boolean
 }[] = [
   { to: '/dashboard', label: 'Dashboard', icon: House, feature: 'dashboard' },
-  { to: '/billing', label: 'Billing', icon: Receipt, feature: 'billing' },
+  { to: '/adagu', label: 'Adagu', icon: Handshake, feature: 'adagu' },
   { to: '/gold-savings', label: 'Gold Savings', icon: PiggyBank, feature: 'gold_savings' },
-  { to: '/inventory', label: 'Inventory', icon: Package, feature: 'inventory' },
   { to: '/dues', label: 'Dues', icon: Wallet, feature: 'dues' },
   { to: '/customers', label: 'Customers', icon: Users, feature: 'customers' },
   { to: '/reports', label: 'Reports', icon: BarChart3, feature: 'reports' },
@@ -50,16 +47,14 @@ const links: {
 function featureForPath(pathname: string): FeatureKey | 'users' | null {
   if (pathname.startsWith('/users')) return 'users'
   if (pathname.startsWith('/dashboard')) return 'dashboard'
-  if (pathname.startsWith('/billing') || pathname.startsWith('/invoices')) return 'billing'
-  if (pathname.startsWith('/gold-savings')) return 'gold_savings'
-  if (pathname.startsWith('/inventory/products')) return 'products'
-  if (pathname.startsWith('/inventory/stock')) return 'stock'
-  if (pathname.startsWith('/inventory/inwards') || pathname.startsWith('/inventory/suppliers') || pathname.startsWith('/inventory/old-gold')) {
-    return 'inward'
+  if (
+    pathname.startsWith('/adagu') ||
+    pathname.startsWith('/billing') ||
+    pathname.startsWith('/invoices')
+  ) {
+    return 'adagu'
   }
-  if (pathname.startsWith('/products')) return 'products'
-  if (pathname.startsWith('/stock')) return 'stock'
-  if (pathname.startsWith('/suppliers') || pathname.startsWith('/inwards')) return 'inward'
+  if (pathname.startsWith('/gold-savings')) return 'gold_savings'
   if (pathname.startsWith('/customers')) return 'customers'
   if (pathname.startsWith('/dues')) return 'dues'
   if (pathname.startsWith('/reports')) return 'reports'
@@ -75,19 +70,11 @@ export function AppLayout() {
   const logoSrc = logoImagePath ? localImageSrc(logoImagePath, '') : ''
   const visibleLinks = links.filter((link) => {
     if (link.adminOnly || link.feature === 'users') return isAdmin
-    if (link.feature === 'inventory') return canAccessInventory(can)
     return can(link.feature)
   })
   const required = featureForPath(location.pathname)
-  const onInventory = location.pathname === '/inventory' || location.pathname.startsWith('/inventory/')
-  const inventoryAllowed = canAccessInventory(can)
   const denied =
-    (required === 'users' && !isAdmin) ||
-    (onInventory && !inventoryAllowed) ||
-    (required &&
-      required !== 'users' &&
-      !can(required) &&
-      !(onInventory && inventoryAllowed))
+    (required === 'users' && !isAdmin) || (required !== null && required !== 'users' && !can(required))
 
   const [navOpen, setNavOpen] = useState(false)
 

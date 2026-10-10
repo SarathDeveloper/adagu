@@ -3,7 +3,7 @@ import {
   defaultShopLogoUrl,
   localImageSrc,
   type ShopDisplayInfo,
-} from '../invoices/mapShopDisplay'
+} from '../print/mapShopDisplay'
 
 export function AdaguPrintSheet({
   shop,

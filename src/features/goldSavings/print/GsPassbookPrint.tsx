@@ -1,6 +1,6 @@
 import type { GoldSavingLedgerEntry, GoldSavingPassbook } from '@shared/types'
 import { formatDisplayDate } from '../../../lib/format'
-import { defaultShopLogoUrl, EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../invoices/mapShopDisplay'
+import { defaultShopLogoUrl, EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../print/mapShopDisplay'
 import { currentBonusGold, progressPct, projectedBonusGold } from '../gsProjection'
 import './GsPassbookPrint.css'
 

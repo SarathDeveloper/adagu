@@ -413,18 +413,6 @@ function SchemeFormModal({
           />
         </label>
         <label>
-          <span className="field-label">Redemption type</span>
-          <select
-            className="input"
-            value={form.redemptionType}
-            onChange={(e) => setForm({ ...form, redemptionType: e.target.value as GoldSavingSchemeInput['redemptionType'] })}
-          >
-            <option value="gold">Gold</option>
-            <option value="jewellery">Jewellery purchase</option>
-            <option value="configurable">Configurable</option>
-          </select>
-        </label>
-        <label>
           <span className="field-label">Grace period (days)</span>
           <input
             className="input"

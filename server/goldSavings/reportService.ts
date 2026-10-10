@@ -287,7 +287,8 @@ export function runGoldSavingReport(
     const rows = db
       .prepare(
         `SELECT r.redemption_date AS date, r.receipt_no AS receipt, a.account_no AS account, c.name AS customer,
-                r.redemption_kind AS kind, r.gold_weight AS gold, r.bonus_gold_weight AS bonus, r.remaining_gold AS remaining
+                r.redemption_kind AS kind, r.gold_weight AS gold, r.bonus_gold_weight AS bonus,
+                r.gold_rate AS rate, r.payout_amount AS payout, r.payment_mode AS mode, r.remaining_gold AS remaining
          FROM gold_saving_redemptions r
          JOIN gold_saving_accounts a ON a.id = r.account_id
          JOIN customers c ON c.id = a.customer_id
@@ -296,7 +297,12 @@ export function runGoldSavingReport(
          ORDER BY r.id DESC`,
       )
       .all(from ?? null, from ?? null, to ?? null, to ?? null) as Array<Record<string, string | number>>
-    return pack(id, ['Date', 'Receipt', 'Account', 'Customer', 'Kind', 'Gold', 'Bonus', 'Remaining'], rows, generatedAt)
+    return pack(
+      id,
+      ['Date', 'Receipt', 'Account', 'Customer', 'Kind', 'Gold', 'Bonus', 'Rate', 'Payout', 'Mode', 'Remaining'],
+      rows,
+      generatedAt,
+    )
   }
 
   const rows = db

@@ -1,12 +1,12 @@
 ---
-description: Compact SaaS UI density from Adagu/billing — fonts, controls, gaps, cards
+description: Compact SaaS UI density from Adagu — fonts, controls, gaps, cards
 globs: src/**/*.{tsx,css}
 alwaysApply: false
 ---
 
-# Billing UI density (Adagu scale)
+# Adagu UI density
 
-Match the compact operational density used on Adagu Bill and billing POS. Source of truth: `.billing-shell` and `.adagu-*` in `src/index.css`.
+Match the compact operational density used on the Adagu pledge editor and the POS screens. Source of truth: `.billing-shell` and `.adagu-*` in `src/index.css`.
 
 ## Tokens on `.billing-shell`
 
@@ -39,3 +39,4 @@ Reuse these variables; do not invent new sizes for dense screens:
 - **Do** use `--billing-*` tokens or the rem values above
 - **Don't** use large dashboard density (`1.5rem` titles, `1.25rem+` card padding) on operational pages unless the page is marketing/hero
 - **Don't** rename Adagu-specific classes unless refactoring into a shared shell
+- **Note**: the pledge editor is the largest consumer of this density (`.sale-bill-editor` / `.adagu-*`)

@@ -1,8 +1,8 @@
 import { amountInWords } from '@shared/billing/amountInWords'
 import type { GoldSavingPayment } from '@shared/types'
 import { formatDisplayDate } from '../../../lib/format'
-import { defaultShopLogoUrl, EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../invoices/mapShopDisplay'
-import { paperClassName } from '../../invoices/paperSize'
+import { defaultShopLogoUrl, EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../print/mapShopDisplay'
+import { paperClassName } from '../../print/paperSize'
 import { formatGsPaymentMode } from '../gsLabels'
 import './GsReceiptPrint.css'
 

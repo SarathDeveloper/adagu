@@ -22,12 +22,6 @@ router.get(
       customers: db
         .prepare(`SELECT id, name FROM customers ORDER BY name COLLATE NOCASE`)
         .all() as ReportLookups['customers'],
-      suppliers: db
-        .prepare(`SELECT id, name FROM suppliers ORDER BY name COLLATE NOCASE`)
-        .all() as ReportLookups['suppliers'],
-      products: db
-        .prepare(`SELECT id, name FROM products ORDER BY name COLLATE NOCASE`)
-        .all() as ReportLookups['products'],
     }
     res.json(lookups)
   }),

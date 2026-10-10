@@ -1,92 +1,67 @@
 import { describe, expect, it } from 'vitest'
-import type { ReportDefinition, ReportResult } from '@shared/reportsCatalog'
-import { IPC_CHANNELS, invokeIpcForTests, ipc, useIntegrationEnv, withHuids } from './helpers/testEnv'
+import { REPORT_IDS, type ReportDefinition, type ReportResult } from '@shared/reportsCatalog'
+import { getTestAgent, IPC_CHANNELS, invokeIpcForTests, ipc, useIntegrationEnv } from './helpers/testEnv'
 
-const UNAVAILABLE = [
-  'adagu-sales',
-  'sales-return',
-  'purchase-return',
-  'variant-size-stock',
-  'gross-profit',
-]
+async function seedActivePledge(customerId: number): Promise<{ id: number; receiptNo: string }> {
+  const created = await getTestAgent().post('/api/pledges').send({
+    customerId,
+    pledgeDate: '2026-09-24',
+    assessedValue: 20000,
+    loanAmount: 10000,
+    interestPct: 2.1,
+    repaymentDueDate: '2026-10-24',
+    items: [
+      { description: 'Bangle', metal: 'Gold', purity: '22K', grossWeight: 8, netWeight: 8, pieces: 1 },
+    ],
+  })
+  expect(created.status).toBe(201)
+  const pledge = created.body as { id: number; receiptNo: string }
+  const sanctioned = await getTestAgent().post(`/api/pledges/${pledge.id}/sanction`)
+  expect(sanctioned.status).toBe(200)
+  return pledge
+}
 
 describe('reports', () => {
   useIntegrationEnv()
 
-  it('marks reports that need missing documents as unavailable', async () => {
+  it('exposes only the Adagu and customer reports', async () => {
     const catalog = await ipc<ReportDefinition[]>(IPC_CHANNELS.REPORTS_CATALOG)
-    for (const id of UNAVAILABLE) {
-      const report = catalog.find((item) => item.id === id)
-      expect(report?.available).toBe(false)
-      expect(report?.unavailableReason).toBeTruthy()
-    }
-    expect(catalog.filter((item) => item.available).length).toBeGreaterThan(0)
+    expect(catalog.map((item) => item.id).sort()).toEqual([...REPORT_IDS].sort())
+    expect(catalog.every((item) => item.available)).toBe(true)
+    expect(catalog.every((item) => item.group === 'pledge' || item.group === 'customer')).toBe(true)
   })
 
-  it('includes a finalized cash bill in daily sales and leaves it out of tax invoice sales', async () => {
+  it('lists an active pledge in the active-pledges report', async () => {
     const customer = await ipc<{ id: number }>(IPC_CHANNELS.CUSTOMERS_CREATE, {
       name: 'Buyer',
       phone: '9876543210',
       address: 'Salem',
       notes: '',
     })
-    const product = await ipc<{ id: number }>(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({
-      name: 'Chain item',
-      category: 'Chain',
-      metal: 'Gold',
-      purity: '22K',
-      grossWeight: 10,
-      netWeight: 2,
-      makingCharges: 0,
-      stockQty: 3,
-      imagePath: '',
-    }))
-    const invoiceDate = '2026-09-24'
-    const draft = await ipc<{ id: number }>(IPC_CHANNELS.INVOICES_CREATE, {
-      customerId: customer.id,
-      invoiceDate,
-      tax: 0,
-      autoTax: false,
-      billFormat: 'cash_bill',
-      items: [{ productId: product.id, qty: 1, rate: 1000, metalRate: 1000, netWeight: 2, huid: product.huids[0] }],
-    })
-    const finalized = await ipc<{ amountPayable: number; invoiceNo: string }>(
-      IPC_CHANNELS.INVOICES_FINALIZE,
-      draft.id,
-    )
 
-    const daily = await ipc<ReportResult>(IPC_CHANNELS.REPORTS_RUN, {
-      id: 'daily-sales',
-      from: invoiceDate,
-      to: invoiceDate,
-    })
-    expect(daily.rows).toHaveLength(1)
-    expect(daily.rows[0]?.date).toBe(invoiceDate)
-    expect(daily.totals.payable).toBe(finalized.amountPayable)
+    const empty = await ipc<ReportResult>(IPC_CHANNELS.REPORTS_RUN, { id: 'active-pledges' })
+    expect(empty.rows).toHaveLength(0)
 
-    const cash = await ipc<ReportResult>(IPC_CHANNELS.REPORTS_RUN, {
-      id: 'cash-sales',
-      from: invoiceDate,
-      to: invoiceDate,
-    })
-    expect(cash.rows.map((row) => row.invoiceNo)).toContain(finalized.invoiceNo)
+    const pledge = await seedActivePledge(customer.id)
 
-    const tax = await ipc<ReportResult>(IPC_CHANNELS.REPORTS_RUN, {
-      id: 'tax-invoice-sales',
-      from: invoiceDate,
-      to: invoiceDate,
-    })
-    expect(tax.rows).toHaveLength(0)
+    const report = await ipc<ReportResult>(IPC_CHANNELS.REPORTS_RUN, { id: 'active-pledges' })
+    expect(report.rows).toHaveLength(1)
+    expect(report.rows[0]?.receipt).toBe(pledge.receiptNo)
+    expect(report.rows[0]?.customer).toBe('Buyer')
+    expect(report.rows[0]?.status).toBe('active')
+    expect(report.totals.loan).toBe(10000)
   })
 
-  it('rejects an unavailable report and runs every available report', async () => {
+  it('rejects an unknown report id', async () => {
     const denied = await invokeIpcForTests(IPC_CHANNELS.REPORTS_RUN, {
       id: 'gross-profit',
       from: '2026-09-01',
       to: '2026-09-30',
     })
     expect(denied.ok).toBe(false)
+  })
 
+  it('runs every available report', async () => {
     const catalog = await ipc<ReportDefinition[]>(IPC_CHANNELS.REPORTS_CATALOG)
     const failures: string[] = []
     for (const report of catalog.filter((item) => item.available)) {

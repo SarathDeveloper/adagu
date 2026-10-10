@@ -13,19 +13,11 @@ import backupRoutes from './routes/backup.routes'
 import customersRoutes from './routes/customers.routes'
 import diagnosticsRoutes from './routes/diagnostics.routes'
 import duesRoutes from './routes/dues.routes'
-import invoicesRoutes from './routes/invoices.routes'
-import inwardsRoutes from './routes/inwards.routes'
 import metalRatesRoutes from './routes/metalRates.routes'
 import pledgesRoutes from './routes/pledges.routes'
-import productsRoutes from './routes/products.routes'
 import reportsRoutes from './routes/reports.routes'
 import settingsRoutes from './routes/settings.routes'
-import stockRoutes from './routes/stock.routes'
-import stockAdjustmentsRoutes from './routes/stockAdjustments.routes'
-import suppliersRoutes from './routes/suppliers.routes'
 import systemRoutes from './routes/system.routes'
-import oldGoldPurchasesRoutes from './routes/oldGoldPurchases.routes'
-import oldGoldBatchesRoutes from './routes/oldGoldBatches.routes'
 import usersRoutes from './routes/users.routes'
 import goldSavingsRoutes from './routes/goldSavings.routes'
 
@@ -53,18 +45,10 @@ export function createApp(): express.Express {
   app.use('/api/users', requireAuth, requireRole('admin'), usersRoutes)
   app.use('/api/backup', requireAuth, requireFeature('settings'), backupRoutes)
   app.use('/api/customers', requireAuth, requireFeature('customers'), customersRoutes)
-  app.use('/api/suppliers', requireAuth, requireFeature('inward'), suppliersRoutes)
-  app.use('/api/inwards', requireAuth, requireFeature('inward'), inwardsRoutes)
-  app.use('/api/old-gold-purchases', requireAuth, oldGoldPurchasesRoutes)
-  app.use('/api/old-gold-batches', requireAuth, oldGoldBatchesRoutes)
   app.use('/api/dues', requireAuth, requireFeature('dues'), duesRoutes)
-  app.use('/api/invoices', requireAuth, requireFeature('billing'), invoicesRoutes)
-  app.use('/api/pledges', requireAuth, requireFeature('billing'), pledgesRoutes)
+  app.use('/api/pledges', requireAuth, requireFeature('adagu'), pledgesRoutes)
   app.use('/api/metal-rates', requireAuth, metalRatesRoutes)
-  app.use('/api/products', requireAuth, requireFeature('products'), productsRoutes)
   app.use('/api/settings', settingsRoutes)
-  app.use('/api/stock/adjustments', requireAuth, requireFeature('stock'), stockAdjustmentsRoutes)
-  app.use('/api/stock', requireAuth, requireFeature('stock'), stockRoutes)
   app.use('/api/reports', requireAuth, requireFeature('reports'), reportsRoutes)
   app.use('/api/gold-savings', requireAuth, requireFeature('gold_savings'), goldSavingsRoutes)
   app.use('/api/system', systemRoutes)

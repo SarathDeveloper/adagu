@@ -51,10 +51,10 @@ describe('auth and permissions', () => {
       username: 'cashier',
       password: 'staff123',
       role: 'staff',
-      features: ['billing'],
+      features: ['adagu'],
     })
     expect(created.status).toBe(201)
-    expect(created.body.features).toEqual(['billing'])
+    expect(created.body.features).toEqual(['adagu'])
 
     await getTestAgent().post('/api/auth/logout')
     const staffLogin = await getTestAgent().post('/api/auth/login').send({
@@ -63,13 +63,13 @@ describe('auth and permissions', () => {
     })
     expect(staffLogin.status).toBe(200)
     const staff = staffLogin.body as AuthUser
-    expect(staff.features).toEqual(['billing'])
+    expect(staff.features).toEqual(['adagu'])
 
-    const products = await getTestAgent().get('/api/products')
-    expect(products.status).toBe(403)
+    const customers = await getTestAgent().get('/api/customers')
+    expect(customers.status).toBe(403)
 
-    const invoices = await getTestAgent().get('/api/invoices')
-    expect(invoices.status).toBe(200)
+    const pledges = await getTestAgent().get('/api/pledges')
+    expect(pledges.status).toBe(200)
   })
 
   it('prevents deactivating the last admin', async () => {

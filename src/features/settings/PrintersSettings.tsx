@@ -21,25 +21,18 @@ export function PrintersSettings({
         <div>
           <h2 className="settings-section-title">Printers</h2>
           <p className="muted settings-card-subtitle">
-            Bills print from the browser. Choose paper sizes and copy counts for each bill type.
+            Adagu receipts and Gold Savings vouchers print from the browser. Choose the paper size and copy count.
           </p>
         </div>
       </div>
 
       <div className="printer-role-grid">
         <PaperRoleCard
-          title="Cash bill"
+          title="Adagu receipt"
           paperValue={shop.paperSizeCash}
           copiesValue={shop.copiesCash}
           onPaperChange={(value) => onChange({ ...shop, paperSizeCash: value })}
           onCopiesChange={(value) => onChange({ ...shop, copiesCash: value })}
-        />
-        <PaperRoleCard
-          title="Tax invoice"
-          paperValue={shop.paperSizeTax}
-          copiesValue={shop.copiesTax}
-          onPaperChange={(value) => onChange({ ...shop, paperSizeTax: value })}
-          onCopiesChange={(value) => onChange({ ...shop, copiesTax: value })}
         />
       </div>
 

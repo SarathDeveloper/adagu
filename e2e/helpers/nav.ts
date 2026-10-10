@@ -44,13 +44,10 @@ export async function openGoldSavingsTab(
   await expect(tabEl).toHaveAttribute('aria-selected', 'true')
 }
 
-/** Open an Inventory hub tab (Products, Gold & Silver, Purchase, Old Gold Purchase, or Suppliers). */
-export async function openInventoryTab(
-  page: Page,
-  tab: 'Products' | 'Gold & Silver' | 'Purchase' | 'Old Gold Purchase' | 'Suppliers',
-) {
-  await sidebarLink(page, 'Inventory').click()
-  const tabEl = page.getByRole('tab', { name: tab, exact: true })
+/** Open an Adagu chrome tab. */
+export async function openAdaguTab(page: Page, tab: 'Receipts' | 'New Adagu') {
+  await sidebarLink(page, 'Adagu').click()
+  const tabEl = page.locator('.billing-chrome').getByRole('tab', { name: tab, exact: true })
   await expect(tabEl).toBeVisible()
   if ((await tabEl.getAttribute('aria-selected')) !== 'true') {
     await tabEl.click()

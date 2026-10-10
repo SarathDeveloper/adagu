@@ -63,44 +63,35 @@ test('shop logo uploads and persists after save', async ({ window }) => {
   ).toHaveAttribute('src', /\/uploads\/.+\.png/)
 })
 
-test('invoice settings preview opens from Test Print', async ({ window }) => {
+test('adagu settings preview opens from Test Print', async ({ window }) => {
   await sidebarLink(window, 'Settings').click()
   await expect(window.getByRole('heading', { name: 'Shop Identity' })).toBeVisible()
-  await expect(window.getByRole('heading', { name: 'Invoice Settings' })).toBeVisible()
-  await expect(window.getByRole('heading', { name: 'Bill template' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Adagu Settings' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Adagu receipt template' })).toBeVisible()
   await expect(window.getByRole('button', { name: 'Test Print' })).toBeVisible()
-  await expect(window.locator('.settings-bill-preview-placeholder')).toContainText('Cash bill')
+  await expect(window.locator('.settings-bill-preview-placeholder')).toContainText('Adagu receipt')
   await expect(window.locator('.settings-bill-preview-frame')).toHaveCount(0)
   await window.getByRole('button', { name: 'Test Print' }).click()
   const previewDialog = await expectPrintPreviewModal(window)
   await previewDialog.getByRole('button', { name: 'Close' }).click()
   await expect(previewDialog).toBeHidden()
-  await expect(window.getByRole('heading', { name: 'GST tax summary' })).toBeVisible()
-  await expect(window.getByRole('button', { name: 'Detailed' })).toHaveCount(0)
-  await expect(window.getByRole('textbox', { name: 'Customer prefix' })).toHaveCount(0)
 
-  await window.getByRole('textbox', { name: /Shop Name/ }).fill('Invoice Shop')
+  await expect(window.getByRole('heading', { name: 'Adagu POS Settings' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'GST tax summary' })).toHaveCount(0)
+  await expect(window.getByRole('tab', { name: 'Cash Bill' })).toHaveCount(0)
+  await expect(window.getByRole('tab', { name: 'Tax Invoice' })).toHaveCount(0)
+
+  await window.getByRole('textbox', { name: /Shop Name/ }).fill('Adagu Shop')
   await window.getByRole('textbox', { name: /Phone 1/ }).fill('9000000000')
   await window.getByRole('textbox', { name: /Address Line 1/ }).fill('1 Market Street')
   await window.getByRole('textbox', { name: /City/ }).fill('Salem')
 
-  const invoiceTabs = window.getByRole('tablist', { name: 'Bill template' })
-  await invoiceTabs.getByRole('tab', { name: 'Tax Invoice' }).click()
-  await expect(window.locator('.settings-bill-preview-placeholder')).toContainText('Tax invoice')
-
-  await invoiceTabs.getByRole('tab', { name: 'Adagu Bill' }).click()
-  await expect(window.locator('.settings-bill-preview-placeholder')).toContainText('Adagu bill')
-  await expect(window.getByText('Adagu POS Settings')).toBeVisible()
-
-  await invoiceTabs.getByRole('tab', { name: 'Cash Bill' }).click()
-  await expect(window.locator('.settings-bill-preview-placeholder')).toContainText('Cash bill')
-
   await window
     .locator('.card')
-    .filter({ has: window.getByRole('heading', { name: 'Invoice Settings' }) })
+    .filter({ has: window.getByRole('heading', { name: 'Adagu Settings' }) })
     .getByRole('button', { name: 'Save Changes' })
     .click()
-  await expect(window.getByText('Invoice settings saved')).toBeVisible()
+  await expect(window.getByText('Adagu settings saved')).toBeVisible()
 })
 
 test('printers backup and data settings are available', async ({ window }) => {
@@ -108,11 +99,9 @@ test('printers backup and data settings are available', async ({ window }) => {
 
   await window.getByRole('tab', { name: 'Printers' }).click()
   await expect(window.getByRole('heading', { name: 'Printers' })).toBeVisible()
-  await expect(window.getByText('Bills print from the browser')).toBeVisible()
-  await expect(window.getByLabel('Cash bill paper size')).toContainText('A5')
-  await expect(window.getByLabel('Tax invoice paper size')).toContainText('A4')
-  await expect(window.getByLabel('Cash bill copies')).toContainText('1')
-  await expect(window.getByLabel('Tax invoice copies')).toContainText('1')
+  await expect(window.getByText('Adagu receipts and Gold Savings vouchers print from the browser')).toBeVisible()
+  await expect(window.getByLabel('Adagu receipt paper size')).toContainText('A5')
+  await expect(window.getByLabel('Adagu receipt copies')).toContainText('1')
 
   await window.getByRole('tab', { name: 'Backup' }).click()
   await expect(window.getByRole('heading', { name: 'Database Backup' })).toBeVisible()
@@ -134,5 +123,5 @@ test('printers backup and data settings are available', async ({ window }) => {
   await expect(window.getByRole('heading', { name: 'Data' })).toBeVisible()
   await expect(window.getByText('App version')).toBeVisible()
   await expect(window.getByText('Log folder')).toBeVisible()
-  await expect(window.getByText(/products, .*customers/)).toBeVisible()
+  await expect(window.getByText(/\d+ customers/)).toBeVisible()
 })

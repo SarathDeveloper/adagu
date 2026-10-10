@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Banknote,
   BookOpen,
   Building2,
   Database,
@@ -17,25 +16,18 @@ import {
   Store,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type {
-  AppInfo,
-  ShopSettings,
-  TaxReportRow,
-} from '@shared/types'
+import type { AppInfo, ShopSettings } from '@shared/types'
 import { PageHeader } from '../../components/PageHeader'
-import { formatCurrency, formatDisplayMonth } from '../../lib/format'
 import { api } from '../../lib/api'
 import { useToast } from '../../components/toastContext'
-import { defaultShopLogoUrl, localImageSrc, shopSettingsToDisplay } from '../invoices/mapShopDisplay'
-import { storeSampleBillPrint, type SampleBillKind } from '../invoices/sampleBillPrintStore'
+import { defaultShopLogoUrl, localImageSrc, shopSettingsToDisplay } from '../print/mapShopDisplay'
+import { storeSampleBillPrint, type SampleBillKind } from './sampleBillPrintStore'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
 import { printPreviewPaths } from '../print/printPreviewPaths'
 import { PrintersSettings } from './PrintersSettings'
 import { BackupSettings } from './BackupSettings'
 import { RequiredMark } from './ShopHeaderFields'
 import { useShopBranding } from './shopBrandingContext'
-
-type InvoiceSettingsTab = 'cash' | 'tax' | 'adagu'
 
 type SettingsTab = 'invoice' | 'printers' | 'backup' | 'data'
 
@@ -159,12 +151,10 @@ export function SettingsPage() {
   })
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [counts, setCounts] = useState<{ products: number; customers: number } | null>(null)
+  const [counts, setCounts] = useState<{ customers: number } | null>(null)
   const [shop, setShop] = useState<ShopSettings | null>(null)
   const shopRef = useRef<ShopSettings | null>(null)
-  const [invoiceTab, setInvoiceTab] = useState<InvoiceSettingsTab>('cash')
   const [samplePrintKind, setSamplePrintKind] = useState<SampleBillKind | null>(null)
-  const [taxReport, setTaxReport] = useState<TaxReportRow[]>([])
 
   const shopDisplay = shopSettingsToDisplay(shop)
   const headerLogoSrc = localImageSrc(shop?.logoImagePath, defaultShopLogoUrl)
@@ -199,22 +189,6 @@ export function SettingsPage() {
       }
     })()
   }, [])
-
-  useEffect(() => {
-    if (tab !== 'invoice') return
-    let active = true
-    void api
-      .getTaxReport()
-      .then((report) => {
-        if (active) setTaxReport(report)
-      })
-      .catch(() => {
-        if (active) setTaxReport([])
-      })
-    return () => {
-      active = false
-    }
-  }, [tab])
 
   useEffect(() => {
     if (tab !== 'data') return
@@ -267,7 +241,7 @@ export function SettingsPage() {
   function handleTestPrint() {
     const current = shopRef.current
     if (!current) return
-    const kind: SampleBillKind = invoiceTab
+    const kind: SampleBillKind = 'adagu'
     storeSampleBillPrint(kind, current)
     setSamplePrintKind(kind)
   }
@@ -296,25 +270,8 @@ export function SettingsPage() {
     }
   }
 
-  function exportTaxCsv() {
-    const header = 'Month,Taxable,CGST,SGST,IGST,Bills\n'
-    const rows = taxReport
-      .map(
-        (row) =>
-          `${row.month},${row.taxableSales},${row.cgst},${row.sgst},${row.igst},${row.invoiceCount}`,
-      )
-      .join('\n')
-    const blob = new Blob([header + rows], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'tax-report.csv'
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
   const tabs: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
-    { id: 'invoice', label: 'Invoice Settings', icon: FileText },
+    { id: 'invoice', label: 'Adagu Settings', icon: FileText },
     { id: 'printers', label: 'Printers', icon: Printer },
     { id: 'backup', label: 'Backup', icon: Database },
     { id: 'data', label: 'Data', icon: HardDrive },
@@ -324,7 +281,7 @@ export function SettingsPage() {
     <div className="app-page settings-page">
       <PageHeader
         title="Settings"
-        subtitle="Shop profile, backups, and GST tax summary"
+        subtitle="Shop profile, Adagu settings, and backups"
         actions={
           <>
             <div className="settings-header-chip">
@@ -625,17 +582,16 @@ export function SettingsPage() {
               <div className="card padded">
                 <div className="settings-card-head">
                   <div>
-                    <h2 className="settings-section-title">Invoice Settings</h2>
+                    <h2 className="settings-section-title">Adagu Settings</h2>
                     <p className="muted settings-card-subtitle">
-                      Shop details print on cash bills, tax invoices, and Adagu bills. Use Test Print
-                      to check a template.
+                      Shop details print on Adagu receipts. Use Test Print to check the template.
                     </p>
                   </div>
                   <div className="toolbar settings-toolbar">
                     <button
                       type="button"
                       className="btn"
-                      onClick={() => void saveShop('printHeader', 'Invoice settings saved')}
+                      onClick={() => void saveShop('printHeader', 'Adagu settings saved')}
                     >
                       <Save size={16} strokeWidth={1.75} aria-hidden />
                       Save Changes
@@ -643,53 +599,12 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="billing-chrome" style={{ marginBottom: '1.25rem' }}>
-                  <div className="billing-chrome-tabs" role="tablist" aria-label="Bill template">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={invoiceTab === 'cash'}
-                      className={`billing-chrome-tab${invoiceTab === 'cash' ? ' active' : ''}`}
-                      onClick={() => setInvoiceTab('cash')}
-                    >
-                      <span className="billing-chrome-tab-icon" aria-hidden>
-                        <Banknote size={18} strokeWidth={1.75} />
-                      </span>
-                      <span className="billing-chrome-tab-label">Cash Bill</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={invoiceTab === 'tax'}
-                      className={`billing-chrome-tab${invoiceTab === 'tax' ? ' active' : ''}`}
-                      onClick={() => setInvoiceTab('tax')}
-                    >
-                      <span className="billing-chrome-tab-icon" aria-hidden>
-                        <FileText size={18} strokeWidth={1.75} />
-                      </span>
-                      <span className="billing-chrome-tab-label">Tax Invoice</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={invoiceTab === 'adagu'}
-                      className={`billing-chrome-tab${invoiceTab === 'adagu' ? ' active' : ''}`}
-                      onClick={() => setInvoiceTab('adagu')}
-                    >
-                      <span className="billing-chrome-tab-icon" aria-hidden>
-                        <BookOpen size={18} strokeWidth={1.75} />
-                      </span>
-                      <span className="billing-chrome-tab-label">Adagu Bill</span>
-                    </button>
-                  </div>
-                </div>
-
                 <div className="settings-bill-preview-card">
                   <div className="settings-bill-preview-head">
                     <div>
-                      <h3 className="settings-subsection-title">Bill template</h3>
+                      <h3 className="settings-subsection-title">Adagu receipt template</h3>
                       <p className="muted settings-card-subtitle">
-                        Shop details above print on cash bills, tax invoices, and Adagu bills.
+                        Shop details above print on Adagu receipts.
                       </p>
                     </div>
                     <button type="button" className="btn secondary" onClick={handleTestPrint}>
@@ -700,19 +615,14 @@ export function SettingsPage() {
                   <div className="settings-bill-preview-placeholder">
                     <Printer size={22} strokeWidth={1.75} aria-hidden />
                     <p>
-                      {invoiceTab === 'cash'
-                        ? 'Cash bill'
-                        : invoiceTab === 'tax'
-                          ? 'Tax invoice'
-                          : 'Adagu bill'}{' '}
-                      preview opens only when you tap Test Print, so this page stays light on shop PCs.
+                      Adagu receipt preview opens only when you tap Test Print, so this page stays
+                      light on shop PCs.
                     </p>
                   </div>
                 </div>
 
-                {invoiceTab === 'adagu' && (
-                  <>
-                    <h3 className="settings-subsection-title">Adagu POS Settings</h3>
+                <>
+                  <h3 className="settings-subsection-title">Adagu POS Settings</h3>
                     <div className="settings-form-grid">
                       <label className="span-3">
                         Pawnbroker licence no.
@@ -796,50 +706,7 @@ export function SettingsPage() {
                         </span>
                       </label>
                     </div>
-                  </>
-                )}
-              </div>
-
-              <div className="card padded" id="gst-summary">
-                <div className="section-head">
-                  <h3 className="settings-section-title settings-section-title-inline">GST tax summary</h3>
-                  <div className="settings-gst-actions">
-                    <button type="button" className="btn secondary" onClick={exportTaxCsv}>
-                      Export CSV
-                    </button>
-                  </div>
-                </div>
-                <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Month</th>
-                      <th className="num">Taxable</th>
-                      <th className="num">CGST</th>
-                      <th className="num">SGST</th>
-                      <th className="num">IGST</th>
-                      <th className="num">Bills</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {taxReport.map((row) => (
-                      <tr key={row.month}>
-                        <td>{formatDisplayMonth(row.month)}</td>
-                        <td className="num">{formatCurrency(row.taxableSales)}</td>
-                        <td className="num">{formatCurrency(row.cgst)}</td>
-                        <td className="num">{formatCurrency(row.sgst)}</td>
-                        <td className="num">{formatCurrency(row.igst)}</td>
-                        <td className="num">{row.invoiceCount}</td>
-                      </tr>
-                    ))}
-                    {taxReport.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="empty-cell">No finalized tax invoices yet</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-                </div>
+                </>
               </div>
             </div>
           )}
@@ -873,7 +740,7 @@ export function SettingsPage() {
                 <p className="settings-row">
                   <strong>Records</strong>
                   <span className="muted">
-                    {counts.products} products, {counts.customers} customers
+                    {counts.customers} customers
                   </span>
                 </p>
               )}

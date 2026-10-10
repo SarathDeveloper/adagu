@@ -176,6 +176,10 @@ export type RedemptionRow = {
   notes: string
   created_by: number | null
   created_at: string
+  gold_rate: number
+  payout_amount: number
+  payment_mode: string
+  transaction_ref: string
   account_no: string
   customer_name: string
   invoice_no: string | null
@@ -389,6 +393,10 @@ export function mapRedemption(row: RedemptionRow): GoldSavingRedemption {
     remainingGold: row.remaining_gold,
     closesAccount: asBool(row.closes_account),
     notes: row.notes,
+    goldRate: row.gold_rate ?? 0,
+    payoutAmount: row.payout_amount ?? 0,
+    paymentMode: row.payment_mode ?? '',
+    transactionRef: row.transaction_ref ?? '',
     createdAt: row.created_at,
   }
 }

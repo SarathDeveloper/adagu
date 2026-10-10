@@ -2,28 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { printPreviewPaths, withEmbedFlag } from '../../src/features/print/printPreviewPaths'
 
 describe('printPreviewPaths', () => {
-  it('builds invoice, pledge, purchase, stock, and sample paths', () => {
-    expect(printPreviewPaths.cashBill(12)).toBe('/print/cash-bill/12')
-    expect(printPreviewPaths.taxInvoice(12)).toBe('/print/tax-invoice/12')
-    expect(printPreviewPaths.invoice(12, 'cash_bill')).toBe('/print/cash-bill/12')
-    expect(printPreviewPaths.invoice(12, 'tax_invoice')).toBe('/print/tax-invoice/12')
+  it('builds pledge, gold savings, and sample paths', () => {
     expect(printPreviewPaths.pledge(4)).toBe('/print/pledge/4')
     expect(printPreviewPaths.pledgeRelease(4)).toBe('/print/pledge-release/4')
-    expect(printPreviewPaths.purchase(9)).toBe('/print/purchase/9')
-    expect(printPreviewPaths.oldGoldPurchase(7)).toBe('/print/old-gold-purchase/7')
-    expect(printPreviewPaths.metalDay('2026-09-30', 'Gold')).toBe('/print/metal-day/2026-09-30/Gold')
-    expect(printPreviewPaths.stockClosing('2026-09-30', 'transacted')).toBe(
-      '/print/stock-closing/2026-09-30?mode=transacted',
-    )
-    expect(printPreviewPaths.sample('cash')).toBe('/print/sample/cash')
+    expect(printPreviewPaths.pledgeNotice(4)).toBe('/print/pledge-notice/4')
+    expect(printPreviewPaths.gsPassbook(9)).toBe('/print/gs-passbook/9')
+    expect(printPreviewPaths.gsPayout(7)).toBe('/print/gs-payout/7')
+    expect(printPreviewPaths.sample('adagu')).toBe('/print/sample/adagu')
   })
 })
 
 describe('withEmbedFlag', () => {
   it('adds embed=1 without dropping existing query params', () => {
-    expect(withEmbedFlag('/print/cash-bill/12')).toBe('/print/cash-bill/12?embed=1')
-    expect(withEmbedFlag('/print/stock-closing/2026-09-30?mode=all')).toBe(
-      '/print/stock-closing/2026-09-30?mode=all&embed=1',
-    )
+    expect(withEmbedFlag('/print/pledge/12')).toBe('/print/pledge/12?embed=1')
+    expect(withEmbedFlag('/print/gs-passbook/9?mode=all')).toBe('/print/gs-passbook/9?mode=all&embed=1')
   })
 })

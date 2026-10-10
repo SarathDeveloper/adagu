@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { ImagePlus, Trash2 } from 'lucide-react'
 import type { PledgePhoto, PledgePhotoKind } from '@shared/types'
 import { api } from '../../lib/api'
-import { localImageSrc } from '../invoices/mapShopDisplay'
+import { localImageSrc } from '../print/mapShopDisplay'
 import './PledgePhotos.css'
 
 export function PledgePhotosStrip({

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_BILL_TEMPLATE, DEFAULT_CASH_VISIBILITY, DEFAULT_TAX_VISIBILITY } from '@shared/billTemplate'
 import type { ShopSettings } from '@shared/types'
-import { composeShopAddressLines, localImageSrc, shopSettingsToDisplay } from '../../src/features/invoices/mapShopDisplay'
+import { composeShopAddressLines, localImageSrc, shopSettingsToDisplay } from '../../src/features/print/mapShopDisplay'
 
 function shop(overrides: Partial<ShopSettings> = {}): ShopSettings {
   return {

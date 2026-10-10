@@ -44,7 +44,7 @@ test('chrome tabs show seeded personas and dashboard KPIs', async ({ window }) =
     ['Accounts', 'Scheme accounts'],
     ['Collections', 'Monthly collections'],
     ['Ledger', 'Scheme ledger'],
-    ['Maturity', 'Maturity & redemption'],
+    ['Maturity', 'Maturity & payout'],
     ['Overdue', 'Overdue aging'],
     ['Reports', 'Daily collections'],
   ] as const
@@ -190,6 +190,42 @@ test('collect two installments in one batch and reprint the batch receipt', asyn
   await expect(window.locator('.gs-receipt-print-error')).toHaveCount(0)
 })
 
+test('maturity payout pays cash and prints the voucher', async ({ window }) => {
+  seedGoldSavingsDemo()
+
+  await openGoldSavingsTab(window, 'Maturity')
+  await expect(window.getByRole('heading', { name: 'Maturity & payout' })).toBeVisible()
+
+  await window
+    .getByPlaceholder('Search account number, name, mobile or customer ID…')
+    .fill('Ravi Kumar')
+  await window.locator('.billing-customer-option').filter({ hasText: 'Ravi Kumar' }).first().click()
+
+  await expect(window.getByRole('heading', { name: 'Payout' })).toBeVisible()
+  const payoutButton = window.getByRole('button', { name: /^Pay out ₹/ })
+  await expect(payoutButton).toBeEnabled()
+  await payoutButton.click()
+
+  const confirm = window.getByRole('dialog', { name: 'Confirm payout' })
+  await expect(confirm).toBeVisible()
+  await confirm.getByRole('button', { name: 'Pay out' }).click()
+  await expect(window.getByText('Payout recorded')).toBeVisible()
+  await closePrintPreview(window, 'Payout voucher')
+
+  const redemption = getDatabase()
+    .prepare(
+      `SELECT payout_amount AS payout, payment_mode AS mode, gold_rate AS rate
+       FROM gold_saving_redemptions
+       WHERE redemption_kind = 'payout'
+       ORDER BY id DESC
+       LIMIT 1`,
+    )
+    .get() as { payout: number; mode: string; rate: number }
+  expect(redemption.mode).toBe('cash')
+  expect(redemption.rate).toBeGreaterThan(0)
+  expect(redemption.payout).toBeGreaterThan(0)
+})
+
 test('customer with a scheme account cannot be deleted', async ({ window }) => {
   seedGoldSavingsDemo()
 
@@ -223,7 +259,7 @@ test('staff without gold_savings does not see the sidebar item', async ({ window
         username: 'gsstaff',
         password: 'staff123',
         role: 'staff',
-        features: ['billing'],
+        features: ['adagu'],
       }),
     })
     await api('/api/auth/logout', { method: 'POST' })
@@ -239,7 +275,7 @@ test('staff without gold_savings does not see the sidebar item', async ({ window
   await window.getByLabel('Confirm new password').fill('staff456')
   await window.getByRole('button', { name: 'Save password' }).click()
 
-  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Billing' })).toBeVisible()
+  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Adagu' })).toBeVisible()
   await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Gold Savings' })).toHaveCount(0)
 })
 

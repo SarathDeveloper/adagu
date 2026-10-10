@@ -1,6 +1,6 @@
 import type { Pledge, PledgeAuction } from '@shared/types'
 import { formatDisplayDate } from '../../lib/format'
-import { EMPTY_SHOP_DISPLAY, type ShopDisplayInfo } from '../invoices/mapShopDisplay'
+import { EMPTY_SHOP_DISPLAY, type ShopDisplayInfo } from '../print/mapShopDisplay'
 import {
   AdaguBorrower,
   AdaguEmptyRows,

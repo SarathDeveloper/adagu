@@ -18,12 +18,11 @@ import {
   listAccounts,
   waiveInstallment,
 } from '../goldSavings/accountService'
-import { previewSchemeCredits } from '../goldSavings/billingCredit'
 import { collectPayment, getPayment, reversePayment } from '../goldSavings/collectionService'
 import { getDashboard } from '../goldSavings/dashboardService'
 import { getPassbook, listAudit, listLedger } from '../goldSavings/ledgerService'
 import { datedRateForPurity } from '../goldSavings/rateGuard'
-import { listRedemptions, processRedemption } from '../goldSavings/maturityService'
+import { listRedemptions, getRedemption, processRedemption } from '../goldSavings/maturityService'
 import { runGoldSavingReport } from '../goldSavings/reportService'
 import { createScheme, getScheme, listSchemes, updateScheme } from '../goldSavings/schemeService'
 import { getDatabase } from '../db'
@@ -83,26 +82,6 @@ router.get(
   asyncHandler((req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q : undefined
     res.json(listAccounts(getDatabase(), q))
-  }),
-)
-
-router.get(
-  '/billing-preview',
-  asyncHandler((req, res) => {
-    const customerId = req.query.customerId ? Number(req.query.customerId) : undefined
-    if (!customerId || !Number.isInteger(customerId)) {
-      throw new HttpError(400, 'A customer is required to preview scheme credit')
-    }
-    const invoiceId = req.query.invoiceId ? Number(req.query.invoiceId) : undefined
-    const date = typeof req.query.date === 'string' && req.query.date ? req.query.date : undefined
-    res.json(
-      previewSchemeCredits(
-        getDatabase(),
-        customerId,
-        Number.isInteger(invoiceId) ? invoiceId : undefined,
-        date,
-      ),
-    )
   }),
 )
 
@@ -220,14 +199,18 @@ router.get(
   }),
 )
 
+router.get(
+  '/redemptions/:id',
+  asyncHandler((req, res) => {
+    res.json(getRedemption(getDatabase(), parseIdParam(routeParam(req.params.id))))
+  }),
+)
+
 router.post(
   '/redemptions',
   asyncHandler((req, res) => {
     const input = parseBody(goldSavingRedemptionInputSchema, req.body)
-    if (input.redemptionKind === 'invoice') {
-      throw new HttpError(400, 'Apply the scheme on the sale bill to redeem against an invoice')
-    }
-    res.status(201).json(processRedemption(getDatabase(), input, actor(req).id))
+    res.status(201).json(processRedemption(getDatabase(), input, actor(req)))
   }),
 )
 

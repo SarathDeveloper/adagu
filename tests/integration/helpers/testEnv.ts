@@ -15,80 +15,17 @@ export const IPC_CHANNELS = {
   APP_EXPORT_DB: 'app:exportDb',
   APP_RESTORE_DB: 'app:restoreDb',
   APP_BACKUP_STATUS: 'app:backupStatus',
-  PRODUCTS_LIST: 'products:list',
-  PRODUCTS_GET: 'products:get',
-  PRODUCTS_VARIANTS: 'products:variants',
-  PRODUCTS_CREATE: 'products:create',
-  PRODUCTS_UPDATE: 'products:update',
-  PRODUCTS_DELETE: 'products:delete',
-  STOCK_LIST: 'stock:list',
-  STOCK_UPSERT: 'stock:upsert',
-  STOCK_CREATE_CATEGORY: 'stock:createCategory',
-  STOCK_UPDATE_CATEGORY: 'stock:updateCategory',
-  STOCK_DELETE_CATEGORY: 'stock:deleteCategory',
-  STOCK_CLEAR_OVERRIDES: 'stock:clearSalesOverrides',
-  STOCK_HISTORY: 'stock:history',
-  STOCK_DAY_LINES: 'stock:dayLines',
-  STOCK_DAY_CLOSING_GET: 'stock:dayClosingGet',
-  STOCK_DAY_CLOSING_CLOSE: 'stock:dayClosingClose',
-  STOCK_DAY_CLOSING_REOPEN: 'stock:dayClosingReopen',
-  STOCK_CATEGORIES_LIST: 'stock:categoriesList',
-  STOCK_DAY_CLOSING_PRECHECK: 'stock:dayClosingPrecheck',
-  STOCK_RECONCILIATION: 'stock:reconciliation',
-  STOCK_ADJUSTMENT_LIST: 'stock:adjustmentList',
-  STOCK_ADJUSTMENT_CREATE: 'stock:adjustmentCreate',
-  STOCK_ADJUSTMENT_GET: 'stock:adjustmentGet',
-  STOCKTAKE_LIST: 'stocktakeList',
-  STOCKTAKE_CREATE: 'stocktakeCreate',
-  STOCKTAKE_GET: 'stocktakeGet',
-  STOCKTAKE_UPDATE_LINES: 'stocktakeUpdateLines',
-  STOCKTAKE_POST: 'stocktakePost',
   CUSTOMERS_LIST: 'customers:list',
   CUSTOMERS_GET: 'customers:get',
   CUSTOMERS_CREATE: 'customers:create',
   CUSTOMERS_UPDATE: 'customers:update',
   CUSTOMERS_DELETE: 'customers:delete',
-  SUPPLIERS_LIST: 'suppliers:list',
-  SUPPLIERS_CREATE: 'suppliers:create',
-  INWARDS_CREATE: 'inwards:create',
-  INWARDS_LIST: 'inwards:list',
-  INWARDS_UPDATE: 'inwards:update',
-  INWARDS_FINALIZE: 'inwards:finalize',
-  INWARDS_GET: 'inwards:get',
-  OLD_GOLD_PURCHASES_LIST: 'oldGoldPurchases:list',
-  OLD_GOLD_PURCHASES_CREATE: 'oldGoldPurchases:create',
-  OLD_GOLD_PURCHASES_GET: 'oldGoldPurchases:get',
-  OLD_GOLD_PURCHASES_UPDATE: 'oldGoldPurchases:update',
-  OLD_GOLD_PURCHASES_FINALIZE: 'oldGoldPurchases:finalize',
-  OLD_GOLD_PURCHASES_DELETE: 'oldGoldPurchases:delete',
-  OLD_GOLD_PURCHASES_BY_NO: 'oldGoldPurchases:byNo',
-  OLD_GOLD_PURCHASES_PAYOUT: 'oldGoldPurchases:payout',
-  OLD_GOLD_PURCHASES_VOID_PAYOUT: 'oldGoldPurchases:voidPayout',
-  OLD_GOLD_PURCHASES_CANCEL: 'oldGoldPurchases:cancel',
-  OLD_GOLD_PURCHASES_STATS: 'oldGoldPurchases:stats',
-  OLD_GOLD_BATCHES_LOT: 'oldGoldBatches:lot',
-  OLD_GOLD_BATCHES_LIST: 'oldGoldBatches:list',
-  OLD_GOLD_BATCHES_GET: 'oldGoldBatches:get',
-  OLD_GOLD_BATCHES_CREATE: 'oldGoldBatches:create',
-  OLD_GOLD_BATCHES_MELT: 'oldGoldBatches:melt',
-  OLD_GOLD_BATCHES_SEND: 'oldGoldBatches:send',
-  OLD_GOLD_BATCHES_SETTLE: 'oldGoldBatches:settle',
-  OLD_GOLD_BATCHES_CANCEL: 'oldGoldBatches:cancel',
   DUES_LIST: 'dues:list',
   DUES_CREATE: 'dues:create',
   DUES_UPDATE: 'dues:update',
   DUES_DELETE: 'dues:delete',
   DUES_RECORD_PAYMENT: 'dues:recordPayment',
   DUES_MARK_PAID: 'dues:markPaid',
-  INVOICES_LIST: 'invoices:list',
-  INVOICES_GET: 'invoices:get',
-  INVOICES_CREATE: 'invoices:create',
-  INVOICES_RECORD_HISTORICAL: 'invoices:recordHistorical',
-  INVOICES_UPDATE: 'invoices:update',
-  INVOICES_FINALIZE: 'invoices:finalize',
-  INVOICES_CANCEL: 'invoices:cancel',
-  INVOICES_DELETE: 'invoices:delete',
-  INVOICES_TAX_REPORT: 'invoices:taxReport',
   REPORTS_CATALOG: 'reports:catalog',
   REPORTS_RUN: 'reports:run',
   SETTINGS_GET: 'settings:get',
@@ -161,94 +98,6 @@ export async function invokeIpcForTests<T>(channel: string, rawInput?: unknown):
         return { ok: false, error: message }
       }
     }
-    case IPC_CHANNELS.PRODUCTS_LIST:
-      response = await agent().get('/api/products').query(typeof input === 'string' ? { q: input } : {})
-      break
-    case IPC_CHANNELS.PRODUCTS_GET:
-      response = await agent().get(`/api/products/${input}`)
-      break
-    case IPC_CHANNELS.PRODUCTS_VARIANTS:
-      response = await agent().get(`/api/products/${input}/variants`)
-      break
-    case IPC_CHANNELS.PRODUCTS_CREATE:
-      response = await agent().post('/api/products').send(input)
-      break
-    case IPC_CHANNELS.PRODUCTS_UPDATE: {
-      const { id, input: body } = input as { id: number; input: unknown }
-      response = await agent().put(`/api/products/${id}`).send(body)
-      break
-    }
-    case IPC_CHANNELS.PRODUCTS_DELETE:
-      response = await agent().delete(`/api/products/${input}`)
-      break
-    case IPC_CHANNELS.STOCK_LIST:
-      response = await agent().get('/api/stock').query(input as object)
-      break
-    case IPC_CHANNELS.STOCK_UPSERT:
-      response = await agent().post('/api/stock').send(input)
-      break
-    case IPC_CHANNELS.STOCK_CREATE_CATEGORY:
-      response = await agent().post('/api/stock/categories').send(input)
-      break
-    case IPC_CHANNELS.STOCK_UPDATE_CATEGORY:
-      response = await agent().put('/api/stock/categories').send(input)
-      break
-    case IPC_CHANNELS.STOCK_DELETE_CATEGORY:
-      response = await agent().delete('/api/stock/categories').send(input)
-      break
-    case IPC_CHANNELS.STOCK_CLEAR_OVERRIDES:
-      response = await agent().post('/api/stock/clear-overrides').send(input)
-      break
-    case IPC_CHANNELS.STOCK_HISTORY:
-      response = await agent().get('/api/stock/history').query(input as object)
-      break
-    case IPC_CHANNELS.STOCK_DAY_LINES:
-      response = await agent().get('/api/stock/day-lines').query(input as object)
-      break
-    case IPC_CHANNELS.STOCK_DAY_CLOSING_GET:
-      response = await agent().get('/api/stock/day-closings').query(input as object)
-      break
-    case IPC_CHANNELS.STOCK_DAY_CLOSING_CLOSE:
-      response = await agent().post('/api/stock/day-closings/close').send(input)
-      break
-    case IPC_CHANNELS.STOCK_DAY_CLOSING_REOPEN:
-      response = await agent().post('/api/stock/day-closings/reopen').send(input)
-      break
-    case IPC_CHANNELS.STOCK_CATEGORIES_LIST:
-      response = await agent().get('/api/stock/categories')
-      break
-    case IPC_CHANNELS.STOCK_DAY_CLOSING_PRECHECK:
-      response = await agent().get('/api/stock/day-closings/precheck').query(input as object)
-      break
-    case IPC_CHANNELS.STOCK_RECONCILIATION:
-      response = await agent().get('/api/stock/reconciliation').query(input as object)
-      break
-    case IPC_CHANNELS.STOCK_ADJUSTMENT_LIST:
-      response = await agent().get('/api/stock/adjustments')
-      break
-    case IPC_CHANNELS.STOCK_ADJUSTMENT_CREATE:
-      response = await agent().post('/api/stock/adjustments').send(input)
-      break
-    case IPC_CHANNELS.STOCK_ADJUSTMENT_GET:
-      response = await agent().get(`/api/stock/adjustments/${input}`)
-      break
-    case IPC_CHANNELS.STOCKTAKE_LIST:
-      response = await agent().get('/api/stock/stocktakes')
-      break
-    case IPC_CHANNELS.STOCKTAKE_CREATE:
-      response = await agent().post('/api/stock/stocktakes').send(input)
-      break
-    case IPC_CHANNELS.STOCKTAKE_GET:
-      response = await agent().get(`/api/stock/stocktakes/${input}`)
-      break
-    case IPC_CHANNELS.STOCKTAKE_UPDATE_LINES: {
-      const { id, body } = input as { id: number; body: unknown }
-      response = await agent().put(`/api/stock/stocktakes/${id}/lines`).send(body)
-      break
-    }
-    case IPC_CHANNELS.STOCKTAKE_POST:
-      response = await agent().post(`/api/stock/stocktakes/${input}/post`)
-      break
     case IPC_CHANNELS.CUSTOMERS_LIST:
       response = await agent().get('/api/customers').query(typeof input === 'string' ? { q: input } : {})
       break
@@ -265,106 +114,6 @@ export async function invokeIpcForTests<T>(channel: string, rawInput?: unknown):
     }
     case IPC_CHANNELS.CUSTOMERS_DELETE:
       response = await agent().delete(`/api/customers/${input}`)
-      break
-    case IPC_CHANNELS.SUPPLIERS_LIST:
-      response = await agent().get('/api/suppliers').query(typeof input === 'string' ? { q: input } : {})
-      break
-    case IPC_CHANNELS.SUPPLIERS_CREATE:
-      response = await agent().post('/api/suppliers').send(input)
-      break
-    case IPC_CHANNELS.INWARDS_CREATE:
-      response = await agent().post('/api/inwards').send(input)
-      break
-    case IPC_CHANNELS.INWARDS_LIST:
-      response = await agent().get('/api/inwards')
-      break
-    case IPC_CHANNELS.INWARDS_UPDATE: {
-      const { id, ...body } = input as { id: number }
-      response = await agent().put(`/api/inwards/${id}`).send(body)
-      break
-    }
-    case IPC_CHANNELS.INWARDS_GET:
-      response = await agent().get(`/api/inwards/${input}`)
-      break
-    case IPC_CHANNELS.INWARDS_FINALIZE:
-      response = await agent().post(`/api/inwards/${input}/finalize`)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_LIST:
-      response = await agent().get('/api/old-gold-purchases')
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_CREATE:
-      response = await agent().post('/api/old-gold-purchases').send(input)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_GET:
-      response = await agent().get(`/api/old-gold-purchases/${input}`)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_UPDATE:
-      response = await agent()
-        .put(`/api/old-gold-purchases/${(input as { id: number }).id}`)
-        .send(input)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_FINALIZE:
-      response = await agent().post(`/api/old-gold-purchases/${input}/finalize`)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_DELETE:
-      response = await agent().delete(`/api/old-gold-purchases/${input}`)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_BY_NO:
-      response = await agent().get(`/api/old-gold-purchases/by-no/${encodeURIComponent(String(input))}`)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_PAYOUT:
-      response = await agent()
-        .post(`/api/old-gold-purchases/${(input as { id: number }).id}/payouts`)
-        .send((input as { input: unknown }).input)
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_VOID_PAYOUT:
-      response = await agent()
-        .post(
-          `/api/old-gold-purchases/${(input as { id: number }).id}/payouts/${(input as { payoutId: number }).payoutId}/void`,
-        )
-        .send({ reason: (input as { reason: string }).reason })
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_CANCEL:
-      response = await agent()
-        .post(`/api/old-gold-purchases/${(input as { id: number }).id}/cancel`)
-        .send({ reason: (input as { reason: string }).reason })
-      break
-    case IPC_CHANNELS.OLD_GOLD_PURCHASES_STATS:
-      response = await agent().get(
-        `/api/old-gold-purchases/stats${input ? `?date=${encodeURIComponent(String(input))}` : ''}`,
-      )
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_LOT:
-      response = await agent().get('/api/old-gold-batches/lot')
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_LIST:
-      response = await agent().get('/api/old-gold-batches')
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_GET:
-      response = await agent().get(`/api/old-gold-batches/${input}`)
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_CREATE:
-      response = await agent().post('/api/old-gold-batches').send(input)
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_MELT:
-      response = await agent()
-        .post(`/api/old-gold-batches/${(input as { id: number }).id}/melt`)
-        .send((input as { input: unknown }).input)
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_SEND:
-      response = await agent()
-        .post(`/api/old-gold-batches/${(input as { id: number }).id}/send`)
-        .send((input as { input: unknown }).input)
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_SETTLE:
-      response = await agent()
-        .post(`/api/old-gold-batches/${(input as { id: number }).id}/settle`)
-        .send((input as { input: unknown }).input)
-      break
-    case IPC_CHANNELS.OLD_GOLD_BATCHES_CANCEL:
-      response = await agent()
-        .post(`/api/old-gold-batches/${(input as { id: number }).id}/cancel`)
-        .send({ reason: (input as { reason: string }).reason })
       break
     case IPC_CHANNELS.DUES_LIST:
       response = await agent().get('/api/dues').query(typeof input === 'string' ? { q: input } : {})
@@ -388,41 +137,6 @@ export async function invokeIpcForTests<T>(channel: string, rawInput?: unknown):
     case IPC_CHANNELS.DUES_MARK_PAID:
       response = await agent().post(`/api/dues/${input}/mark-paid`)
       break
-    case IPC_CHANNELS.INVOICES_LIST: {
-      response = await agent().get('/api/invoices').query({ page: 1, pageSize: 50 })
-      if (response.status >= 200 && response.status < 300 && Array.isArray(response.body?.items)) {
-        return { ok: true, data: response.body.items } as IpcResult<T>
-      }
-      break
-    }
-    case IPC_CHANNELS.INVOICES_GET:
-      response = await agent().get(`/api/invoices/${input}`)
-      break
-    case IPC_CHANNELS.INVOICES_CREATE:
-      response = await agent().post('/api/invoices').send(input)
-      break
-    case IPC_CHANNELS.INVOICES_RECORD_HISTORICAL:
-      response = await agent().post('/api/invoices/historical').send(input)
-      break
-    case IPC_CHANNELS.INVOICES_UPDATE:
-      response = await agent()
-        .put(`/api/invoices/${(input as { id: number }).id}`)
-        .send(input)
-      break
-    case IPC_CHANNELS.INVOICES_FINALIZE:
-      response = await agent().post(`/api/invoices/${input}/finalize`)
-      break
-    case IPC_CHANNELS.INVOICES_CANCEL: {
-      const { id, reason } = input as { id: number; reason: string }
-      response = await agent().post(`/api/invoices/${id}/cancel`).send({ reason })
-      break
-    }
-    case IPC_CHANNELS.INVOICES_DELETE:
-      response = await agent().delete(`/api/invoices/${input}`)
-      break
-    case IPC_CHANNELS.INVOICES_TAX_REPORT:
-      response = await agent().get('/api/invoices/tax-report')
-      break
     case IPC_CHANNELS.REPORTS_CATALOG:
       response = await agent().get('/api/reports')
       break
@@ -432,10 +146,6 @@ export async function invokeIpcForTests<T>(channel: string, rawInput?: unknown):
         from?: string
         to?: string
         customerId?: number
-        supplierId?: number
-        productId?: number
-        metal?: string
-        qtyCutoff?: number
       }
       response = await agent().get(`/api/reports/${id}`).query(query)
       break
@@ -508,15 +218,9 @@ export function dbVersions(): number[] {
     .map((row) => (row as { version: number }).version)
 }
 
-let huidSerial = 0
+let customerSerial = 0
 
-export function testHuids(count: number): string[] {
-  return Array.from({ length: Math.max(0, count) }, () => {
-    huidSerial += 1
-    return `H${String(huidSerial).padStart(5, '0')}`
-  })
-}
-
-export function withHuids<T extends { stockQty?: number }>(input: T): T & { huids: string[] } {
-  return { ...input, huids: testHuids(input.stockQty ?? 0) }
+export function uniqueCustomerPhone(): string {
+  customerSerial += 1
+  return `9${String(100000000 + customerSerial).slice(0, 9)}`
 }

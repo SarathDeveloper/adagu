@@ -1,9 +1,18 @@
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
-import type { BackupFile, BackupInspection, BackupStatus, Product } from '@shared/types'
+import type { BackupFile, BackupInspection, BackupStatus, Customer } from '@shared/types'
 import {
   assertSqliteIntegrity,
   backupDatabaseTo,
@@ -21,25 +30,25 @@ import { writePremigrateSnapshot } from '../../server/db/snapshot'
 import { getUploadsDir } from '../../server/lib/paths'
 import { setShopSetting } from '../../server/lib/settingsStore'
 import { localDateIso } from '../../shared/localDate'
-import { getTestAgent, IPC_CHANNELS, ipc, useIntegrationEnv, withHuids } from './helpers/testEnv'
+import { getTestAgent, IPC_CHANNELS, ipc, useIntegrationEnv, uniqueCustomerPhone } from './helpers/testEnv'
 
-const sampleProduct = withHuids({
-  name: 'Test chain',
-  category: 'Chain',
-  metal: 'Gold',
-  purity: '22K',
-  grossWeight: 10,
-  netWeight: 9.5,
-  makingCharges: 100,
-  stockQty: 5,
-  imagePath: '',
-})
+async function seedCustomer(name = 'Test customer'): Promise<Customer> {
+  const response = await getTestAgent().post('/api/customers').send({
+    name,
+    phone: uniqueCustomerPhone(),
+    address: 'Salem',
+  })
+  if (response.status !== 201) {
+    throw new Error(`Customer seed failed: ${response.text}`)
+  }
+  return response.body as Customer
+}
 
 describe('database backup and restore', () => {
   useIntegrationEnv()
 
   it('exports a consistent SQLite snapshot that passes integrity_check', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const destination = join(process.env.JEWELTRACKERPRO_E2E_USER_DATA as string, 'export.db')
     const status = await ipc<BackupStatus>(IPC_CHANNELS.APP_EXPORT_DB, { destinationPath: destination })
 
@@ -49,10 +58,10 @@ describe('database backup and restore', () => {
 
     const snapshot = new Database(destination, { readonly: true, fileMustExist: true })
     try {
-      const row = snapshot.prepare('SELECT name FROM products WHERE name = ?').get('Test chain') as {
+      const row = snapshot.prepare('SELECT name FROM customers WHERE name = ?').get('Test customer') as {
         name: string
       }
-      expect(row.name).toBe('Test chain')
+      expect(row.name).toBe('Test customer')
     } finally {
       snapshot.close()
     }
@@ -62,21 +71,21 @@ describe('database backup and restore', () => {
   })
 
   it('restores a backup and replaces current records', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const destination = join(process.env.JEWELTRACKERPRO_E2E_USER_DATA as string, 'restore-source.db')
     await ipc(IPC_CHANNELS.APP_EXPORT_DB, { destinationPath: destination })
 
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({ ...sampleProduct, name: 'Later ring' }))
-    expect(await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)).toHaveLength(2)
+    await seedCustomer('Later ring')
+    expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(2)
 
     await ipc(IPC_CHANNELS.APP_RESTORE_DB, { sourcePath: destination })
-    const products = await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)
-    expect(products).toHaveLength(1)
-    expect(products[0]?.name).toBe('Test chain')
+    const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
+    expect(customers).toHaveLength(1)
+    expect(customers[0]?.name).toBe('Test customer')
   })
 
   it('writes a daily backup on demand', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     await ensureDailyBackup()
     const today = localDateIso()
     const dailyPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.db`)
@@ -86,8 +95,8 @@ describe('database backup and restore', () => {
     expect(existsSync(excelPath)).toBe(true)
     const excel = readFileSync(excelPath)
     expect(excel.subarray(0, 2).toString()).toBe('PK')
-    expect(excel.toString('utf8')).toContain('Test chain')
-    expect(excel.toString('utf8')).toContain('products')
+    expect(excel.toString('utf8')).toContain('Test customer')
+    expect(excel.toString('utf8')).toContain('customers')
     const hash = getDatabase().prepare('SELECT password_hash FROM users LIMIT 1').get() as {
       password_hash: string
     }
@@ -96,7 +105,7 @@ describe('database backup and restore', () => {
   })
 
   it('creates a manual backup that can be listed, restored, and deleted', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
 
     const created = await agent.post('/api/backup/create')
@@ -115,14 +124,14 @@ describe('database backup and restore', () => {
       true,
     )
 
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({ ...sampleProduct, name: 'Later ring' }))
-    expect(await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)).toHaveLength(2)
+    await seedCustomer('Later ring')
+    expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(2)
 
     const restored = await agent.post('/api/backup/restore-local').send({ name: backup.name })
     expect(restored.status).toBe(200)
-    const products = await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)
-    expect(products).toHaveLength(1)
-    expect(products[0]?.name).toBe('Test chain')
+    const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
+    expect(customers).toHaveLength(1)
+    expect(customers[0]?.name).toBe('Test customer')
 
     const deleted = await agent.delete(`/api/backup/${encodeURIComponent(backup.name)}`)
     expect(deleted.status).toBe(204)
@@ -210,7 +219,7 @@ describe('database backup and restore', () => {
   })
 
   it('copies the newest backup off-machine, verifies it, and restores shop data from that file', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-'))
     const today = localDateIso()
@@ -233,26 +242,26 @@ describe('database backup and restore', () => {
       assertSqliteIntegrity(offsitePath)
       const offsiteExcel = join(offsiteDir, `jeweltrackerpro-${today}.xlsx`)
       expect(existsSync(offsiteExcel)).toBe(true)
-      expect(readFileSync(offsiteExcel).toString('utf8')).toContain('Test chain')
+      expect(readFileSync(offsiteExcel).toString('utf8')).toContain('Test customer')
       await proveBackupRestores(offsitePath, join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.db`))
 
       const skipped = await copyNewestBackupOffsite()
       expect(skipped.lastOffsiteAt).toBe(copied.body.lastOffsiteAt)
 
-      await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({ ...sampleProduct, name: 'Later ring' }))
-      expect(await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)).toHaveLength(2)
+      await seedCustomer('Later ring')
+      expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(2)
 
       await restoreDatabaseFrom(offsitePath)
-      const products = await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)
-      expect(products).toHaveLength(1)
-      expect(products[0]?.name).toBe('Test chain')
+      const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
+      expect(customers).toHaveLength(1)
+      expect(customers[0]?.name).toBe('Test customer')
     } finally {
       rmSync(offsiteDir, { recursive: true, force: true })
     }
   })
 
   it('records a missing off-machine folder without skipping the local backup', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const parent = mkdtempSync(join(tmpdir(), 'jtp-offsite-parent-'))
     const missing = join(parent, 'not-plugged-in')
@@ -281,7 +290,7 @@ describe('database backup and restore', () => {
   })
 
   it('copies off-machine after a scheduled local backup', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-tick-'))
     const today = localDateIso()
     const agent = getTestAgent()
@@ -311,7 +320,7 @@ describe('database backup and restore', () => {
   })
 
   it('downloads an Excel workbook of every table', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const exported = await agent
       .get('/api/backup/export-excel')
@@ -328,13 +337,14 @@ describe('database backup and restore', () => {
     expect(exported.status).toBe(200)
     const body = Buffer.isBuffer(exported.body) ? exported.body : Buffer.from(exported.body)
     expect(body.subarray(0, 2).toString()).toBe('PK')
-    expect(body.toString('utf8')).toContain('Test chain')
+    expect(body.toString('utf8')).toContain('Test customer')
     expect(body.toString('utf8')).toContain('_tables')
-    expect(body.toString('utf8')).toContain('invoices')
+    expect(body.toString('utf8')).toContain('customers')
+    expect(body.toString('utf8')).toContain('pledges')
   })
 
   it('rejects a file that is not a JewelTrackerPro backup without touching live data', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const backupsDir = join(getUserDataDir(), 'backups')
     mkdirSync(backupsDir, { recursive: true })
@@ -347,12 +357,12 @@ describe('database backup and restore', () => {
       .post('/api/backup/restore-local')
       .send({ name: 'jeweltrackerpro-2020-01-01.db' })
     expect(response.status).toBe(400)
-    expect(response.body.error).toBe('This file is not a JewelTrackerPro backup')
-    expect(await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)).toHaveLength(1)
+    expect(response.body.error).toBe('This file is not a JewelTrackerPro Adagu backup')
+    expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(1)
   })
 
   it('rejects a backup made by a newer version of the app', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const backupsDir = join(getUserDataDir(), 'backups')
     mkdirSync(backupsDir, { recursive: true })
@@ -371,16 +381,14 @@ describe('database backup and restore', () => {
       .send({ name: 'jeweltrackerpro-2020-01-02.db' })
     expect(response.status).toBe(400)
     expect(response.body.error).toContain('newer version')
-    expect(await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)).toHaveLength(1)
+    expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(1)
   })
 
-  it('keeps a pre-restore safety copy and rolls back a restore that cannot open', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+  it('rejects a stub that is missing required tables without touching live data', async () => {
+    await seedCustomer()
     const backupsDir = join(getUserDataDir(), 'backups')
     mkdirSync(backupsDir, { recursive: true })
 
-    // A healthy SQLite file that carries the required tables but claims schema
-    // 55 with no `customers` table, so migration 56 fails after the copy-in.
     const stubPath = join(backupsDir, 'jeweltrackerpro-manual-19990101-000000.db')
     const stub = new Database(stubPath)
     stub.exec(`
@@ -388,16 +396,23 @@ describe('database backup and restore', () => {
       INSERT INTO schema_migrations (version) VALUES (55);
       CREATE TABLE users (id INTEGER PRIMARY KEY);
       CREATE TABLE shop_settings (key TEXT PRIMARY KEY, value TEXT);
-      CREATE TABLE products (id INTEGER PRIMARY KEY);
-      CREATE TABLE invoices (id INTEGER PRIMARY KEY);
     `)
     stub.close()
 
     await expect(restoreDatabaseFrom(stubPath)).rejects.toThrow()
-    expect(await ipc<Product[]>(IPC_CHANNELS.PRODUCTS_LIST)).toHaveLength(1)
-    expect(readdirSync(backupsDir).some((name) => name.startsWith('jeweltrackerpro-prerestore-'))).toBe(
-      true,
-    )
+    expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(1)
+  })
+
+  it('keeps a pre-restore safety copy before replacing data', async () => {
+    await seedCustomer()
+    const backupsDir = join(getUserDataDir(), 'backups')
+    const destination = join(backupsDir, 'jeweltrackerpro-manual-19990101-000001.db')
+    mkdirSync(backupsDir, { recursive: true })
+    await backupDatabaseTo(destination)
+
+    await restoreDatabaseFrom(destination)
+
+    expect(readdirSync(backupsDir).some((name) => name.startsWith('jeweltrackerpro-prerestore-'))).toBe(true)
   })
 
   it('writes a safety snapshot before applying pending migrations', () => {
@@ -414,44 +429,8 @@ describe('database backup and restore', () => {
     assertSqliteIntegrity(join(backupsDir, name))
   })
 
-  it('backs up after a metal day close and leaves the schedule due', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
-    const agent = getTestAgent()
-    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-dayclose-'))
-    try {
-      await agent
-        .put('/api/backup/settings')
-        .send({ frequency: 'daily', time: '21:00', offsiteDir })
-
-      const closed = await agent.post('/api/stock/day-closings/close').send({
-        businessDate: localDateIso(),
-        metal: 'Gold',
-        operatorName: 'admin',
-        note: '',
-      })
-      expect(closed.status).toBe(200)
-      expect(closed.body.backupSaved).toBe(true)
-
-      const backupsDir = join(getUserDataDir(), 'backups')
-      const dayCloseFiles = readdirSync(backupsDir).filter(
-        (name) => name.startsWith('jeweltrackerpro-dayclose-') && name.endsWith('.db'),
-      )
-      expect(dayCloseFiles).toHaveLength(1)
-      // Excel copies are only written for daily and manual snapshots.
-      expect(existsSync(join(backupsDir, dayCloseFiles[0]!.replace(/\.db$/, '.xlsx')))).toBe(false)
-      expect(existsSync(join(offsiteDir, `jeweltrackerpro-${localDateIso()}.db`))).toBe(true)
-
-      const status = await agent.get('/api/backup/status')
-      expect(status.body.lastBackupAt).toBeTruthy()
-      // The day-close backup must not satisfy the scheduled slot.
-      expect(status.body.nextBackupAt).toBeNull()
-    } finally {
-      rmSync(offsiteDir, { recursive: true, force: true })
-    }
-  })
-
   it('mirrors shop images off-machine and copies them back on restore', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-media-'))
     const uploadsDir = getUploadsDir()
@@ -475,7 +454,7 @@ describe('database backup and restore', () => {
   })
 
   it('detects a tampered off-machine copy', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-tamper-'))
     const localPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${localDateIso()}.db`)
@@ -493,7 +472,7 @@ describe('database backup and restore', () => {
   })
 
   it('reports what a backup contains without restoring it', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const created = await agent.post('/api/backup/create')
     const backup = created.body as BackupFile
@@ -504,12 +483,14 @@ describe('database backup and restore', () => {
     expect(result.restorable).toBe(true)
     expect(result.schemaVersion).toBe(latestMigrationVersion())
     expect(result.appSchemaVersion).toBe(latestMigrationVersion())
-    expect(result.counts.products).toBe(1)
+    expect(result.counts.customers).toBe(1)
+    expect(result.counts.pledges).toBe(0)
+    expect(result.counts.goldSavingAccounts).toBe(0)
     expect(result.issues).toHaveLength(0)
   })
 
   it('removes the temporary export file after a download', async () => {
-    await ipc(IPC_CHANNELS.PRODUCTS_CREATE, sampleProduct)
+    await seedCustomer()
     const agent = getTestAgent()
     const exportPath = join(tmpdir(), `jeweltrackerpro-backup-${new Date().toISOString().slice(0, 10)}.db`)
     const exported = await agent.get('/api/backup/export')

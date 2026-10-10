@@ -1,19 +1,21 @@
 import { expect, test } from './fixtures/web-app'
-import { seedFinalInvoice, seedShopName } from './helpers/seed'
+import { seedGoldSavingsDemoPayment, seedPledge, seedShopName } from './helpers/seed'
 
-test('cash bill and tax invoice print routes render shop header', async ({ window }) => {
+test('pledge and gold savings print routes render shop header', async ({ window }) => {
   const shopName = 'Print Shop'
   await seedShopName(window, shopName)
-  const invoiceId = await seedFinalInvoice(window)
+  const pledgeId = await seedPledge(window)
 
   const origin = new URL(window.url()).origin
-  await window.goto(`${origin}/print/cash-bill/${invoiceId}`)
+  await window.goto(`${origin}/print/pledge/${pledgeId}`)
   await expect(window.getByRole('heading', { name: shopName })).toBeVisible({
     timeout: 15_000,
   })
   await expect(window.locator('.error-banner')).toHaveCount(0)
 
-  await window.goto(`${origin}/print/tax-invoice/${invoiceId}`)
+  const paymentId = seedGoldSavingsDemoPayment()
+  expect(paymentId).not.toBeNull()
+  await window.goto(`${origin}/print/gs-receipt/${paymentId}`)
   await expect(window.getByRole('heading', { name: shopName })).toBeVisible({
     timeout: 15_000,
   })
@@ -23,7 +25,7 @@ test('cash bill and tax invoice print routes render shop header', async ({ windo
 test('a print route loads the print document, not the application', async ({ window }) => {
   const shopName = 'Print Shop'
   await seedShopName(window, shopName)
-  const invoiceId = await seedFinalInvoice(window)
+  const pledgeId = await seedPledge(window)
   const origin = new URL(window.url()).origin
 
   // Record only what the print document asks for. The dashboard load above is
@@ -31,7 +33,7 @@ test('a print route loads the print document, not the application', async ({ win
   const requested: string[] = []
   window.on('request', (request) => requested.push(new URL(request.url()).pathname))
 
-  await window.goto(`${origin}/print/cash-bill/${invoiceId}`)
+  await window.goto(`${origin}/print/pledge/${pledgeId}`)
   await expect(window.getByRole('heading', { name: shopName })).toBeVisible({ timeout: 15_000 })
 
   // The document that was served is print.html, so its entry is the print chunk.

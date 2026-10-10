@@ -144,7 +144,7 @@ fn sqlite_addon_name() -> &'static str {
 fn resolve_data_dir() -> Result<PathBuf, String> {
     let dir = dirs::data_dir()
         .ok_or_else(|| "Could not resolve the application data directory".to_string())?
-        .join("JewelTrackerPro");
+        .join("JewelTrackerPro Adagu");
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     Ok(dir)
 }
@@ -278,7 +278,7 @@ async fn start_sidecar(app: &AppHandle) -> Result<u16, String> {
 fn open_main_window(app: &AppHandle, url: &str, api_port: Option<u16>) -> Result<(), String> {
     let parsed = url.parse().map_err(|error| format!("{error}"))?;
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
-        .title("JewelTrackerPro")
+        .title("JewelTrackerPro Adagu")
         .inner_size(1280.0, 840.0)
         .min_inner_size(1024.0, 700.0)
         .visible(false)
@@ -472,7 +472,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("failed to build JewelTrackerPro")
+        .expect("failed to build JewelTrackerPro Adagu")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 stop_sidecar(app);

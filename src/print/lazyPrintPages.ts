@@ -7,24 +7,6 @@ import { lazy } from 'react'
  * React Fast Refresh requires. Anything imported here ends up in the print
  * bundle, so these must stay free of auth and app-shell imports.
  */
-export const CashBillPrintPage = lazy(() =>
-  import('../features/invoices/CashBillPrintPage').then((module) => ({
-    default: module.CashBillPrintPage,
-  })),
-)
-export const TaxInvoicePrintPage = lazy(() =>
-  import('../features/invoices/TaxInvoicePrintPage').then((module) => ({
-    default: module.TaxInvoicePrintPage,
-  })),
-)
-export const SampleBillPrintPage = lazy(() =>
-  import('../features/invoices/SampleBillPrintPage').then((module) => ({
-    default: module.SampleBillPrintPage,
-  })),
-)
-export const TestPrintPage = lazy(() =>
-  import('../features/invoices/TestPrintPage').then((module) => ({ default: module.TestPrintPage })),
-)
 export const PledgePrintPage = lazy(() =>
   import('../features/pledges/PledgePrintPage').then((module) => ({
     default: module.PledgePrintPage,
@@ -40,24 +22,9 @@ export const PledgeNoticePrintPage = lazy(() =>
     default: module.PledgeNoticePrintPage,
   })),
 )
-export const MetalDayPrintPage = lazy(() =>
-  import('../features/stock/MetalDayPrintPage').then((module) => ({
-    default: module.MetalDayPrintPage,
-  })),
-)
-export const ClosingSummaryPrintPage = lazy(() =>
-  import('../features/stock/ClosingSummaryPrintPage').then((module) => ({
-    default: module.ClosingSummaryPrintPage,
-  })),
-)
-export const PurchaseInvoicePrintPage = lazy(() =>
-  import('../features/inwards/PurchaseInvoicePrintPage').then((module) => ({
-    default: module.PurchaseInvoicePrintPage,
-  })),
-)
-export const OldGoldPurchasePrintPage = lazy(() =>
-  import('../features/oldGoldPurchases/print/OldGoldPurchasePrintPage').then((module) => ({
-    default: module.OldGoldPurchasePrintPage,
+export const SampleAdaguPrintPage = lazy(() =>
+  import('../features/print/SampleAdaguPrintPage').then((module) => ({
+    default: module.SampleAdaguPrintPage,
   })),
 )
 export const GsReceiptPrintPage = lazy(() =>
@@ -83,5 +50,10 @@ export const GsCallListPrintPage = lazy(() =>
 export const GsBatchReceiptPrintPage = lazy(() =>
   import('../features/goldSavings/print/GsBatchReceiptPrintPage').then((module) => ({
     default: module.GsBatchReceiptPrintPage,
+  })),
+)
+export const GsPayoutPrintPage = lazy(() =>
+  import('../features/goldSavings/print/GsPayoutPrintPage').then((module) => ({
+    default: module.GsPayoutPrintPage,
   })),
 )

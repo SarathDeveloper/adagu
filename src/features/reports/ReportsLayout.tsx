@@ -1,18 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import {
-  BarChart3,
-  ChevronDown,
-  ClipboardList,
-  Landmark,
-  Package,
-  Percent,
-  Receipt,
-  Scale,
-  Users,
-  Wallet,
-  type LucideIcon,
-} from 'lucide-react'
+import { ChevronDown, Landmark, Users, type LucideIcon } from 'lucide-react'
 import {
   findReport,
   REPORT_GROUPS,
@@ -23,22 +11,15 @@ import {
 import { api } from '../../lib/api'
 
 const GROUP_ICONS: Record<ReportGroupId, LucideIcon> = {
-  sales: Receipt,
-  purchase: ClipboardList,
-  stock: Package,
-  customer: Users,
-  payment: Wallet,
-  metal: Scale,
   pledge: Landmark,
-  tax: Percent,
-  summary: BarChart3,
+  customer: Users,
 }
 
-const LookupsContext = createContext<ReportLookups>({
+const EMPTY_LOOKUPS: ReportLookups = {
   customers: [],
-  suppliers: [],
-  products: [],
-})
+}
+
+const LookupsContext = createContext<ReportLookups>(EMPTY_LOOKUPS)
 
 export function useReportLookups(): ReportLookups {
   return useContext(LookupsContext)
@@ -52,11 +33,7 @@ export function ReportsLayout() {
   const location = useLocation()
   const activeReport = findReport(location.pathname.split('/').pop() ?? '')
   const [openGroup, setOpenGroup] = useState<ReportGroupId | null>(null)
-  const [lookups, setLookups] = useState<ReportLookups>({
-    customers: [],
-    suppliers: [],
-    products: [],
-  })
+  const [lookups, setLookups] = useState<ReportLookups>(EMPTY_LOOKUPS)
   const navRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -65,7 +42,7 @@ export function ReportsLayout() {
       if (!cancelled) setLookups(data)
     }).catch(() => {
       if (!cancelled) {
-        setLookups({ customers: [], suppliers: [], products: [] })
+        setLookups(EMPTY_LOOKUPS)
       }
     })
     return () => {

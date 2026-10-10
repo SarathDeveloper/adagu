@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../../lib/api'
 
-export const DEFAULT_APP_SUBTITLE = 'Billing & inventory'
-export const DEFAULT_WINDOW_TITLE = 'JewelTrackerPro'
+export const DEFAULT_APP_SUBTITLE = 'Adagu & Gold Savings'
+export const DEFAULT_WINDOW_TITLE = 'JewelTrackerPro Adagu'
 
 interface ShopBranding {
   shopName: string

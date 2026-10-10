@@ -27,7 +27,7 @@ describe('diagnostic classification', () => {
   it('skips expected shop-facing errors', () => {
     expect(isExpectedError(new Error('Export cancelled'))).toBe(true)
     expect(isExpectedError(new Error('Invoice not found'))).toBe(true)
-    expect(isExpectedError(new Error('Insufficient stock for Ring'))).toBe(true)
+    expect(isExpectedError(new Error('Scheme not found'))).toBe(true)
     expect(isExpectedError(new ZodError([]))).toBe(true)
     expect(isExpectedError({ name: 'SqliteError', code: 'SQLITE_CONSTRAINT', message: 'UNIQUE' })).toBe(
       true,
@@ -41,12 +41,12 @@ describe('diagnostic classification', () => {
   })
 
   it('routes unexpected failures to category files', () => {
-    expect(classifyFailure('/api/products', new Error('Invoice not found'))).toBeNull()
+    expect(classifyFailure('/api/adagu', new Error('Invoice not found'))).toBeNull()
     expect(classifyFailure('/api/backup/restore', new Error('Backup file was not found'))).toBe('backup')
     expect(
-      classifyFailure('/api/products', { name: 'SqliteError', code: 'SQLITE_IOERR', message: 'disk I/O' }),
+      classifyFailure('/api/adagu', { name: 'SqliteError', code: 'SQLITE_IOERR', message: 'disk I/O' }),
     ).toBe('database')
-    expect(classifyFailure('/api/products', new Error('disk I/O error'))).toBe('application')
+    expect(classifyFailure('/api/adagu', new Error('disk I/O error'))).toBe('application')
   })
 })
 

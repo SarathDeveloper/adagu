@@ -83,9 +83,13 @@ describe('settings IPC', () => {
     expect(reloaded.promoLine).toBe('Hallmarked jewellery')
   })
 
+  it('returns Adagu & Gold Savings as the default app subtitle', async () => {
+    const settings = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
+    expect(settings.appSubtitle).toBe('Adagu & Gold Savings')
+  })
+
   it('persists app subtitle for sidebar branding', async () => {
     const current = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
-    expect(current.appSubtitle).toBe('Billing & inventory')
 
     const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {
       ...current,
@@ -106,66 +110,73 @@ describe('settings IPC', () => {
     expect(reloaded.appSubtitle).toBe('Gold and silver')
   })
 
-  it('persists printer paper size, copies, and cash drawer flag', async () => {
+  it('persists printer paper size and copies', async () => {
     const current = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
     expect(current.paperSizeCash).toBe('a5')
-    expect(current.paperSizeTax).toBe('a4')
-    expect(current.billTemplate.taxColParticulars).toBe('Particulars')
-    expect(current.billTemplate.taxColTotWgt).toBe('Tot Wgt')
-    expect(current.billTemplate.taxColStnWgt).toBe('Stn Wgt')
-    expect(current.billTemplate.taxColVamc).toBe('VA/MC')
-    expect(current.billTemplate.taxColStoneRate).toBe('Stone Rate')
-    expect(current.billTemplate.taxColMetalRate).toBe('Gld/Slvr Rate')
     expect(current.copiesCash).toBe(1)
-    expect(current.openCashDrawer).toBe(false)
 
     const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {
       ...current,
       shopName: 'Printer Shop',
       paperSizeCash: 'thermal',
-      paperSizeTax: 'a4',
       copiesCash: 2,
-      copiesTax: 3,
-      openCashDrawer: true,
     })
 
     expect(updated.paperSizeCash).toBe('thermal')
-    expect(updated.paperSizeTax).toBe('a4')
     expect(updated.copiesCash).toBe(2)
-    expect(updated.copiesTax).toBe(3)
-    expect(updated.openCashDrawer).toBe(true)
 
     const reloaded = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
     expect(reloaded.paperSizeCash).toBe('thermal')
-    expect(reloaded.copiesTax).toBe(3)
-    expect(reloaded.openCashDrawer).toBe(true)
+    expect(reloaded.copiesCash).toBe(2)
   })
 
-  it('persists cash and tax template visibility and presets', async () => {
+  it('persists Adagu and Gold Savings template visibility', async () => {
     const current = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
-    expect(current.cashPreset).toBe('detailed')
     expect(current.cashVisibility.showWastageCol).toBe(true)
     expect(current.taxVisibility.showWastageCol).toBe(true)
 
     const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {
       ...current,
       shopName: 'Visibility Shop',
-      cashPreset: 'compact',
-      taxPreset: 'thermal',
       cashVisibility: { ...current.cashVisibility, showWastageCol: false, showOtherCol: false },
       taxVisibility: { ...current.taxVisibility, showWastageCol: false, showMarketRates: false },
     })
 
-    expect(updated.cashPreset).toBe('compact')
-    expect(updated.taxPreset).toBe('thermal')
     expect(updated.cashVisibility.showWastageCol).toBe(false)
     expect(updated.taxVisibility.showWastageCol).toBe(false)
 
     const reloaded = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
-    expect(reloaded.cashPreset).toBe('compact')
     expect(reloaded.cashVisibility.showWastageCol).toBe(false)
-    expect(reloaded.taxPreset).toBe('thermal')
+    expect(reloaded.cashVisibility.showOtherCol).toBe(false)
+    expect(reloaded.taxVisibility.showWastageCol).toBe(false)
     expect(reloaded.taxVisibility.showMarketRates).toBe(false)
+  })
+
+  it('persists the Adagu pledge defaults', async () => {
+    const current = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
+    expect(current.pledgeLtvPct).toBe(75)
+    expect(current.adaguInterestPct).toBe(2.1)
+    expect(current.adaguAuctionNoticeDays).toBe(14)
+
+    const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {
+      ...current,
+      shopName: 'Adagu Shop',
+      pledgeLtvPct: 70,
+      adaguInterestPct: 2.5,
+      adaguAuctionNoticeDays: 21,
+      adaguRequireKyc: true,
+    })
+
+    expect(updated.pledgeLtvPct).toBe(70)
+    expect(updated.adaguInterestPct).toBe(2.5)
+    expect(updated.adaguAuctionNoticeDays).toBe(21)
+    expect(updated.adaguRequireKyc).toBe(true)
+
+    const reloaded = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
+    expect(reloaded.pledgeLtvPct).toBe(70)
+    expect(reloaded.adaguInterestPct).toBe(2.5)
+    expect(reloaded.adaguAuctionNoticeDays).toBe(21)
+    expect(reloaded.adaguRequireKyc).toBe(true)
   })
 
   it('persists logo image path through update and reloads from SQLite', async () => {
@@ -208,12 +219,10 @@ describe('settings IPC', () => {
     expect(reloaded.passbookSideImagePath).toBe('/uploads/passbook-side.png')
   })
 
-  it('returns product and customer counts from SQLite', async () => {
-    const counts = await ipc<{ products: number; customers: number }>(IPC_CHANNELS.SETTINGS_COUNTS)
+  it('returns the customer count from SQLite', async () => {
+    const counts = await ipc<{ customers: number }>(IPC_CHANNELS.SETTINGS_COUNTS)
     const db = getDatabase()
-    const products = db.prepare('SELECT COUNT(*) AS n FROM products').get() as { n: number }
     const customers = db.prepare('SELECT COUNT(*) AS n FROM customers').get() as { n: number }
-    expect(counts.products).toBe(products.n)
     expect(counts.customers).toBe(customers.n)
   })
 

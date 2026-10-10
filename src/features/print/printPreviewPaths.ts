@@ -1,7 +1,4 @@
-import type { BillFormat } from '@shared/types'
-import { printPath } from '../../lib/api'
-
-export type SamplePrintKind = 'cash' | 'tax' | 'adagu'
+export type SamplePrintKind = 'adagu'
 
 export function withEmbedFlag(path: string): string {
   const url = new URL(path, 'http://print.local')
@@ -10,16 +7,10 @@ export function withEmbedFlag(path: string): string {
 }
 
 export const printPreviewPaths = {
-  invoice: (invoiceId: number, format: BillFormat) => printPath(invoiceId, format),
-  cashBill: (invoiceId: number) => `/print/cash-bill/${invoiceId}`,
-  taxInvoice: (invoiceId: number) => `/print/tax-invoice/${invoiceId}`,
   pledge: (pledgeId: number) => `/print/pledge/${pledgeId}`,
   pledgeRelease: (pledgeId: number) => `/print/pledge-release/${pledgeId}`,
   pledgeNotice: (pledgeId: number) => `/print/pledge-notice/${pledgeId}`,
-  purchase: (inwardId: number) => `/print/purchase/${inwardId}`,
-  oldGoldPurchase: (purchaseId: number) => `/print/old-gold-purchase/${purchaseId}`,
-  metalDay: (date: string, metal: string) => `/print/metal-day/${date}/${metal}`,
-  stockClosing: (date: string, mode: string) => `/print/stock-closing/${date}?mode=${encodeURIComponent(mode)}`,
   sample: (kind: SamplePrintKind) => `/print/sample/${kind}`,
   gsPassbook: (accountId: number) => `/print/gs-passbook/${accountId}`,
+  gsPayout: (redemptionId: number) => `/print/gs-payout/${redemptionId}`,
 }

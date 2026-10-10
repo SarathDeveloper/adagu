@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "JewelTrackerPro",
+  "productName": "JewelTrackerPro Adagu",
   "version": "1.0.0",
-  "identifier": "com.jeweltrackerpro.desktop",
+  "identifier": "com.jeweltrackerpro.adagu",
   "build": {
     "frontendDist": "splash",
     "devUrl": "http://127.0.0.1:5173",

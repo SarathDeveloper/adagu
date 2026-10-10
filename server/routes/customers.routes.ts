@@ -20,7 +20,7 @@ type CustomerRow = {
   created_at: string
 }
 
-function mapCustomer(row: CustomerRow & { last_bill_date?: string | null }): Customer {
+function mapCustomer(row: CustomerRow): Customer {
   return {
     id: row.id,
     name: row.name,
@@ -33,19 +33,6 @@ function mapCustomer(row: CustomerRow & { last_bill_date?: string | null }): Cus
     pan: row.pan ?? '',
     idProofType: row.id_proof_type ?? '',
     createdAt: row.created_at,
-    lastBillDate: row.last_bill_date ?? null,
-  }
-}
-
-export function assertCustomerAllowedForBill(
-  db: ReturnType<typeof getDatabase>,
-  customerId: number,
-): void {
-  const row = db.prepare('SELECT id FROM customers WHERE id = ?').get(customerId) as
-    | { id: number }
-    | undefined
-  if (!row) {
-    throw new Error('Customer not found')
   }
 }
 
@@ -54,19 +41,15 @@ router.get(
   asyncHandler((req, res) => {
     const db = getDatabase()
     const term = typeof req.query.q === 'string' ? req.query.q.trim() : ''
-    const lastBill = `(SELECT MAX(invoice_date) FROM invoices
-       WHERE customer_id = customers.id AND status = 'final' AND is_estimate = 0) AS last_bill_date`
     const rows = term
       ? (db
           .prepare(
-            `SELECT *, ${lastBill} FROM customers
+            `SELECT * FROM customers
              WHERE name LIKE ? OR phone LIKE ?
              ORDER BY created_at DESC`,
           )
-          .all(`%${term}%`, `%${term}%`) as Array<CustomerRow & { last_bill_date: string | null }>)
-      : (db
-          .prepare(`SELECT *, ${lastBill} FROM customers ORDER BY created_at DESC`)
-          .all() as Array<CustomerRow & { last_bill_date: string | null }>)
+          .all(`%${term}%`, `%${term}%`) as CustomerRow[])
+      : (db.prepare('SELECT * FROM customers ORDER BY created_at DESC').all() as CustomerRow[])
     res.json(rows.map(mapCustomer))
   }),
 )
@@ -152,10 +135,6 @@ router.delete(
       | undefined
     if (!existing) {
       throw new Error('Customer not found')
-    }
-    const invoice = db.prepare('SELECT id FROM invoices WHERE customer_id = ? LIMIT 1').get(id)
-    if (invoice) {
-      throw new Error('Cannot delete customer with existing invoices')
     }
     const dueEntry = db.prepare('SELECT id FROM customer_dues WHERE customer_id = ? LIMIT 1').get(id)
     if (dueEntry) {

@@ -1,17 +1,21 @@
 import { expect, test } from './fixtures/web-app'
 import { sidebarLink } from './helpers/nav'
-import { seedFinalInvoice } from './helpers/seed'
+import { seedPledge } from './helpers/seed'
 
-test('dues ledger shows bill after finalize', async ({ window }) => {
-  await seedFinalInvoice(window)
+test('dues ledger lists an Adagu loan after sanction', async ({ window }) => {
+  await seedPledge(window)
 
   await sidebarLink(window, 'Dues').click()
-  await expect(window.getByRole('heading', { name: /Dues/i })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Adagu Dues' })).toBeVisible()
   await expect(window.getByText('E2E Customer')).toBeVisible()
-  await window.getByRole('button', { name: 'Details' }).click()
-  await expect(window.getByRole('heading', { name: 'Payment detail' })).toBeVisible()
-  await expect(window.getByText(/Bill (CB-|TI-)/)).toBeVisible()
-  await expect(window.getByText('E2E Chain')).toBeVisible()
-  await expect(window.getByText('E2E Customer').nth(1)).toBeVisible()
-  await expect(window.getByRole('button', { name: 'Mark paid' })).toBeVisible()
+  await expect(window.getByText(/ADG/)).toBeVisible()
+
+  await window.getByRole('button', { name: 'View' }).click()
+  const drawer = window.getByRole('dialog', { name: 'E2E Customer' })
+  await expect(drawer.getByRole('heading', { name: 'Loan Summary' })).toBeVisible()
+  await expect(drawer.getByRole('heading', { name: 'Gold Pledged' })).toBeVisible()
+  await expect(drawer.getByRole('heading', { name: 'Due Summary' })).toBeVisible()
+  await expect(drawer.getByRole('heading', { name: 'Payment History' })).toBeVisible()
+  await expect(drawer.getByText('E2E Chain')).toBeVisible()
+  await expect(drawer.getByText('Collect interest').first()).toBeVisible()
 })

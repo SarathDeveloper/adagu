@@ -1,11 +1,11 @@
 ---
-description: Compact module top nav tabs — Inventory chrome is the source of truth
+description: Compact module top nav tabs — Gold Savings chrome is the source of truth
 alwaysApply: true
 ---
 
 # Module top nav tabs
 
-Every module’s compact top tabs use `.billing-chrome` / `.billing-chrome-tab`. Copy Inventory (`src/features/inventory/InventoryLayout.tsx`). Do not invent a second tab bar.
+Every module’s compact top tabs use `.billing-chrome` / `.billing-chrome-tab`. Copy Gold Savings (`src/features/goldSavings/GoldSavingsLayout.tsx`), or Adagu (`src/features/pledges/AdaguLayout.tsx`). Do not invent a second tab bar.
 
 ## Compact spec (source of truth)
 
@@ -29,7 +29,7 @@ Every module’s compact top tabs use `.billing-chrome` / `.billing-chrome-tab`.
 
 ## Do / don't
 
-- **Do** reuse these classes on Billing, Inventory, Reports, and any new module
+- **Do** reuse these classes on Adagu, Gold Savings, Reports, Settings, and any new module
 - **Don't** size compact tabs from the editor/page underneath
 - **Don't** give compact tabs per-type active colors
-- **Exception:** Billing landing cards (`.billing-chrome--list`) keep the large colored tiles; that is not the compact tab bar
+- **Exception:** large colored landing tiles (`.billing-chrome--list`) are not the compact tab bar

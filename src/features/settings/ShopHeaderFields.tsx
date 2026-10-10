@@ -1,6 +1,6 @@
 import { Upload } from 'lucide-react'
 import type { ShopSettings } from '@shared/types'
-import { defaultShopLogoUrl, localImageSrc } from '../invoices/mapShopDisplay'
+import { defaultShopLogoUrl, localImageSrc } from '../print/mapShopDisplay'
 
 export function RequiredMark() {
   return (

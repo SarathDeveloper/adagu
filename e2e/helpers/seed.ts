@@ -24,8 +24,12 @@ async function apiCall<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export async function seedFinalInvoice(page: Page): Promise<number> {
-  const invoiceDate = localTodayIso()
+/**
+ * Create a customer and a sanctioned Adagu pledge, then return the pledge id.
+ * Used by the customer, dues and print-route specs.
+ */
+export async function seedPledge(page: Page): Promise<number> {
+  const pledgeDate = localTodayIso()
   return page.evaluate(async (date) => {
     async function api<T>(path: string, init?: RequestInit): Promise<T> {
       const response = await fetch(path, {
@@ -44,78 +48,43 @@ export async function seedFinalInvoice(page: Page): Promise<number> {
       body: JSON.stringify({
         name: 'E2E Customer',
         phone: '9000000000',
-        address: 'Test',
+        address: 'Salem',
         notes: '',
       }),
     })
-    const product = await api<{ id: number }>('/api/products', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: 'E2E Chain',
-        category: 'Chain',
-        metal: 'Gold',
-        purity: '22K',
-        grossWeight: 10,
-        netWeight: 2.5,
-        makingCharges: 0,
-        stockQty: 5,
-        imagePath: '',
-        huids: ['E00001', 'E00002', 'E00003', 'E00004', 'E00005'],
-      }),
-    })
-    const invoice = await api<{ id: number }>('/api/invoices', {
+    const pledge = await api<{ id: number }>('/api/pledges', {
       method: 'POST',
       body: JSON.stringify({
         customerId: customer.id,
-        invoiceDate: date,
-        tax: 0,
-        autoTax: false,
-        paymentMode: 'upi',
+        pledgeDate: date,
+        assessedValue: 20000,
+        loanAmount: 10000,
+        interestPct: 2.1,
         items: [
           {
-            productId: product.id,
-            qty: 1,
-            rate: 1000,
-            metalRate: 1000,
-            netWeight: 2.5,
-            huid: 'E00001',
+            description: 'E2E Chain',
+            metal: 'Gold',
+            purity: '22K',
+            grossWeight: 10,
+            netWeight: 9.5,
+            pieces: 1,
           },
         ],
       }),
     })
-    const finalized = await api<{ id: number }>(`/api/invoices/${invoice.id}/finalize`, { method: 'POST' })
-    return finalized.id
-  }, invoiceDate)
+    await api(`/api/pledges/${pledge.id}/sanction`, { method: 'POST' })
+    return pledge.id
+  }, pledgeDate)
 }
 
-/** Create a single-piece product tagged with one known HUID, for scan-to-bill tests. */
-export async function seedTaggedProduct(
-  page: Page,
-  values: { name: string; huid: string },
-): Promise<number> {
-  return page.evaluate(async ({ name, huid }) => {
-    const response = await fetch('/api/products', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        category: 'Ring',
-        metal: 'Gold',
-        purity: '22K',
-        grossWeight: 3,
-        netWeight: 2.5,
-        makingCharges: 0,
-        stockQty: 1,
-        imagePath: '',
-        huids: [huid],
-      }),
-    })
-    if (!response.ok) {
-      throw new Error(await response.text())
-    }
-    const product = (await response.json()) as { id: number }
-    return product.id
-  }, values)
+/** Seed the Gold Savings demo data and return a real payment id for a receipt print. */
+export function seedGoldSavingsDemoPayment(): number | null {
+  const db = getDatabase()
+  seedSampleGoldSavingsIfEmpty(db)
+  const row = db.prepare('SELECT id FROM gold_saving_payments ORDER BY id LIMIT 1').get() as
+    | { id: number }
+    | undefined
+  return row?.id ?? null
 }
 
 export async function seedShopName(page: Page, shopName: string): Promise<void> {

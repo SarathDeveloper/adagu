@@ -60,8 +60,7 @@ import {
   parseNumericField,
   type NumericField,
 } from "../../lib/numericField";
-import { BillCustomerSearch } from "../invoices/BillCustomerSearch";
-import { setBillingType } from "../invoices/billingType";
+import { CustomerSearch } from "../customers/CustomerSearch";
 import { PledgePreviewModal } from "./PledgePreviewModal";
 import { printPreviewPaths } from "../print/printPreviewPaths";
 import { downloadPrintPdf } from "../print/downloadPrintPdf";
@@ -189,10 +188,6 @@ export function PledgeEditorPage() {
   );
   const displayInterestPct = numericFieldToNumber(interestPct);
   const displayBillNo = pledge?.receiptNo || previewReceiptNo || "…";
-
-  useEffect(() => {
-    setBillingType("adagu");
-  }, []);
 
   useEffect(() => {
     if (!isNew || pledge?.receiptNo) return;
@@ -577,7 +572,7 @@ export function PledgeEditorPage() {
       if (isNew && !pledge?.id) {
         const created = await api.createPledge(payload);
         setPledge(created);
-        navigate(`/billing/adagu/${created.id}`, { replace: true });
+        navigate(`/adagu/${created.id}`, { replace: true });
         return created;
       }
       const targetId = pledge?.id ?? Number(id);
@@ -819,7 +814,7 @@ export function PledgeEditorPage() {
       await api.deletePledge(targetId);
       setDeleteOpen(false);
       showToast("Draft deleted", "success");
-      navigate("/billing");
+      navigate("/adagu");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete draft");
     } finally {
@@ -863,7 +858,7 @@ export function PledgeEditorPage() {
             {pledge?.renewedFromId ? (
               <Link
                 className="adagu-header-renew-link"
-                to={`/billing/adagu/${pledge.renewedFromId}`}
+                to={`/adagu/${pledge.renewedFromId}`}
               >
                 Renewed from {pledge.renewedFromReceiptNo || `ADG #${pledge.renewedFromId}`}
               </Link>
@@ -871,7 +866,7 @@ export function PledgeEditorPage() {
             {pledge?.renewedToId ? (
               <Link
                 className="adagu-header-renew-link"
-                to={`/billing/adagu/${pledge.renewedToId}`}
+                to={`/adagu/${pledge.renewedToId}`}
               >
                 Renewed to {pledge.renewedToReceiptNo || `ADG #${pledge.renewedToId}`}
               </Link>
@@ -908,7 +903,7 @@ export function PledgeEditorPage() {
             <span>Loan</span>
             <strong>{formatCurrency(numericFieldToNumber(loanAmount))}</strong>
           </span>
-          <Link to="/billing" className="btn ghost">
+          <Link to="/adagu" className="btn ghost">
             <ArrowLeft size={16} strokeWidth={1.75} aria-hidden /> Back
           </Link>
           <button
@@ -1041,7 +1036,7 @@ export function PledgeEditorPage() {
                 </div>
               </div>
               <div className="sale-bill-customer-search-wrap">
-                <BillCustomerSearch
+                <CustomerSearch
                   customers={customers}
                   customerId={customerId}
                   disabled={!canEdit || busy}

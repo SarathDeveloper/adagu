@@ -5,8 +5,8 @@ import {
   EMPTY_SHOP_DISPLAY,
   localImageSrc,
   type ShopDisplayInfo,
-} from '../../invoices/mapShopDisplay'
-import { paperClassName } from '../../invoices/paperSize'
+} from '../../print/mapShopDisplay'
+import { paperClassName } from '../../print/paperSize'
 import { groupCallList } from './gsCallListRows'
 import './GsCallListPrint.css'
 

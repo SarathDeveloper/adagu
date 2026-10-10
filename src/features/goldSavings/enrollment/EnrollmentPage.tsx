@@ -9,7 +9,7 @@ import { useToast } from '../../../components/toastContext'
 import { ConfirmDialog } from '../../../components/ConfirmDialog'
 import { formatCurrency, formatDisplayDate, formatWeight } from '../../../lib/format'
 import { api } from '../../../lib/api'
-import { BillCustomerSearch } from '../../invoices/BillCustomerSearch'
+import { CustomerSearch } from '../../customers/CustomerSearch'
 import { PrintPreviewModal } from '../../print/PrintPreviewModal'
 import { GsGoldWeightPreview } from '../GsGoldWeightPreview'
 import { GsRateNotice } from '../GsRateNotice'
@@ -124,7 +124,7 @@ export function EnrollmentPage() {
         <div className="settings-stack">
           <section className="card padded">
             <h2 className="settings-section-title">Customer information</h2>
-            <BillCustomerSearch
+            <CustomerSearch
               customers={customers}
               customerId={customerId}
               onSelect={(next) => {

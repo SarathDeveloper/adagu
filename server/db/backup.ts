@@ -33,8 +33,14 @@ export const LAST_OFFSITE_AT_KEY = 'last_offsite_at'
 export const LAST_OFFSITE_ERROR_KEY = 'last_offsite_error'
 export const LAST_OFFSITE_SOURCE_KEY = 'last_offsite_source'
 
-const RESTORE_REQUIRED_TABLES = ['schema_migrations', 'users', 'shop_settings', 'products', 'invoices'] as const
-const INVOICE_INSTANT_COLUMNS = ['created_at', 'invoice_date', 'bill_date', 'date'] as const
+const RESTORE_REQUIRED_TABLES = [
+  'schema_migrations',
+  'users',
+  'shop_settings',
+  'customers',
+  'pledges',
+  'gold_saving_accounts',
+] as const
 
 /**
  * Serialises every operation that reads or replaces the database files, so a
@@ -214,7 +220,7 @@ export function assertRestorableBackup(filePath: string): void {
     const tables = listTableNames(db)
     const missing = RESTORE_REQUIRED_TABLES.filter((table) => !tables.has(table))
     if (missing.length > 0) {
-      throw new HttpError(400, 'This file is not a JewelTrackerPro backup')
+      throw new HttpError(400, 'This file is not a JewelTrackerPro Adagu backup')
     }
     if (schemaVersionOf(db, tables) > latestMigrationVersion()) {
       throw new HttpError(
@@ -251,31 +257,14 @@ export function inspectBackup(name: string): BackupInspection {
       issues.push('Made by a newer version of the app')
     }
 
-    let latestInvoiceAt: string | null = null
-    if (tables.has('invoices')) {
-      const columns = (
-        db.prepare('PRAGMA table_info("invoices")').all() as { name: string }[]
-      ).map((row) => row.name)
-      const column = INVOICE_INSTANT_COLUMNS.find((candidate) => columns.includes(candidate))
-      if (column) {
-        const row = db.prepare(`SELECT MAX("${column}") AS value FROM invoices`).get() as {
-          value: string | null
-        }
-        latestInvoiceAt = row.value ?? null
-      }
-    }
-
     return {
       name,
       schemaVersion,
       appSchemaVersion: latestMigrationVersion(),
       restorable: issues.length === 0,
-      latestInvoiceAt,
       counts: {
         customers: countIfPresent(db, tables, 'customers'),
-        invoices: countIfPresent(db, tables, 'invoices'),
         pledges: countIfPresent(db, tables, 'pledges'),
-        products: countIfPresent(db, tables, 'products'),
         goldSavingAccounts: countIfPresent(db, tables, 'gold_saving_accounts'),
       },
       issues,

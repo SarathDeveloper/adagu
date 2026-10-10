@@ -5,7 +5,6 @@ import { ensureDefaultAdmin, seedE2eAdmin } from '../auth/users'
 import { getDataDir } from '../lib/paths'
 import { sqliteNativeOptions } from '../lib/sqliteNative'
 import { getMigrations } from './migrations'
-import { ensureStockCategories } from './stockCategories'
 import { writePremigrateSnapshot } from './snapshot'
 import { backfillLegacyPledgePayments } from '../pledges/backfill'
 
@@ -80,7 +79,6 @@ export function initDatabase(): Database.Database {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   runMigrations(db)
-  ensureStockCategories(db)
   backfillLegacyPledgePayments(db)
   if (process.env.JEWELTRACKERPRO_E2E === '1') {
     seedE2eAdmin(db)

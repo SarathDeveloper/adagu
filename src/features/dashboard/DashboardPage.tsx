@@ -1,45 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Banknote,
   Calendar,
   ChevronDown,
-  Coins,
-  FileEdit,
+  Handshake,
   IndianRupee,
-  Package,
   Plus,
   RefreshCw,
+  ShieldAlert,
+  Sparkles,
   UserPlus,
   Users,
   Wallet,
   Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { STOCK_METALS } from '@shared/itemTypes'
 import { localTodayIso } from '@shared/localDate'
-import type {
-  DuesLedger,
-  GoldSavingDashboard,
-  Invoice,
-  InvoiceListStats,
-  ItemStockRow,
-  MetalRates,
-  StockReconciliationRow,
-} from '@shared/types'
-import { formatCurrency, formatDisplayDate, formatInr, formatPaymentMode, formatWeight } from '../../lib/format'
+import type { DuesLedger, GoldSavingDashboard, MetalRates } from '@shared/types'
+import { formatCurrency, formatDisplayDate, formatInr, formatWeight } from '../../lib/format'
 import { api } from '../../lib/api'
 import { useAuth } from '../auth/authContext'
-import { CategoryStockCard } from './CategoryStockCard'
 import { DashboardAlertsMenu } from './DashboardAlertsMenu'
 import {
-  applyInvoiceStats,
+  adaguFollowUps,
   buildDashboardAlerts,
-  periodGranularity,
-  RECENT_BILLS_LIMIT,
-  resolvePeriodRange,
-  type DashboardStats,
-  type OldGoldTodayStats,
+  computeAdaguCollectionsInRange,
+  computeAdaguStats,
+  computeDueCollections,
 } from './dashboardStats'
 
 function formatDashboardDate(isoDate: string): string {
@@ -58,25 +45,6 @@ function greetingForHour(hour: number): string {
 
 type KpiTone = 'brand' | 'success' | 'danger' | 'info'
 
-function KpiSparkline({ values }: { values: number[] }) {
-  if (!values.length) {
-    return null
-  }
-  const max = Math.max(...values, 1)
-  const points = values
-    .map((value, index) => {
-      const x = (index / Math.max(values.length - 1, 1)) * 100
-      const y = 22 - (value / max) * 20
-      return `${x},${y}`
-    })
-    .join(' ')
-  return (
-    <svg className="dashboard-kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden>
-      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  )
-}
-
 function KpiCard({
   to,
   label,
@@ -84,7 +52,6 @@ function KpiCard({
   hint,
   icon: Icon,
   tone,
-  sparkline,
 }: {
   to?: string
   label: string
@@ -92,7 +59,6 @@ function KpiCard({
   hint?: string
   icon: LucideIcon
   tone: KpiTone
-  sparkline?: number[]
 }) {
   const body = (
     <>
@@ -104,7 +70,6 @@ function KpiCard({
         <span className="kpi-value num">{value}</span>
         {hint ? <span className="dashboard-kpi-hint">{hint}</span> : null}
       </div>
-      {sparkline ? <KpiSparkline values={sparkline} /> : null}
     </>
   )
 
@@ -231,8 +196,8 @@ function GoldRateTicker({ rates }: { rates: MetalRates | null }) {
             <span className="num">{formatRateAmount(rates?.gold24k)}</span>
           </button>
           {rates ? null : (
-            <Link to="/settings" className="dashboard-rate-menu-link" onClick={() => setOpen(false)}>
-              Set rates in Settings
+            <Link to="/rates" className="dashboard-rate-menu-link" onClick={() => setOpen(false)}>
+              Set rates in Rates
             </Link>
           )}
         </div>
@@ -249,15 +214,9 @@ export function DashboardPage() {
   const { user, can } = useAuth()
   const displayName = user?.username || 'Shop Owner'
   const avatarLetter = displayName.charAt(0).toUpperCase()
-  const [invoiceStats, setInvoiceStats] = useState<InvoiceListStats | null>(null)
-  const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([])
   const [ledger, setLedger] = useState<DuesLedger | undefined>(undefined)
-  const [goldStock, setGoldStock] = useState<ItemStockRow[]>([])
-  const [silverStock, setSilverStock] = useState<ItemStockRow[]>([])
   const [metalRates, setMetalRates] = useState<MetalRates | null>(null)
-  const [reconciliation, setReconciliation] = useState<StockReconciliationRow[] | null>(null)
   const [goldSavings, setGoldSavings] = useState<GoldSavingDashboard | null>(null)
-  const [oldGoldStats, setOldGoldStats] = useState<OldGoldTodayStats | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -266,28 +225,8 @@ export function DashboardPage() {
 
   const today = localTodayIso()
   const greeting = greetingForHour(new Date().getHours())
-  const range = resolvePeriodRange('today', today, today, today)
-  const granularity = periodGranularity('today', range)
-  const emptyStats: InvoiceListStats = {
-    sales: 0,
-    collections: 0,
-    draftCount: 0,
-    billsGenerated: 0,
-    customersBilled: 0,
-    totalItemsSold: 0,
-    chart: [],
-    collectionsChart: [],
-  }
-  const stats: DashboardStats = applyInvoiceStats(
-    invoiceStats ?? emptyStats,
-    recentInvoices,
-    ledger,
-    goldStock,
-    silverStock,
-    today,
-    { period: 'today', customFrom: today, customTo: today },
-    oldGoldStats,
-  )
+  const monthStart = `${today.slice(0, 8)}01`
+  const canGoldSavings = can('gold_savings')
 
   useEffect(() => {
     let active = true
@@ -298,42 +237,15 @@ export function DashboardPage() {
           if (hasLoadedRef.current) setRefreshing(true)
           else setLoading(true)
         }
-        const [
-          statsPayload,
-          recentPage,
-          dues,
-          goldRows,
-          silverRows,
-          latestRates,
-          reconRows,
-          gsDashboard,
-          oldGoldPayload,
-        ] = await Promise.all([
-            api.getInvoiceStats({ from: range.from, to: range.to, granularity }).catch(() => emptyStats),
-            api.listInvoices({ page: 1, pageSize: RECENT_BILLS_LIMIT, sort: 'desc' }).catch(() => ({
-              items: [] as Invoice[],
-              total: 0,
-              page: 1,
-              pageSize: RECENT_BILLS_LIMIT,
-            })),
-            api.listDues().catch(() => undefined),
-            api.listItemStock({ stockDate: today, metal: STOCK_METALS[0] }).catch(() => [] as ItemStockRow[]),
-            api.listItemStock({ stockDate: today, metal: STOCK_METALS[1] }).catch(() => [] as ItemStockRow[]),
-            api.getLatestMetalRates().catch(() => null),
-            can('stock') ? api.getStockReconciliation(today).catch(() => null) : Promise.resolve(null),
-            can('gold_savings') ? api.getGsDashboard().catch(() => null) : Promise.resolve(null),
-            api.getOldGoldPurchaseStats(today).catch(() => null),
-          ])
+        const [dues, latestRates, gsDashboard] = await Promise.all([
+          api.listDues().catch(() => undefined),
+          api.getLatestMetalRates().catch(() => null),
+          canGoldSavings ? api.getGsDashboard().catch(() => null) : Promise.resolve(null),
+        ])
         if (active) {
-          setInvoiceStats(statsPayload ?? emptyStats)
-          setRecentInvoices(recentPage.items ?? [])
           setLedger(dues)
-          setGoldStock(goldRows)
-          setSilverStock(silverRows)
           setMetalRates(latestRates)
-          setReconciliation(reconRows)
           setGoldSavings(gsDashboard)
-          setOldGoldStats(oldGoldPayload)
           hasLoadedRef.current = true
         }
       } catch (err) {
@@ -350,38 +262,31 @@ export function DashboardPage() {
     return () => {
       active = false
     }
-  }, [today, refreshKey, range.from, range.to, granularity, can])
+  }, [today, refreshKey, canGoldSavings])
 
-  const recentBills = stats.recentBills ?? []
-  const sales = stats.salesOverview
-  const outstandingHint =
-    stats.outstandingCustomerCount > 0
-      ? `${stats.outstandingCustomerCount} customer${stats.outstandingCustomerCount === 1 ? '' : 's'}`
-      : undefined
-  const draftHint = stats.draftCount > 0 ? 'Needs attention' : undefined
-  const oldGold = stats.oldGoldToday
-  const oldGoldHint =
-    oldGold.count > 0
-      ? `${formatWeight(oldGold.netWeight)} · open ₹ ${formatInr(oldGold.openBalance)}`
-      : undefined
-  const salesSparkline = sales.hourlyTotals
-  const collectionsSparkline = sales.collectionTotals
-  const alerts = buildDashboardAlerts(ledger, reconciliation, goldSavings, today)
+  const adagu = computeAdaguStats(ledger, today)
+  const followUps = adaguFollowUps(ledger, today)
+  const { dueCollections, outstandingCustomerCount } = computeDueCollections(ledger, today)
+  const adaguCollectedThisMonth = computeAdaguCollectionsInRange(
+    ledger?.columns.flatMap((column) => column.entries ?? []),
+    monthStart,
+    today,
+  )
+  const maturingAccounts = goldSavings?.maturingAccounts ?? []
+  const alerts = buildDashboardAlerts(ledger, goldSavings, today)
 
   return (
     <div className="dashboard-page">
       <header className="dashboard-header">
         <div>
           <h1>Dashboard</h1>
-          <p className="dashboard-greeting">{greeting}, {displayName}</p>
+          <p className="dashboard-greeting">
+            {greeting}, {displayName}
+          </p>
         </div>
         <div className="dashboard-header-tools">
           <GoldRateTicker rates={metalRates} />
-          <RateTicker
-            metal="silver"
-            label="SILVER/1g"
-            amount={formatRateAmount(metalRates?.silverFine)}
-          />
+          <RateTicker metal="silver" label="SILVER/1g" amount={formatRateAmount(metalRates?.silverFine)} />
           <span className="dashboard-date-chip">
             <Calendar size={15} strokeWidth={1.75} aria-hidden />
             {formatDashboardDate(today)}
@@ -393,15 +298,13 @@ export function DashboardPage() {
             disabled={loading || refreshing}
             aria-label="Refresh dashboard"
           >
-            <RefreshCw
-              size={18}
-              strokeWidth={1.75}
-              className={loading || refreshing ? 'dashboard-spin' : ''}
-            />
+            <RefreshCw size={18} strokeWidth={1.75} className={loading || refreshing ? 'dashboard-spin' : ''} />
           </button>
           <DashboardAlertsMenu alerts={alerts} />
           <div className="dashboard-profile">
-            <span className="dashboard-avatar" aria-hidden>{avatarLetter}</span>
+            <span className="dashboard-avatar" aria-hidden>
+              {avatarLetter}
+            </span>
             <span className="dashboard-profile-name">{displayName}</span>
           </div>
         </div>
@@ -417,50 +320,70 @@ export function DashboardPage() {
         <>
           <div className="dashboard-kpi-grid">
             <KpiCard
-              label="Today's sales"
-              value={`₹ ${formatInr(stats.todaySales)}`}
-              icon={IndianRupee}
-              tone="brand"
-              sparkline={salesSparkline}
-            />
-            <KpiCard
-              label="Today's collections"
-              value={`₹ ${formatInr(stats.todayCollections)}`}
-              icon={Banknote}
-              tone="success"
-              sparkline={collectionsSparkline}
-            />
-            <KpiCard
               to="/dues"
-              label="Outstanding"
-              value={`₹ ${formatInr(stats.totalOutstanding)}`}
-              hint={outstandingHint}
+              label="Adagu outstanding"
+              value={`₹ ${formatInr(adagu.outstanding)}`}
+              hint={
+                outstandingCustomerCount > 0
+                  ? `${outstandingCustomerCount} customer${outstandingCustomerCount === 1 ? '' : 's'}`
+                  : undefined
+              }
               icon={Wallet}
-              tone="danger"
+              tone="brand"
             />
             <KpiCard
-              to="/billing"
-              label="Draft bills"
-              value={String(stats.draftCount)}
-              hint={draftHint}
-              icon={FileEdit}
+              to="/adagu"
+              label="Active Adagu loans"
+              value={String(adagu.activePledges)}
+              hint={
+                adagu.activePrincipal > 0
+                  ? `Interest base ₹ ${formatInr(adagu.activePrincipal)}`
+                  : undefined
+              }
+              icon={Handshake}
               tone="info"
             />
             <KpiCard
-              to="/inventory/old-gold"
-              label="Old gold bought"
-              value={`₹ ${formatInr(oldGold.amount)}`}
-              hint={oldGoldHint}
-              icon={Coins}
-              tone="brand"
+              to="/dues"
+              label="Interest overdue"
+              value={String(adagu.overduePledges)}
+              hint={adagu.overduePledges > 0 ? 'Follow up today' : 'All clear'}
+              icon={ShieldAlert}
+              tone={adagu.overduePledges > 0 ? 'danger' : 'success'}
             />
+            <KpiCard
+              label="Adagu collected (month)"
+              value={`₹ ${formatInr(adaguCollectedThisMonth)}`}
+              icon={IndianRupee}
+              tone="success"
+            />
+            {canGoldSavings && (
+              <KpiCard
+                to="/gold-savings"
+                label="Gold Savings today"
+                value={`₹ ${formatInr(goldSavings?.todayCollections ?? 0)}`}
+                hint={
+                  goldSavings ? `${formatWeight(goldSavings.totalGold)} accumulated` : undefined
+                }
+                icon={Sparkles}
+                tone="brand"
+              />
+            )}
+            {canGoldSavings && (
+              <KpiCard
+                to="/gold-savings/maturity"
+                label="Maturities due"
+                value={String(goldSavings?.upcomingMaturities ?? 0)}
+                hint={
+                  goldSavings && goldSavings.overdueInstallments > 0
+                    ? `${goldSavings.overdueInstallments} installments overdue`
+                    : undefined
+                }
+                icon={Calendar}
+                tone={(goldSavings?.upcomingMaturities ?? 0) > 0 ? 'info' : 'success'}
+              />
+            )}
           </div>
-
-          <CategoryStockCard
-            goldRows={goldStock}
-            silverRows={silverStock}
-            dateLabel={formatDashboardDate(today)}
-          />
 
           <section className="dashboard-quick-section" aria-label="Quick actions">
             <h2 className="dashboard-quick-title">
@@ -468,21 +391,29 @@ export function DashboardPage() {
               Quick actions
             </h2>
             <div className="dashboard-quick-actions">
-              <Link to="/billing/cash/new" className="btn dashboard-quick-primary">
+              <Link to="/adagu/new" className="btn dashboard-quick-primary">
                 <Plus size={18} strokeWidth={2} aria-hidden />
-                New bill
+                New Adagu
               </Link>
+              {canGoldSavings && (
+                <Link to="/gold-savings/collections" className="btn secondary dashboard-quick-btn">
+                  <IndianRupee size={18} strokeWidth={1.75} aria-hidden />
+                  Collect installment
+                </Link>
+              )}
+              {canGoldSavings && (
+                <Link to="/gold-savings/enroll" className="btn secondary dashboard-quick-btn">
+                  <UserPlus size={18} strokeWidth={1.75} aria-hidden />
+                  Enroll
+                </Link>
+              )}
               <Link to="/customers" className="btn secondary dashboard-quick-btn">
                 <Users size={18} strokeWidth={1.75} aria-hidden />
                 Customers
               </Link>
-              <Link to="/inventory/products" className="btn secondary dashboard-quick-btn">
-                <Package size={18} strokeWidth={1.75} aria-hidden />
-                Products
-              </Link>
               <Link to="/dues" className="btn secondary dashboard-quick-btn">
-                <UserPlus size={18} strokeWidth={1.75} aria-hidden />
-                Record payment
+                <Wallet size={18} strokeWidth={1.75} aria-hidden />
+                Collect Adagu
               </Link>
             </div>
           </section>
@@ -490,54 +421,35 @@ export function DashboardPage() {
           <div className="dashboard-lower-grid">
             <section>
               <div className="dashboard-section-head">
-                <h2 className="dashboard-section-title">Recent bills</h2>
-                <Link to="/billing" className="dashboard-panel-link">View all</Link>
+                <h2 className="dashboard-section-title">Adagu follow-ups</h2>
+                <Link to="/dues" className="dashboard-panel-link">
+                  View all
+                </Link>
               </div>
-              {recentBills.length === 0 ? (
-                <div className="card padded dashboard-empty-state">No bills yet.</div>
+              {followUps.length === 0 ? (
+                <div className="card padded dashboard-empty-state">No Adagu balances outstanding.</div>
               ) : (
                 <div className="card table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>Bill #</th>
+                        <th>Receipt</th>
                         <th>Customer</th>
-                        <th>Date</th>
-                        <th className="num">Amount</th>
-                        <th>Payment</th>
-                        <th>Status</th>
+                        <th className="num">Interest due</th>
+                        <th className="num">Remaining</th>
+                        <th className="num">Days</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {recentBills.map((invoice) => (
-                        <tr key={invoice.id}>
+                      {followUps.map((row) => (
+                        <tr key={row.pledgeId}>
                           <td>
-                            <Link
-                              to={
-                                invoice.billFormat === 'tax_invoice'
-                                  ? `/billing/tax/${invoice.id}`
-                                  : `/billing/cash/${invoice.id}`
-                              }
-                            >
-                              {invoice.invoiceNo}
-                            </Link>
+                            <Link to={`/adagu/${row.pledgeId}`}>{row.receiptNo}</Link>
                           </td>
-                          <td>{invoice.customerName}</td>
-                          <td>{formatDisplayDate(invoice.invoiceDate)}</td>
-                          <td className="num">{formatCurrency(invoice.total)}</td>
-                          <td>{formatPaymentMode(invoice.paymentMode)}</td>
-                          <td>
-                            {invoice.status === 'draft' ? (
-                              <span className="badge draft">Draft</span>
-                            ) : invoice.balanceDue > 0 ? (
-                              <span className="badge due">Due</span>
-                            ) : (
-                              <span className="badge final">Final</span>
-                            )}
-                            {invoice.isEstimate === true && (
-                              <span className="badge draft"> estimate</span>
-                            )}
-                          </td>
+                          <td>{row.customerName}</td>
+                          <td className="num">{formatCurrency(row.interestDue)}</td>
+                          <td className="num">{formatCurrency(row.remaining)}</td>
+                          <td className="num">{row.daysSinceStart}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -549,9 +461,11 @@ export function DashboardPage() {
             <section>
               <div className="dashboard-section-head">
                 <h2 className="dashboard-section-title">Due collections</h2>
-                <Link to="/dues" className="dashboard-panel-link">View all</Link>
+                <Link to="/dues" className="dashboard-panel-link">
+                  View all
+                </Link>
               </div>
-              {stats.dueCollections.length === 0 ? (
+              {dueCollections.length === 0 ? (
                 <div className="card padded dashboard-empty-state">No outstanding balances.</div>
               ) : (
                 <div className="card table-wrap dashboard-due-table-wrap">
@@ -565,7 +479,7 @@ export function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.dueCollections.map((row) => (
+                      {dueCollections.map((row) => (
                         <tr key={row.customerId}>
                           <td>{row.customerName}</td>
                           <td className="num dashboard-due-amount">₹ {formatInr(row.balance)}</td>
@@ -583,6 +497,41 @@ export function DashboardPage() {
               )}
             </section>
           </div>
+
+          {canGoldSavings && maturingAccounts.length > 0 && (
+            <section className="dashboard-lower-grid">
+              <div className="dashboard-section-head">
+                <h2 className="dashboard-section-title">Gold Savings maturing soon</h2>
+                <Link to="/gold-savings/maturity" className="dashboard-panel-link">
+                  View all
+                </Link>
+              </div>
+              <div className="card table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Account</th>
+                      <th>Customer</th>
+                      <th>Scheme</th>
+                      <th>Maturity</th>
+                      <th className="num">Gold</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {maturingAccounts.slice(0, 5).map((account) => (
+                      <tr key={account.id}>
+                        <td>{account.accountNo}</td>
+                        <td>{account.customerName}</td>
+                        <td>{account.schemeName}</td>
+                        <td>{formatDisplayDate(account.maturityDate)}</td>
+                        <td className="num">{formatWeight(account.goldAccumulated)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
         </>
       )}
     </div>

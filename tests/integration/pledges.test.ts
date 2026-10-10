@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getDatabase } from '../../server/db'
 import { setShopSetting } from '../../server/lib/settingsStore'
-import { getTestAgent, ipc, IPC_CHANNELS, useIntegrationEnv, withHuids } from './helpers/testEnv'
+import { getTestAgent, ipc, IPC_CHANNELS, useIntegrationEnv } from './helpers/testEnv'
 
 async function createPledgeCustomer(name: string, phone: string): Promise<number> {
   const customer = await ipc<{ id: number }>(IPC_CHANNELS.CUSTOMERS_CREATE, {
@@ -90,7 +90,7 @@ describe('pledges API', () => {
     expect(next.body.receiptNo).toMatch(/^ADG\d{4,}$/)
   })
 
-  it('creates, updates, and redeems an Adagu pledge without touching product stock', async () => {
+  it('creates, updates, and redeems an Adagu pledge', async () => {
     const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
       name: 'Pledge Customer',
       phone: '9000000001',
@@ -98,17 +98,6 @@ describe('pledges API', () => {
       guardianName: 'Perumal',
       notes: '',
     })
-    const product = await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({
-      name: 'Shop Ring',
-      category: 'Ring',
-      metal: 'Gold',
-      purity: '22K',
-      grossWeight: 5,
-      netWeight: 4,
-      makingCharges: 0,
-      stockQty: 10,
-      imagePath: '',
-    }))
 
     const created = await getTestAgent().post('/api/pledges').send({
       customerId: customer.id,
@@ -228,58 +217,9 @@ describe('pledges API', () => {
       })
     expect(editBlocked.status).toBe(400)
 
-    const productAfter = await ipc(IPC_CHANNELS.PRODUCTS_GET, product.id)
-    expect(productAfter.stockQty).toBe(10)
-
     const list = await getTestAgent().get('/api/pledges')
     expect(list.status).toBe(200)
     expect(list.body.items.some((row: { id: number }) => row.id === created.body.id)).toBe(true)
-  })
-
-  it('assigns separate CB and TI invoice number prefixes', async () => {
-    const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
-      name: 'Prefix Customer',
-      phone: '9000000002',
-      address: 'Salem',
-      notes: '',
-    })
-    const product = await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({
-      name: 'Prefix Item',
-      category: 'Ring',
-      metal: 'Gold',
-      purity: '22K',
-      grossWeight: 5,
-      netWeight: 4,
-      makingCharges: 0,
-      stockQty: 5,
-      imagePath: '',
-    }))
-
-    const cash = await ipc(IPC_CHANNELS.INVOICES_CREATE, {
-      customerId: customer.id,
-      invoiceDate: '2026-09-26',
-      tax: 0,
-      autoTax: false,
-      billFormat: 'cash_bill',
-      items: [
-        { productId: product.id, qty: 1, rate: 100, metalRate: 100, netWeight: 2, huid: product.huids[0] },
-      ],
-    })
-    const cashFinal = await ipc(IPC_CHANNELS.INVOICES_FINALIZE, cash.id)
-    expect(cashFinal.invoiceNo).toMatch(/^CB-\d{4}-\d{4}$/)
-
-    const tax = await ipc(IPC_CHANNELS.INVOICES_CREATE, {
-      customerId: customer.id,
-      invoiceDate: '2026-09-26',
-      tax: 0,
-      autoTax: true,
-      billFormat: 'tax_invoice',
-      items: [
-        { productId: product.id, qty: 1, rate: 100, metalRate: 100, netWeight: 2, huid: product.huids[1] },
-      ],
-    })
-    const taxFinal = await ipc(IPC_CHANNELS.INVOICES_FINALIZE, tax.id)
-    expect(taxFinal.invoiceNo).toMatch(/^TI-\d{4}-\d{4}$/)
   })
 
   it('records partial collections and forfeits active pledges', async () => {
@@ -1006,7 +946,7 @@ describe('pledges API', () => {
     expect(paid.body.surplusPaidDate).toBe('2026-08-01')
   })
 
-  it('moves bought-back gold into stock when the shop takes an auctioned pledge', async () => {
+  it('never posts bought-back gold into stock when the shop takes an auctioned pledge', async () => {
     const customerId = await createPledgeCustomer('Auction Shop', '9000000048')
     const created = await getTestAgent().post('/api/pledges').send({
       customerId,
@@ -1019,7 +959,6 @@ describe('pledges API', () => {
     })
     expect(created.status).toBe(201)
     const pledgeId = created.body.id
-    const itemId = created.body.items[0].id
     await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
     getDatabase()
       .prepare('UPDATE pledges SET repayment_due_date = ? WHERE id = ?')
@@ -1032,25 +971,17 @@ describe('pledges API', () => {
       auctionDate: '2026-07-30',
       buyerType: 'shop',
       saleAmount: 25000,
-      items: [{ pledgeItemId: itemId, category: 'Chain' }],
     })
     expect(auction.status).toBe(200)
     expect(auction.body.status).toBe('forfeited')
 
     const movement = getDatabase()
       .prepare(
-        `SELECT movement_type, metal, category, weight_delta
-         FROM stock_movements
+        `SELECT movement_type FROM stock_movements
          WHERE reference_type = 'pledge_auction' AND reference_id = ?`,
       )
-      .get(pledgeId) as
-      | { movement_type: string; metal: string; category: string; weight_delta: number }
-      | undefined
-    expect(movement).toBeDefined()
-    expect(movement?.movement_type).toBe('purchase')
-    expect(movement?.metal).toBe('Gold')
-    expect(movement?.category).toBe('Chain')
-    expect(movement?.weight_delta).toBeCloseTo(9.5, 3)
+      .get(pledgeId)
+    expect(movement).toBeUndefined()
   })
 
   it('writes off an auction shortfall and clears the customer balance', async () => {
@@ -1213,16 +1144,13 @@ describe('pledges API', () => {
 
     const from = '2026-08-01'
     const to = '2026-08-31'
-    const daily = await getTestAgent()
-      .get('/api/reports/daily-collection')
+    const modes = await getTestAgent()
+      .get('/api/reports/adagu-collections-by-mode')
       .query({ from, to })
-    const dailyTotal = (daily.body.rows as Array<{ amount: number }>).reduce(
-      (sum, row) => sum + row.amount,
-      0,
-    )
-    expect(dailyTotal).toBeGreaterThan(0)
-
-    const stats = await getTestAgent().get('/api/invoices/stats').query({ from, to })
-    expect(stats.body.collections).toBe(dailyTotal)
+    const rows = modes.body.rows as Array<{ amount: number; principal: number }>
+    // The renewal carries the principal across tickets as a transfer, which is
+    // not a collection, so no collections row may carry pledged principal.
+    expect(rows.reduce((sum, row) => sum + row.principal, 0)).toBe(0)
+    expect(rows.every((row) => row.amount < 20000)).toBe(true)
   })
 })

@@ -14,7 +14,7 @@ describe('error diagnostics', () => {
   useIntegrationEnv()
 
   it('does not assign a reference ID to an expected validation error', async () => {
-    const result = await invokeIpcForTests(IPC_CHANNELS.PRODUCTS_CREATE, { name: '' })
+    const result = await invokeIpcForTests(IPC_CHANNELS.CUSTOMERS_CREATE, { name: '' })
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.error.length).toBeGreaterThan(0)

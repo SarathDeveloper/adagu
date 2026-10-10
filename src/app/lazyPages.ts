@@ -13,46 +13,14 @@ export const DashboardPage = lazy(() =>
     default: module.DashboardPage,
   })),
 )
-export const InvoicesPage = lazy(() =>
-  import('../features/invoices/InvoicesPage').then((module) => ({
-    default: module.InvoicesPage,
+export const AdaguListPage = lazy(() =>
+  import('../features/pledges/AdaguListPage').then((module) => ({
+    default: module.AdaguListPage,
   })),
-)
-export const InvoiceEditorPage = lazy(() =>
-  import('../features/invoices/InvoiceEditorPage').then((module) => ({
-    default: module.InvoiceEditorPage,
-  })),
-)
-export const OldBillPage = lazy(() =>
-  import('../features/invoices/OldBillPage').then((module) => ({ default: module.OldBillPage })),
 )
 export const PledgeEditorPage = lazy(() =>
   import('../features/pledges/PledgeEditorPage').then((module) => ({
     default: module.PledgeEditorPage,
-  })),
-)
-export const ProductsPage = lazy(() =>
-  import('../features/products/ProductsPage').then((module) => ({ default: module.ProductsPage })),
-)
-export const StockPage = lazy(() =>
-  import('../features/stock/StockPage').then((module) => ({ default: module.StockPage })),
-)
-export const InwardsPage = lazy(() =>
-  import('../features/inwards/InwardsPage').then((module) => ({ default: module.InwardsPage })),
-)
-export const OldGoldPurchasesPage = lazy(() =>
-  import('../features/oldGoldPurchases/OldGoldPurchasesPage').then((module) => ({
-    default: module.OldGoldPurchasesPage,
-  })),
-)
-export const OldGoldLotPage = lazy(() =>
-  import('../features/oldGoldPurchases/OldGoldLotPage').then((module) => ({
-    default: module.OldGoldLotPage,
-  })),
-)
-export const SuppliersPage = lazy(() =>
-  import('../features/suppliers/SuppliersPage').then((module) => ({
-    default: module.SuppliersPage,
   })),
 )
 export const CustomersPage = lazy(() =>

@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type {
-  Pledge,
-  PledgeAuction,
-  PledgeAuctionBuyerType,
-  PledgeAuctionInput,
-} from '@shared/types'
+import type { PledgeAuction, PledgeAuctionBuyerType, PledgeAuctionInput } from '@shared/types'
 import { localTodayIso } from '@shared/localDate'
 import { DateInput } from '../../components/DateInput'
 import { Modal } from '../../components/Modal'
 import { api } from '../../lib/api'
-import { formatCurrency, formatDisplayDate, formatWeight } from '../../lib/format'
+import { formatCurrency, formatDisplayDate } from '../../lib/format'
 
 type AuctionMode = 'notice' | 'auction'
 
@@ -42,18 +37,14 @@ export function AuctionModal({
   const [buyerType, setBuyerType] = useState<PledgeAuctionBuyerType>('outside')
   const [buyerName, setBuyerName] = useState('')
   const [writeOffShortfall, setWriteOffShortfall] = useState(false)
-  const [pledge, setPledge] = useState<Pledge | null>(null)
-  const [categories, setCategories] = useState<string[]>([])
-  const [itemCategories, setItemCategories] = useState<Record<number, string>>({})
   const [payoff, setPayoff] = useState(summary.remaining)
   const [formPledgeId, setFormPledgeId] = useState(summary.pledgeId)
 
-  // A reused modal must not carry the previous loan's buyer or categories over.
+  // A reused modal must not carry the previous loan's buyer over.
   if (formPledgeId !== summary.pledgeId) {
     setFormPledgeId(summary.pledgeId)
     setBuyerName('')
     setBuyerType('outside')
-    setItemCategories({})
     setWriteOffShortfall(false)
     setNotice(null)
     setNoticeDate(localTodayIso())
@@ -66,14 +57,11 @@ export function AuctionModal({
     let active = true
     void (async () => {
       try {
-        const [data, cats, noticeRow] = await Promise.all([
+        const [, noticeRow] = await Promise.all([
           api.getPledge(summary.pledgeId),
-          api.listStockCategories(),
           api.getPledgeAuction(summary.pledgeId),
         ])
         if (!active) return
-        setPledge(data)
-        setCategories(cats.map((category) => category.name))
         setNotice(noticeRow)
         setAuctionDate((current) =>
           current && current !== localTodayIso()
@@ -114,11 +102,6 @@ export function AuctionModal({
     () => Math.max(0, Math.round((saleAmount - payoff) * 100) / 100),
     [payoff, saleAmount],
   )
-
-  const shopReady =
-    buyerType !== 'shop' ||
-    (pledge?.items.length ?? 0) === 0 ||
-    (pledge?.items.every((item) => Boolean(itemCategories[item.id])) ?? false)
 
   if (mode === 'notice') {
     const noticeDays = notice?.noticeDays ?? 14
@@ -186,7 +169,7 @@ export function AuctionModal({
           <button
             type="button"
             className="btn"
-            disabled={busy || !shopReady}
+            disabled={busy}
             onClick={() =>
               onAuction({
                 auctionDate,
@@ -195,10 +178,6 @@ export function AuctionModal({
                 saleAmount,
                 writeOffShortfall,
                 note: '',
-                items: Object.entries(itemCategories).map(([id, category]) => ({
-                  pledgeItemId: Number(id),
-                  category,
-                })),
               })
             }
           >
@@ -275,36 +254,6 @@ export function AuctionModal({
           />
           Write off the {formatCurrency(shortfall)} shortfall
         </label>
-      ) : null}
-
-      {buyerType === 'shop' ? (
-        <div className="adagu-auction-items">
-          <h4>Stock categories for the bought-back items</h4>
-          {(pledge?.items ?? []).map((item) => (
-            <label key={item.id} className="adagu-auction-item">
-              <span>
-                {item.description} · {item.metal} {item.purity} · {formatWeight(item.netWeight, 3)} g
-              </span>
-              <select
-                className="input"
-                value={itemCategories[item.id] ?? ''}
-                onChange={(event) =>
-                  setItemCategories((current) => ({
-                    ...current,
-                    [item.id]: event.target.value,
-                  }))
-                }
-              >
-                <option value="">Select category</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-        </div>
       ) : null}
     </Modal>
   )

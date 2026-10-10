@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from './authContext'
-import { defaultShopLogoUrl } from '../invoices/mapShopDisplay'
+import { defaultShopLogoUrl } from '../print/mapShopDisplay'
 import { useShopBranding } from '../settings/shopBrandingContext'
 
 export function LoginPage() {

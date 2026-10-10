@@ -1,6 +1,6 @@
 import { expect, type Locator } from '@playwright/test'
 import { test } from './fixtures/web-app'
-import { openInventoryTab, parkPointer, sidebarLink } from './helpers/nav'
+import { openAdaguTab, parkPointer, sidebarLink } from './helpers/nav'
 
 /**
  * On desktop the rail stays collapsed until the pointer rests on it, then it widens
@@ -9,8 +9,8 @@ import { openInventoryTab, parkPointer, sidebarLink } from './helpers/nav'
 test('sidebar rail expands on hover and collapses when the pointer leaves', async ({ window }) => {
   expect(window.viewportSize()?.width ?? 0).toBeGreaterThan(1024)
 
-  await openInventoryTab(window, 'Products')
-  await expect(window.getByRole('heading', { name: 'Products' })).toBeVisible()
+  await openAdaguTab(window, 'Receipts')
+  await expect(window.getByRole('heading', { name: 'Adagu' })).toBeVisible()
 
   const rail = window.locator('#app-sidebar')
   const nav = window.locator('.sidebar-nav')

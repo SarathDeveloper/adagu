@@ -10020,3 +10020,23 @@ button.dashboard-rate-ticker[aria-expanded="true"] {
     grid-template-columns: 1fr auto;
   }
 }
+
+/* Maturity payout summary: grams x rate = amount */
+.payout-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--surface-muted, #f9fafb);
+  font-size: 0.95rem;
+}
+.payout-summary-amount {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--brand);
+}
+

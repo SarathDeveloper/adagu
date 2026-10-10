@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { IndianRupee, Pencil, Plus, Trash2 } from 'lucide-react'
-import type { Customer, DuesLedger, GoldSavingAccount, Invoice, OldGoldPurchase } from '@shared/types'
+import type { Customer, DuesLedger, GoldSavingAccount } from '@shared/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { DataTable, TablePager } from '../../components/DataTable'
 import { Drawer } from '../../components/Drawer'
@@ -12,18 +12,16 @@ import { PageHeader } from '../../components/PageHeader'
 import { SearchBar } from '../../components/SearchBar'
 import { StatCard } from '../../components/StatCard'
 import { useToast } from '../../components/toastContext'
-import { formatCurrency, formatDisplayDate, formatWeight, paginate, TABLE_PAGE_SIZE } from '../../lib/format'
+import { formatCurrency, formatDisplayDate, paginate, TABLE_PAGE_SIZE } from '../../lib/format'
 import { api } from '../../lib/api'
 import { CollectPaymentModal } from '../goldSavings/collections/CollectPaymentModal'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
 import { buildCustomerProfile } from './customerProfile'
-import { monthRange } from '../invoices/billingInsights'
+import { monthRange } from '../../lib/dateRange'
 
 export function CustomersPage() {
   const { showToast } = useToast()
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [profileInvoices, setProfileInvoices] = useState<Invoice[]>([])
-  const [profileOldGold, setProfileOldGold] = useState<OldGoldPurchase[]>([])
   const [ledger, setLedger] = useState<DuesLedger>({ columns: [], totalOutstanding: 0 })
   const [search, setSearch] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -114,15 +112,17 @@ export function CustomersPage() {
     return map
   }, [ledger])
 
-  const lastBillByCustomer = useMemo(() => {
+  // Most recent Adagu activity per customer (the last pledge date).
+  const lastActivityByCustomer = useMemo(() => {
     const map = new Map<number, string>()
-    for (const customer of customers) {
-      if (customer.lastBillDate) {
-        map.set(customer.id, customer.lastBillDate)
+    for (const row of ledger.adaguDues ?? []) {
+      const current = map.get(row.customerId)
+      if (!current || row.pledgeDate > current) {
+        map.set(row.customerId, row.pledgeDate)
       }
     }
     return map
-  }, [customers])
+  }, [ledger])
 
   const today = new Date().toISOString().slice(0, 10)
   const thisMonth = monthRange(today)
@@ -167,40 +167,12 @@ export function CustomersPage() {
     }
   }
 
-  useEffect(() => {
-    if (!profile) {
-      setProfileInvoices([])
-      setProfileOldGold([])
-      return
-    }
-    let active = true
-    void api
-      .listInvoices({ customerId: profile.id, page: 1, pageSize: 50, status: 'final' })
-      .then((page) => {
-        if (active) setProfileInvoices(page.items ?? [])
-      })
-      .catch(() => {
-        if (active) setProfileInvoices([])
-      })
-    void api
-      .listOldGoldPurchases({ customerId: profile.id })
-      .then((purchases) => {
-        if (active) setProfileOldGold(purchases)
-      })
-      .catch(() => {
-        if (active) setProfileOldGold([])
-      })
-    return () => {
-      active = false
-    }
-  }, [profile])
-
   const profileSummary = profile
     ? buildCustomerProfile(
         profile.id,
-        profileInvoices,
         ledger.columns.find((column) => column.customerId === profile.id),
-        profileOldGold,
+        ledger.adaguDues ?? [],
+        gsAccounts,
       )
     : null
 
@@ -208,7 +180,7 @@ export function CustomersPage() {
     <div className="app-page app-page-fill">
       <PageHeader
         title="Customers"
-        subtitle="Manage customer profiles and billing relationships"
+        subtitle="Customer profiles, Adagu loans and Gold Savings accounts"
         actions={
           <>
             <SearchBar value={search} onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search name or phone..." />
@@ -235,7 +207,7 @@ export function CustomersPage() {
       ) : listedCustomers.length === 0 ? (
         <EmptyState
           title="No customers yet"
-          description="Add someone to start billing."
+          description="Add someone to start an Adagu loan or Gold Savings scheme."
         />
       ) : (
         <DataTable footer={<TablePager page={page} total={listedCustomers.length} onPageChange={setPage} />}>
@@ -247,14 +219,14 @@ export function CustomersPage() {
                 <th>Phone</th>
                 <th>Address</th>
                 <th className="num">Total Due</th>
-                <th>Last Transaction</th>
+                <th>Last Activity</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {paged.map((customer, index) => {
                 const due = dueByCustomer.get(customer.id) ?? 0
-                const last = lastBillByCustomer.get(customer.id)
+                const last = lastActivityByCustomer.get(customer.id)
                 const schemeAccounts = gsAccountsByCustomer.get(customer.id) ?? []
                 return (
                   <tr key={customer.id}>
@@ -392,55 +364,43 @@ export function CustomersPage() {
           </div>
           <div className="drawer-section">
             <h3>Financial Summary</h3>
-            <p className="settings-row"><strong>Total Purchases</strong> {formatCurrency(profileSummary.totalPurchases)}</p>
             <p className="settings-row"><strong>Total Paid</strong> {formatCurrency(profileSummary.totalPaid)}</p>
             <p className="settings-row"><strong>Outstanding</strong> {formatCurrency(profileSummary.outstanding)}</p>
+            <p className="settings-row"><strong>Active Adagu loans</strong> {profileSummary.activeLoans}</p>
+            <p className="settings-row"><strong>Interest due</strong> {formatCurrency(profileSummary.interestDue)}</p>
           </div>
           <div className="drawer-section">
-            <h3>Old gold sold</h3>
-            {profileSummary.oldGold.length === 0 ? (
-              <p className="muted">No old gold purchases yet.</p>
+            <h3>Adagu loans</h3>
+            {profileSummary.adagu.length === 0 ? (
+              <p className="muted">No Adagu loans yet.</p>
             ) : (
-              <>
-                <p className="settings-row">
-                  <strong>Net weight</strong> {formatWeight(profileSummary.oldGoldNetWeight, 3)}
-                </p>
-                <p className="settings-row">
-                  <strong>Amount</strong> {formatCurrency(profileSummary.oldGoldAmount)}
-                </p>
-                <p className="settings-row">
-                  <strong>Open balance</strong> {formatCurrency(profileSummary.oldGoldOpenBalance)}
-                </p>
-                <ul className="dues-detail-history">
-                  {profileSummary.oldGold.map((purchase) => (
-                    <li key={purchase.id}>
-                      <span>{purchase.purchaseNo}</span>
-                      <span>{formatDisplayDate(purchase.date)}</span>
-                      <span className="num">{formatWeight(purchase.netWeight, 3)}</span>
-                      <span className="num">{formatCurrency(purchase.amount)}</span>
-                      <span className={`num ${purchase.balance > 0 ? 'due-amount' : 'paid-amount'}`}>
-                        Balance {formatCurrency(purchase.balance)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
+              <ul className="dues-detail-history">
+                {profileSummary.adagu.map((row) => (
+                  <li key={row.pledgeId}>
+                    <span>{row.receiptNo}</span>
+                    <span>{formatDisplayDate(row.pledgeDate)}</span>
+                    <span className="num">{formatCurrency(row.principal)}</span>
+                    <span className={`num ${row.remaining > 0 ? 'due-amount' : 'paid-amount'}`}>
+                      Remaining {formatCurrency(row.remaining)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
           <div className="drawer-section">
-            <h3>Purchase History</h3>
-            {profileSummary.purchases.length === 0 ? (
-              <p className="muted">No purchases yet.</p>
+            <h3>Gold Savings accounts</h3>
+            {profileSummary.schemes.length === 0 ? (
+              <p className="muted">No Gold Savings accounts yet.</p>
             ) : (
               <ul className="dues-detail-history">
-                {profileSummary.purchases.map((invoice) => (
-                  <li key={invoice.invoiceId}>
-                    <span>{invoice.invoiceNo}</span>
-                    <span>{formatDisplayDate(invoice.date)}</span>
-                    <span className="num">{formatCurrency(invoice.total)}</span>
-                    <span className="num paid-amount">Paid {formatCurrency(invoice.amountPaid)}</span>
-                    <span className={`num ${invoice.balanceDue > 0 ? 'due-amount' : 'paid-amount'}`}>
-                      Due {formatCurrency(invoice.balanceDue)}
+                {profileSummary.schemes.map((account) => (
+                  <li key={account.id}>
+                    <span>{account.accountNo}</span>
+                    <span>{account.schemeName}</span>
+                    <span className="num">{formatCurrency(account.totalPaid)}</span>
+                    <span className="num">
+                      Next due {account.nextDueDate ? formatDisplayDate(account.nextDueDate) : '—'}
                     </span>
                   </li>
                 ))}
@@ -457,7 +417,7 @@ export function CustomersPage() {
                   <li key={payment.id}>
                     <span>{formatDisplayDate(payment.date)}</span>
                     <span className="num">− {formatCurrency(payment.amount)}</span>
-                    {payment.invoiceNo ? <span>{payment.invoiceNo}</span> : null}
+                    {payment.reference ? <span>{payment.reference}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -473,7 +433,7 @@ export function CustomersPage() {
                   <li key={due.id}>
                     <span>{formatDisplayDate(due.date)}</span>
                     <span className="num">{formatCurrency(due.amount)}</span>
-                    {due.invoiceNo ? <span>{due.invoiceNo}</span> : null}
+                    {due.reference ? <span>{due.reference}</span> : null}
                   </li>
                 ))}
               </ul>

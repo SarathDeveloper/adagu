@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures/web-app'
 import { sidebarLink } from './helpers/nav'
-import { seedFinalInvoice } from './helpers/seed'
+import { seedPledge } from './helpers/seed'
 
 test('customers CRUD', async ({ window }) => {
   await sidebarLink(window, 'Customers').click()
@@ -25,8 +25,8 @@ test('customers CRUD', async ({ window }) => {
   await expect(window.getByText('No customers yet')).toBeVisible()
 })
 
-test('customer profile shows purchase and due history', async ({ window }) => {
-  await seedFinalInvoice(window)
+test('customer profile shows Adagu loan and due history', async ({ window }) => {
+  await seedPledge(window)
 
   await sidebarLink(window, 'Customers').click()
   await expect(window.getByRole('heading', { name: 'Customers' })).toBeVisible()
@@ -35,13 +35,14 @@ test('customer profile shows purchase and due history', async ({ window }) => {
 
   const drawer = window.getByRole('dialog', { name: 'E2E Customer' })
   await expect(drawer.getByRole('heading', { name: 'Customer Profile' })).toBeVisible()
-  await expect(drawer.getByText('Total Purchases')).toBeVisible()
   await expect(drawer.getByText('Total Paid')).toBeVisible()
   await expect(drawer.getByText('Outstanding')).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Purchase History' })).toBeVisible()
+  await expect(drawer.getByText('Active Adagu loans')).toBeVisible()
+  await expect(drawer.getByRole('heading', { name: 'Adagu loans' })).toBeVisible()
+  await expect(drawer.getByRole('heading', { name: 'Gold Savings accounts' })).toBeVisible()
   await expect(drawer.getByRole('heading', { name: 'Payment History' })).toBeVisible()
   await expect(drawer.getByRole('heading', { name: 'Due History' })).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Purchase History' }).locator('..').getByText(/CB-|TI-/)).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Due History' }).locator('..').getByText(/CB-|TI-/)).toBeVisible()
+  await expect(drawer.getByRole('heading', { name: 'Adagu loans' }).locator('..').getByText(/ADG/)).toBeVisible()
+  await expect(drawer.getByRole('heading', { name: 'Due History' }).locator('..').getByText(/ADG/)).toBeVisible()
   await expect(drawer.getByText('No payments recorded.')).toBeVisible()
 })

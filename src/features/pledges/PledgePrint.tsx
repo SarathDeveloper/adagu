@@ -6,7 +6,7 @@ import {
 } from '@shared/billing/pledgeMath'
 import type { Pledge } from '@shared/types'
 import { formatDisplayDate, formatInr } from '../../lib/format'
-import { EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../invoices/mapShopDisplay'
+import { EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../print/mapShopDisplay'
 import { AdaguBorrower, AdaguPrintSheet, AdaguSignatures } from './AdaguPrintHeader'
 
 function weight(value: number): string {

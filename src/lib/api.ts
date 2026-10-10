@@ -4,7 +4,6 @@ import type {
   BackupFile,
   BackupInspection,
   BackupStatus,
-  BillFormat,
   ChangePasswordInput,
   CreateUserInput,
   Customer,
@@ -14,31 +13,9 @@ import type {
   DueEntryUpdateInput,
   DuePaymentInput,
   DuesLedger,
-  HistoricalInvoiceInput,
-  Invoice,
-  InvoiceCancelInput,
-  InvoiceInput,
-  InvoiceListQuery,
-  InvoiceListStats,
-  InvoicePaymentInput,
-  InvoiceUpdateInput,
-  ItemStockListInput,
-  ItemStockRow,
-  ItemStockUpsertInput,
   LoginInput,
   MetalRates,
   MetalRatesInput,
-  OldGoldBatch,
-  OldGoldBatchCancelInput,
-  OldGoldBatchCreateInput,
-  OldGoldBatchMeltInput,
-  OldGoldBatchSendInput,
-  OldGoldBatchSettleInput,
-  OldGoldLot,
-  OldGoldPayoutInput,
-  OldGoldPurchase,
-  OldGoldPurchaseInput,
-  OldGoldPurchaseUpdateInput,
   PagedList,
   Pledge,
   PledgeAuction,
@@ -60,36 +37,11 @@ import type {
   PledgeTopupInput,
   PledgeUpdateInput,
   PledgeWhatsAppOpenInput,
-  Product,
-  ProductInput,
   ResetPasswordInput,
   RecordCounts,
   ShopSettings,
-  StockCategory,
-  StockCategoryCreateInput,
-  StockCategoryUpdateInput,
-  StockClearOverridesInput,
-  StockDayLine,
-  StockDayLinesInput,
-  StockHistoryInput,
-  StockHistoryRow,
-  Supplier,
-  SupplierInput,
-  TaxReportRow,
   UpdatePermissionsInput,
   User,
-  Inward,
-  InwardInput,
-  InwardUpdateInput,
-  MetalDayCloseInput,
-  MetalDayCloseResult,
-  MetalDayClosingHistoryRow,
-  MetalDayClosingSheet,
-  MetalDayReopenInput,
-  DayClosePrecheck,
-  StockReconciliationRow,
-  StockAdjustment,
-  StockAdjustmentInput,
   GoldSavingAccount,
   GoldSavingAccountDetail,
   GoldSavingAccountInput,
@@ -107,7 +59,6 @@ import type {
   GoldSavingReportId,
   GoldSavingReportResult,
   GoldSavingScheme,
-  GoldSavingSchemeCreditPreview,
   GoldSavingSchemeInput,
 } from '@shared/types'
 import type { ReportDefinition, ReportId, ReportLookups, ReportResult } from '@shared/reportsCatalog'
@@ -193,74 +144,6 @@ export const api = {
     request<User>(`/api/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify(input) }),
   deleteUser: (id: number) => request<void>(`/api/users/${id}`, { method: 'DELETE' }),
 
-  listProducts: (search?: string, parentId?: number) =>
-    request<Product[]>(
-      `/api/products${qs({ q: search, parentId: parentId != null ? String(parentId) : undefined })}`,
-    ),
-  listProductVariants: (id: number) => request<Product[]>(`/api/products/${id}/variants`),
-  listProductCategories: () => request<StockCategory[]>('/api/products/categories'),
-  getProduct: (id: number) => request<Product>(`/api/products/${id}`),
-  createProduct: (input: ProductInput) =>
-    request<Product>('/api/products', { method: 'POST', body: JSON.stringify(input) }),
-  updateProduct: (id: number, input: ProductInput) =>
-    request<Product>(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
-  deleteProduct: (id: number) => request<void>(`/api/products/${id}`, { method: 'DELETE' }),
-
-  listItemStock: (input: ItemStockListInput) =>
-    request<ItemStockRow[]>(`/api/stock${qs({ stockDate: input.stockDate, metal: input.metal })}`),
-  upsertItemStock: (input: ItemStockUpsertInput) =>
-    request<ItemStockRow>('/api/stock', { method: 'POST', body: JSON.stringify(input) }),
-  listStockCategories: () => request<StockCategory[]>('/api/stock/categories'),
-  getDayClosePrecheck: (businessDate: string, metal: string) =>
-    request<DayClosePrecheck>(`/api/stock/day-closings/precheck${qs({ businessDate, metal })}`),
-  getStockReconciliation: (date: string) =>
-    request<StockReconciliationRow[]>(`/api/stock/reconciliation${qs({ date })}`),
-  createStockCategory: (input: StockCategoryCreateInput) =>
-    request<StockCategory>('/api/stock/categories', { method: 'POST', body: JSON.stringify(input) }),
-  updateStockCategory: (input: StockCategoryUpdateInput) =>
-    request<StockCategory>('/api/stock/categories', { method: 'PUT', body: JSON.stringify(input) }),
-  deleteStockCategory: (name: string) =>
-    request<void>('/api/stock/categories', { method: 'DELETE', body: JSON.stringify({ name }) }),
-  clearStockSalesOverrides: (input: StockClearOverridesInput) =>
-    request<ItemStockRow[]>('/api/stock/clear-overrides', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  listStockHistory: (input: StockHistoryInput) =>
-    request<StockHistoryRow[]>(`/api/stock/history${qs({ metal: input.metal })}`),
-  listStockDayLines: (input: StockDayLinesInput) =>
-    request<StockDayLine[]>(
-      `/api/stock/day-lines${qs({
-        stockDate: input.stockDate,
-        metal: input.metal,
-        itemName: input.itemName,
-        kind: input.kind,
-      })}`,
-    ),
-  getMetalDayClosing: (businessDate: string, metal: string) =>
-    request<MetalDayClosingSheet>(
-      `/api/stock/day-closings${qs({ businessDate, metal })}`,
-    ),
-  listMetalDayClosingHistory: (metal?: string) =>
-    request<MetalDayClosingHistoryRow[]>(
-      `/api/stock/day-closings/history${qs({ metal })}`,
-    ),
-  closeMetalDay: (input: MetalDayCloseInput) =>
-    request<MetalDayCloseResult>('/api/stock/day-closings/close', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  reopenMetalDay: (input: MetalDayReopenInput) =>
-    request<MetalDayClosingSheet>('/api/stock/day-closings/reopen', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  createStockAdjustment: (input: StockAdjustmentInput) =>
-    request<StockAdjustment>('/api/stock/adjustments', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-
   listCustomers: (search?: string) => request<Customer[]>(`/api/customers${qs({ q: search })}`),
   getCustomer: (id: number) => request<Customer>(`/api/customers/${id}`),
   createCustomer: (input: CustomerInput) =>
@@ -268,112 +151,6 @@ export const api = {
   updateCustomer: (id: number, input: CustomerInput) =>
     request<Customer>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteCustomer: (id: number) => request<void>(`/api/customers/${id}`, { method: 'DELETE' }),
-
-  listSuppliers: (search?: string) => request<Supplier[]>(`/api/suppliers${qs({ q: search })}`),
-  getSupplier: (id: number) => request<Supplier>(`/api/suppliers/${id}`),
-  createSupplier: (input: SupplierInput) =>
-    request<Supplier>('/api/suppliers', { method: 'POST', body: JSON.stringify(input) }),
-  updateSupplier: (id: number, input: SupplierInput) =>
-    request<Supplier>(`/api/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
-  deleteSupplier: (id: number) => request<void>(`/api/suppliers/${id}`, { method: 'DELETE' }),
-
-  listInwards: () => request<Inward[]>('/api/inwards'),
-  getInward: (id: number) => request<Inward>(`/api/inwards/${id}`),
-  createInward: (input: InwardInput) =>
-    request<Inward>('/api/inwards', { method: 'POST', body: JSON.stringify(input) }),
-  updateInward: (input: InwardUpdateInput) =>
-    request<Inward>(`/api/inwards/${input.id}`, { method: 'PUT', body: JSON.stringify(input) }),
-  finalizeInward: (id: number) =>
-    request<Inward>(`/api/inwards/${id}/finalize`, { method: 'POST' }),
-  deleteInward: (id: number) => request<void>(`/api/inwards/${id}`, { method: 'DELETE' }),
-
-  listOldGoldPurchases: (params: {
-    customerId?: number | null
-    status?: string
-    from?: string
-    to?: string
-    available?: boolean
-  } = {}) =>
-    request<OldGoldPurchase[]>(
-      `/api/old-gold-purchases${qs({
-        customerId: params.customerId ?? undefined,
-        status: params.status,
-        from: params.from,
-        to: params.to,
-        available: params.available ? 1 : undefined,
-      })}`,
-    ),
-  getOldGoldPurchase: (id: number) => request<OldGoldPurchase>(`/api/old-gold-purchases/${id}`),
-  getOldGoldPurchaseStats: (date: string) =>
-    request<{
-      date: string
-      count: number
-      amount: number
-      netWeight: number
-      paidOut: number
-      openBalance: number
-    }>(`/api/old-gold-purchases/stats${qs({ date })}`),
-  getNextOldGoldPurchaseNo: (date?: string) =>
-    request<{ purchaseNo: string }>(`/api/old-gold-purchases/next-purchase-no${qs({ date })}`),
-  lookupOldGoldPurchaseByNo: (purchaseNo: string) =>
-    request<OldGoldPurchase>(`/api/old-gold-purchases/by-no/${encodeURIComponent(purchaseNo)}`),
-  createOldGoldPurchase: (input: OldGoldPurchaseInput) =>
-    request<OldGoldPurchase>('/api/old-gold-purchases', { method: 'POST', body: JSON.stringify(input) }),
-  updateOldGoldPurchase: (input: OldGoldPurchaseUpdateInput) =>
-    request<OldGoldPurchase>(`/api/old-gold-purchases/${input.id}`, {
-      method: 'PUT',
-      body: JSON.stringify(input),
-    }),
-  finalizeOldGoldPurchase: (id: number) =>
-    request<OldGoldPurchase>(`/api/old-gold-purchases/${id}/finalize`, { method: 'POST' }),
-  createOldGoldPayout: (id: number, input: OldGoldPayoutInput) =>
-    request<OldGoldPurchase>(`/api/old-gold-purchases/${id}/payouts`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  voidOldGoldPayout: (id: number, payoutId: number, reason: string) =>
-    request<OldGoldPurchase>(`/api/old-gold-purchases/${id}/payouts/${payoutId}/void`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    }),
-  cancelOldGoldPurchase: (id: number, reason: string) =>
-    request<OldGoldPurchase>(`/api/old-gold-purchases/${id}/cancel`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    }),
-  deleteOldGoldPurchase: (id: number) =>
-    request<void>(`/api/old-gold-purchases/${id}`, { method: 'DELETE' }),
-
-  getOldGoldLot: () => request<OldGoldLot>('/api/old-gold-batches/lot'),
-  listOldGoldBatches: (params: { status?: string; from?: string; to?: string } = {}) =>
-    request<OldGoldBatch[]>(
-      `/api/old-gold-batches${qs({ status: params.status, from: params.from, to: params.to })}`,
-    ),
-  getOldGoldBatch: (id: number) => request<OldGoldBatch>(`/api/old-gold-batches/${id}`),
-  getNextOldGoldBatchNo: (date?: string) =>
-    request<{ batchNo: string }>(`/api/old-gold-batches/next-batch-no${qs({ date })}`),
-  createOldGoldBatch: (input: OldGoldBatchCreateInput) =>
-    request<OldGoldBatch>('/api/old-gold-batches', { method: 'POST', body: JSON.stringify(input) }),
-  meltOldGoldBatch: (id: number, input: OldGoldBatchMeltInput) =>
-    request<OldGoldBatch>(`/api/old-gold-batches/${id}/melt`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  sendOldGoldBatch: (id: number, input: OldGoldBatchSendInput) =>
-    request<OldGoldBatch>(`/api/old-gold-batches/${id}/send`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  settleOldGoldBatch: (id: number, input: OldGoldBatchSettleInput) =>
-    request<OldGoldBatch>(`/api/old-gold-batches/${id}/settle`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-  cancelOldGoldBatch: (id: number, input: OldGoldBatchCancelInput) =>
-    request<OldGoldBatch>(`/api/old-gold-batches/${id}/cancel`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
 
   listDues: (search?: string) => request<DuesLedger>(`/api/dues${qs({ q: search })}`),
   createDueEntry: (input: DueEntryInput) =>
@@ -387,52 +164,6 @@ export const api = {
       body: JSON.stringify(input),
     }),
   markDuePaid: (id: number) => request<DueEntry>(`/api/dues/${id}/mark-paid`, { method: 'POST' }),
-
-  listInvoices: async (input?: InvoiceListQuery) =>
-    asPaged<Invoice>(
-      await request<unknown>(
-        `/api/invoices${qs({
-          page: input?.page != null ? String(input.page) : undefined,
-          pageSize: input?.pageSize != null ? String(input.pageSize) : undefined,
-          from: input?.from ?? undefined,
-          to: input?.to ?? undefined,
-          q: input?.q,
-          format: input?.format && input.format !== 'all' ? input.format : undefined,
-          status: input?.status && input.status !== 'all' ? input.status : undefined,
-          paymentMode: input?.paymentMode && input.paymentMode !== 'all' ? input.paymentMode : undefined,
-          duePaid: input?.duePaid && input.duePaid !== 'all' ? input.duePaid : undefined,
-          sort: input?.sort,
-          customerId: input?.customerId != null ? String(input.customerId) : undefined,
-        })}`,
-      ),
-    ),
-  getInvoiceStats: (input: { from: string; to: string; granularity?: string }) =>
-    request<InvoiceListStats>(
-      `/api/invoices/stats${qs({
-        from: input.from,
-        to: input.to,
-        granularity: input.granularity,
-      })}`,
-    ),
-  getInvoice: (id: number) => request<Invoice>(`/api/invoices/${id}`),
-  getNextInvoiceNo: (format: BillFormat) =>
-    request<{ invoiceNo: string }>(`/api/invoices/next-invoice-no?format=${encodeURIComponent(format)}`),
-  createInvoice: (input: InvoiceInput) =>
-    request<Invoice>('/api/invoices', { method: 'POST', body: JSON.stringify(input) }),
-  recordHistoricalInvoice: (input: HistoricalInvoiceInput) =>
-    request<Invoice>('/api/invoices/historical', { method: 'POST', body: JSON.stringify(input) }),
-  updateInvoice: (input: InvoiceUpdateInput) =>
-    request<Invoice>(`/api/invoices/${input.id}`, { method: 'PUT', body: JSON.stringify(input) }),
-  finalizeInvoice: (id: number) =>
-    request<Invoice>(`/api/invoices/${id}/finalize`, { method: 'POST' }),
-  cancelInvoice: (id: number, input: InvoiceCancelInput) =>
-    request<Invoice>(`/api/invoices/${id}/cancel`, { method: 'POST', body: JSON.stringify(input) }),
-  markInvoicePrinted: (invoiceId: number) =>
-    request<{ invoiceNo: string }>(`/api/invoices/${invoiceId}/printed`, { method: 'POST' }),
-  recordInvoicePayment: (id: number, input: InvoicePaymentInput) =>
-    request<Invoice>(`/api/invoices/${id}/payments`, { method: 'POST', body: JSON.stringify(input) }),
-  deleteInvoice: (id: number) => request<void>(`/api/invoices/${id}`, { method: 'DELETE' }),
-  getTaxReport: () => request<TaxReportRow[]>('/api/invoices/tax-report'),
 
   listPledges: async (input?: PledgeListQuery) =>
     asPaged<Pledge>(
@@ -544,27 +275,12 @@ export const api = {
 
   getReportCatalog: () => request<ReportDefinition[]>('/api/reports'),
   getReportLookups: () => request<ReportLookups>('/api/reports/lookups'),
-  runReport: (
-    id: ReportId,
-    query: {
-      from?: string
-      to?: string
-      customerId?: number
-      supplierId?: number
-      productId?: number
-      metal?: string
-      qtyCutoff?: number
-    },
-  ) =>
+  runReport: (id: ReportId, query: { from?: string; to?: string; customerId?: number }) =>
     request<ReportResult>(
       `/api/reports/${id}${qs({
         from: query.from,
         to: query.to,
         customerId: query.customerId ? String(query.customerId) : undefined,
-        supplierId: query.supplierId ? String(query.supplierId) : undefined,
-        productId: query.productId ? String(query.productId) : undefined,
-        metal: query.metal,
-        qtyCutoff: query.qtyCutoff !== undefined ? String(query.qtyCutoff) : undefined,
       })}`,
     ),
 
@@ -579,14 +295,6 @@ export const api = {
     }),
   listGsAccounts: (search?: string) =>
     request<GoldSavingAccount[]>(`/api/gold-savings/accounts${qs({ q: search })}`),
-  previewGsBillingCredit: (customerId: number, invoiceId?: number | null, date?: string | null) =>
-    request<GoldSavingSchemeCreditPreview[]>(
-      `/api/gold-savings/billing-preview${qs({
-        customerId: String(customerId),
-        invoiceId: invoiceId ? String(invoiceId) : undefined,
-        date: date ?? undefined,
-      })}`,
-    ),
   getGsRate: (date: string, purity: string) =>
     request<GoldSavingRate>(`/api/gold-savings/rate${qs({ date, purity })}`),
   getGsAccount: (id: number) => request<GoldSavingAccountDetail>(`/api/gold-savings/accounts/${id}`),
@@ -634,6 +342,8 @@ export const api = {
     request<GoldSavingRedemption[]>(
       `/api/gold-savings/redemptions${qs({ accountId: accountId ? String(accountId) : undefined })}`,
     ),
+  getGsRedemption: (id: number) =>
+    request<GoldSavingRedemption>(`/api/gold-savings/redemptions/${id}`),
   getGsDashboard: () => request<GoldSavingDashboard>('/api/gold-savings/dashboard'),
   runGsReport: (
     id: GoldSavingReportId,
@@ -715,8 +425,4 @@ export const api = {
     body.append('file', file)
     return request<BackupStatus>('/api/backup/restore', { method: 'POST', body })
   },
-}
-
-export function printPath(invoiceId: number, format: BillFormat): string {
-  return format === 'tax_invoice' ? `/print/tax-invoice/${invoiceId}` : `/print/cash-bill/${invoiceId}`
 }

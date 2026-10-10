@@ -20,7 +20,7 @@ test('login screen rejects bad credentials and accepts admin', async ({ window }
   await expect(window.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 10_000 })
 })
 
-test('staff with only billing sees limited sidebar', async ({ window }) => {
+test('staff with only adagu sees limited sidebar', async ({ window }) => {
   const origin = new URL(window.url()).origin
 
   await window.evaluate(async () => {
@@ -39,7 +39,7 @@ test('staff with only billing sees limited sidebar', async ({ window }) => {
         username: 'billstaff',
         password: 'staff123',
         role: 'staff',
-        features: ['billing'],
+        features: ['adagu'],
       }),
     })
     await api('/api/auth/logout', { method: 'POST' })
@@ -57,11 +57,11 @@ test('staff with only billing sees limited sidebar', async ({ window }) => {
   await window.getByLabel('Confirm new password').fill('staff456')
   await window.getByRole('button', { name: 'Save password' }).click()
 
-  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Billing' })).toBeVisible()
-  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Inventory' })).toHaveCount(0)
+  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Adagu' })).toBeVisible()
+  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Gold Savings' })).toHaveCount(0)
   await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Users' })).toHaveCount(0)
 
-  await window.goto(`${origin}/products`)
-  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Billing' })).toBeVisible()
-  await expect(window.getByRole('heading', { name: 'Products' })).toHaveCount(0)
+  await window.goto(`${origin}/gold-savings`)
+  await expect(window).toHaveURL(/\/adagu$/)
+  await expect(window.locator('.sidebar-nav').getByRole('link', { name: 'Adagu' })).toBeVisible()
 })

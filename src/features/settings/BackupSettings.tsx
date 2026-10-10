@@ -363,7 +363,7 @@ export function BackupSettings() {
             <input
               className="input"
               aria-label="Off-machine folder"
-              placeholder="E:\JewelTrackerPro"
+              placeholder="E:\JewelTrackerPro Adagu"
               value={offsiteDir}
               disabled={busy}
               onChange={(event) => setOffsiteDir(event.target.value)}
@@ -517,26 +517,12 @@ export function BackupSettings() {
                 <strong>{inspection.counts.customers}</strong>
               </li>
               <li>
-                <span>Invoices</span>
-                <strong>{inspection.counts.invoices}</strong>
-              </li>
-              <li>
                 <span>Pledges</span>
                 <strong>{inspection.counts.pledges}</strong>
               </li>
               <li>
-                <span>Products</span>
-                <strong>{inspection.counts.products}</strong>
-              </li>
-              <li>
                 <span>Gold saving accounts</span>
                 <strong>{inspection.counts.goldSavingAccounts}</strong>
-              </li>
-              <li>
-                <span>Latest bill</span>
-                <strong>
-                  {inspection.latestInvoiceAt ? formatDisplayDateTime(inspection.latestInvoiceAt) : '—'}
-                </strong>
               </li>
             </ul>
             {inspection.issues.length > 0 ? (

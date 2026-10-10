@@ -42,7 +42,6 @@ import type {
   PledgeTopupInput,
 } from '@shared/types'
 import { getDatabase } from '../db'
-import { assertMetalsOpenForDate } from '../db/metalDayClosing'
 import { syncDueEntryForPledge } from '../dues/pledgeSync'
 import { asyncHandler, HttpError, parseBody, parseIdParam, parsePaging, queryString } from '../lib/http'
 import { getUploadsDir } from '../lib/paths'
@@ -53,7 +52,6 @@ import { addPledgePhoto, deletePledgePhoto, loadPledgePhotos } from '../pledges/
 import { computePledgePayoff, recordPledgePayment } from '../pledges/payments'
 import { buildPledgeReminders } from '../pledges/reminders'
 import { loadPledgeTopups } from '../pledges/topups'
-import { recordWeightMovement } from '../stock/movements'
 import { getLatestMetalRates } from './metalRates.routes'
 
 const router = Router()
@@ -817,35 +815,8 @@ router.post(
       }
 
       if (input.buyerType === 'shop') {
-        const items = loadItems(db, id)
-        const receiptNo = getPledgeRow(db, id).receipt_no
-        const categories = new Map(
-          (input.items ?? []).map((entry) => [entry.pledgeItemId, entry.category]),
-        )
-        try {
-          assertMetalsOpenForDate(db, input.auctionDate, items.map((item) => item.metal))
-          for (const item of items) {
-            const category = categories.get(item.id)
-            if (!category) {
-              throw new HttpError(400, `Pick a stock category for item "${item.description}"`)
-            }
-            recordWeightMovement(db, {
-              type: 'purchase',
-              metal: item.metal,
-              category,
-              weightDelta: item.netWeight,
-              refType: 'pledge_auction',
-              refId: id,
-              reason: 'Adagu auction buyback',
-              note: `From pledge ${receiptNo}`,
-              operatorId: req.user?.id ?? null,
-              movementDate: input.auctionDate,
-            })
-          }
-        } catch (err) {
-          if (err instanceof HttpError) throw err
-          throw new HttpError(400, err instanceof Error ? err.message : 'Stock update failed')
-        }
+        // The shop keeping the pledged items is a bookkeeping note only. Auctions
+        // never post to stock in this edition.
       }
 
       db.prepare(

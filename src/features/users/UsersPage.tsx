@@ -27,10 +27,7 @@ const PAGE_SIZE = 10
 
 const FEATURE_LABELS: Record<FeatureKey, string> = {
   dashboard: 'Dashboard',
-  billing: 'Billing',
-  products: 'Products',
-  stock: 'Gold & Silver',
-  inward: 'Inward',
+  adagu: 'Adagu',
   customers: 'Customers',
   dues: 'Dues',
   reports: 'Reports',
@@ -98,7 +95,7 @@ export function UsersPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [role, setRole] = useState<UserRole>('staff')
-  const [features, setFeatures] = useState<FeatureKey[]>(['dashboard', 'billing'])
+  const [features, setFeatures] = useState<FeatureKey[]>(['dashboard', 'adagu'])
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editFeatures, setEditFeatures] = useState<FeatureKey[]>([])
   const [resetTarget, setResetTarget] = useState<User | null>(null)
@@ -152,7 +149,7 @@ export function UsersPage() {
       setPassword('')
       setShowPassword(false)
       setRole('staff')
-      setFeatures(['dashboard', 'billing'])
+      setFeatures(['dashboard', 'adagu'])
       await reload()
       showToast('User created', 'success')
       setError(null)

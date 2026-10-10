@@ -1,14 +1,31 @@
 import type Database from 'better-sqlite3'
-import { roundGoldGrams } from '@shared/goldSavings/math'
+import { roundGoldGrams, roundMoney } from '@shared/goldSavings/math'
 import type { GoldSavingRedemption, GoldSavingRedemptionInput, GoldSavingRedemptionKind } from '@shared/types'
 import { eligibleBonusGoldForAccount } from './bonus'
-import { currentGoldBalance, insertLedger, loadAccount, loadScheme, mapRedemption, nextReceiptNo, REDEMPTION_SELECT, writeAudit, type RedemptionRow } from './rows'
+import { resolveRateForDate } from './rateGuard'
+import {
+  currentGoldBalance,
+  insertLedger,
+  loadAccount,
+  loadScheme,
+  mapRedemption,
+  nextReceiptNo,
+  REDEMPTION_SELECT,
+  writeAudit,
+  type RedemptionRow,
+} from './rows'
 
 export function listRedemptions(db: Database.Database, accountId?: number): GoldSavingRedemption[] {
   const rows = accountId
     ? (db.prepare(`${REDEMPTION_SELECT} WHERE r.account_id = ? ORDER BY r.id DESC`).all(accountId) as RedemptionRow[])
     : (db.prepare(`${REDEMPTION_SELECT} ORDER BY r.id DESC`).all() as RedemptionRow[])
   return rows.map(mapRedemption)
+}
+
+export function getRedemption(db: Database.Database, id: number): GoldSavingRedemption {
+  const row = db.prepare(`${REDEMPTION_SELECT} WHERE r.id = ?`).get(id) as RedemptionRow | undefined
+  if (!row) throw new Error('Redemption not found')
+  return mapRedemption(row)
 }
 
 export interface RedeemInTxInput {
@@ -21,7 +38,11 @@ export interface RedeemInTxInput {
   bonusGold: number
   /** Total grams available before this redemption (accumulated + bonus). */
   eligible: number
-  invoiceId?: number | null
+  /** Rate applied to the payout, and the amount actually handed over. */
+  goldRate?: number
+  payoutAmount?: number
+  paymentMode?: string
+  transactionRef?: string
   notes?: string
   bonusType?: string
   userId: number | null
@@ -29,8 +50,7 @@ export interface RedeemInTxInput {
 
 /**
  * Insert a redemption and its ledger rows. Callers must validate eligibility
- * first. Used by the maturity screen and by sale-bill finalize so both paths
- * write an identical ledger.
+ * and resolve the payout rate first.
  */
 export function redeemInTx(db: Database.Database, input: RedeemInTxInput): number {
   const account = loadAccount(db, input.accountId)
@@ -43,8 +63,9 @@ export function redeemInTx(db: Database.Database, input: RedeemInTxInput): numbe
     .prepare(
       `INSERT INTO gold_saving_redemptions (
         account_id, receipt_no, redemption_date, redemption_kind, gold_weight, bonus_gold_weight,
-        invoice_id, making_charges, wastage, taxes, invoice_value, remaining_gold, closes_account, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, ?)`,
+        invoice_id, making_charges, wastage, taxes, invoice_value, remaining_gold, closes_account, notes, created_by,
+        gold_rate, payout_amount, payment_mode, transaction_ref
+      ) VALUES (?, ?, ?, ?, ?, ?, NULL, 0, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       account.id,
@@ -53,11 +74,14 @@ export function redeemInTx(db: Database.Database, input: RedeemInTxInput): numbe
       input.redemptionKind,
       requested,
       input.bonusGold,
-      input.invoiceId ?? null,
       remainingAfter,
       isFull ? 1 : 0,
       input.notes ?? '',
       input.userId,
+      input.goldRate ?? 0,
+      input.payoutAmount ?? 0,
+      input.paymentMode ?? 'cash',
+      input.transactionRef ?? '',
     )
   const redemptionId = Number(result.lastInsertRowid)
 
@@ -80,9 +104,9 @@ export function redeemInTx(db: Database.Database, input: RedeemInTxInput): numbe
     entryDate: input.redemptionDate,
     entryType: 'redemption',
     redemptionId,
-    amount: 0,
+    amount: input.payoutAmount ?? 0,
     goldWeight: -requested,
-    goldRate: 0,
+    goldRate: input.goldRate ?? 0,
     txnRef: receiptNo,
     notes: input.notes ?? '',
     createdBy: input.userId,
@@ -98,15 +122,29 @@ export function redeemInTx(db: Database.Database, input: RedeemInTxInput): numbe
     entityId: redemptionId,
     action: isFull ? 'redeem_full' : 'redeem_partial',
     changedBy: input.userId,
-    after: { receiptNo, goldWeight: requested, bonusGold: input.bonusGold, remainingAfter, invoiceId: input.invoiceId ?? null },
+    after: {
+      receiptNo,
+      goldWeight: requested,
+      bonusGold: input.bonusGold,
+      remainingAfter,
+      goldRate: input.goldRate ?? 0,
+      payoutAmount: input.payoutAmount ?? 0,
+      paymentMode: input.paymentMode ?? 'cash',
+    },
   })
   return redemptionId
 }
 
+/**
+ * Maturity payout. The shop hands over cash/UPI/bank, never gold or jewellery,
+ * so the payout is `(grams taken out) x (gold rate for the scheme purity on the
+ * redemption date)`. The rate-date acceptance rule matches collections: a rate
+ * that is not dated on the redemption date needs an administrator to confirm it.
+ */
 export function processRedemption(
   db: Database.Database,
   input: GoldSavingRedemptionInput,
-  userId: number,
+  actor: { id: number; isAdmin: boolean },
 ): GoldSavingRedemption {
   const tx = db.transaction(() => {
     const account = loadAccount(db, input.accountId)
@@ -134,29 +172,26 @@ export function processRedemption(
       throw new Error('Early closure is not allowed for this scheme')
     }
 
-    if (input.redemptionKind === 'invoice' && !input.invoiceId) {
-      throw new Error('Select a jewellery invoice for this redemption')
-    }
-    let invoiceNo = ''
-    if (input.invoiceId) {
-      const invoice = db
-        .prepare('SELECT id, invoice_no, status FROM invoices WHERE id = ?')
-        .get(input.invoiceId) as { id: number; invoice_no: string; status: string } | undefined
-      if (!invoice) throw new Error('Invoice not found')
-      invoiceNo = invoice.invoice_no
-    }
+    const resolved = resolveRateForDate(db, input.redemptionDate, scheme.purity, {
+      acceptRateDate: input.acceptRateDate,
+      isAdmin: actor.isAdmin,
+    })
+    const payoutAmount = roundMoney(requested * resolved.rate)
 
     return redeemInTx(db, {
       accountId: account.id,
       redemptionDate: input.redemptionDate,
-      redemptionKind: input.redemptionKind,
+      redemptionKind: 'payout',
       requested,
       bonusGold,
       eligible,
-      invoiceId: input.invoiceId ?? null,
-      notes: input.notes ?? (invoiceNo ? `Linked to bill ${invoiceNo}` : ''),
+      goldRate: resolved.rate,
+      payoutAmount,
+      paymentMode: input.paymentMode,
+      transactionRef: input.transactionRef ?? '',
+      notes: input.notes ?? '',
       bonusType: scheme.bonus_type,
-      userId,
+      userId: actor.id,
     })
   })
   const id = tx()

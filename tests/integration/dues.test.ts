@@ -1,187 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { getTestAgent, invokeIpcForTests, withHuids } from './helpers/testEnv'
+import { getTestAgent, invokeIpcForTests } from './helpers/testEnv'
 import { IPC_CHANNELS, ipc, useIntegrationEnv } from './helpers/testEnv'
 
 describe('dues IPC', () => {
   useIntegrationEnv()
-
-  it('creates a due entry when an invoice is finalized', async () => {
-    const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
-      name: 'Due Customer',
-      phone: '9000000010',
-      address: 'Salem',
-      notes: '',
-    })
-    const product = await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({
-      name: 'Ring',
-      category: 'Ring',
-      metal: 'Gold',
-      purity: '22K',
-      grossWeight: 5,
-      netWeight: 4,
-      makingCharges: 0,
-      stockQty: 2,
-      imagePath: '',
-    }))
-    const invoice = await ipc(IPC_CHANNELS.INVOICES_CREATE, {
-      customerId: customer.id,
-      invoiceDate: '2026-09-24',
-      tax: 0,
-      autoTax: false,
-      paymentMode: 'upi',
-      items: [{ productId: product.id, qty: 1, rate: 1500, metalRate: 1500, netWeight: 4, huid: product.huids[0] }],
-    })
-    const finalized = await ipc(IPC_CHANNELS.INVOICES_FINALIZE, invoice.id)
-
-    const ledger = await ipc(IPC_CHANNELS.DUES_LIST)
-    const column = ledger.columns.find((entry) => entry.customerId === customer.id)
-    expect(column).toBeDefined()
-    const billEntry = column?.entries.find(
-      (entry) => entry.invoiceId === finalized.id && entry.kind === 'due',
-    )
-    expect(billEntry?.kind).toBe('due')
-    expect(billEntry?.amount).toBe(finalized.balanceDue)
-    expect(finalized.balanceDue).toBe(finalized.total)
-    expect(billEntry?.items?.[0]?.productName).toBe('Ring')
-    expect(billEntry?.items?.[0]?.netWeight).toBe(4)
-  })
-
-  it('tracks partial pay on finalize and settles with markPaid', async () => {
-    const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
-      name: 'Partial Due Customer',
-      phone: '9000000001',
-      address: 'Salem',
-      notes: '',
-    })
-    const product = await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({
-      name: 'Chain',
-      category: 'Chain',
-      metal: 'Gold',
-      purity: '22K',
-      grossWeight: 10,
-      netWeight: 8,
-      makingCharges: 0,
-      stockQty: 3,
-      imagePath: '',
-    }))
-    const invoice = await ipc(IPC_CHANNELS.INVOICES_CREATE, {
-      customerId: customer.id,
-      invoiceDate: '2026-09-24',
-      tax: 0,
-      autoTax: false,
-      paymentMode: 'cash',
-      amountPaid: 2000,
-      items: [{ productId: product.id, qty: 1, rate: 5000, metalRate: 5000, netWeight: 8, huid: product.huids[0] }],
-    })
-    const finalized = await ipc(IPC_CHANNELS.INVOICES_FINALIZE, invoice.id)
-    expect(finalized.amountPaid).toBe(2000)
-    expect(finalized.balanceDue).toBe(finalized.total - 2000)
-    expect(finalized.balanceDue).toBeGreaterThan(0)
-
-    const ledger = await ipc(IPC_CHANNELS.DUES_LIST)
-    const column = ledger.columns.find((entry) => entry.customerId === customer.id)
-    expect(column).toBeDefined()
-    const dueEntry = column?.entries.find((e) => e.invoiceId === finalized.id && e.kind === 'due')
-    const paymentEntry = column?.entries.find(
-      (e) => e.invoiceId === finalized.id && e.kind === 'payment',
-    )
-    expect(dueEntry?.amount).toBe(finalized.total)
-    expect(paymentEntry?.amount).toBe(2000)
-    expect(column?.balance).toBe(finalized.balanceDue)
-    expect(dueEntry?.items?.[0]?.productName).toBe('Chain')
-    expect(dueEntry?.items?.[0]?.netWeight).toBe(8)
-    expect(dueEntry?.balanceDue).toBe(finalized.balanceDue)
-
-    const partialAmount = Math.min(1000, finalized.balanceDue)
-    const recorded = await ipc(IPC_CHANNELS.DUES_RECORD_PAYMENT, {
-      dueEntryId: dueEntry!.id,
-      amount: partialAmount,
-      entryDate: '2026-09-25',
-      note: 'Partial settle',
-    })
-    expect(recorded.kind).toBe('payment')
-    expect(recorded.amount).toBe(partialAmount)
-
-    const afterPartial = await ipc(IPC_CHANNELS.DUES_LIST)
-    const colAfterPartial = afterPartial.columns.find((c) => c.customerId === customer.id)
-    const dueAfterPartial = colAfterPartial?.entries.find((e) => e.id === dueEntry!.id)
-    const expectedAfterPartial = finalized.balanceDue - partialAmount
-    expect(dueAfterPartial?.balanceDue).toBe(expectedAfterPartial)
-    expect(colAfterPartial?.balance).toBe(expectedAfterPartial)
-
-    await ipc(IPC_CHANNELS.DUES_MARK_PAID, dueEntry!.id)
-
-    const afterPaid = await ipc(IPC_CHANNELS.DUES_LIST)
-    const colAfterPaid = afterPaid.columns.find((c) => c.customerId === customer.id)
-    const dueAfterPaid = colAfterPaid?.entries.find((e) => e.id === dueEntry!.id)
-    expect(dueAfterPaid?.balanceDue).toBe(0)
-    expect(colAfterPaid?.balance).toBe(0)
-
-    const invoiceAfter = await ipc(IPC_CHANNELS.INVOICES_GET, finalized.id)
-    expect(invoiceAfter.amountPaid).toBe(invoiceAfter.total)
-    expect(invoiceAfter.balanceDue).toBe(0)
-  })
-
-  it('restores invoice balance when a linked payment is deleted', async () => {
-    const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
-      name: 'Delete Payment Customer',
-      phone: '9000000011',
-      address: 'Salem',
-      notes: '',
-    })
-    const product = await ipc(IPC_CHANNELS.PRODUCTS_CREATE, withHuids({
-      name: 'Chain',
-      category: 'Chain',
-      metal: 'Gold',
-      purity: '22K',
-      grossWeight: 10,
-      netWeight: 8,
-      makingCharges: 0,
-      stockQty: 3,
-      imagePath: '',
-    }))
-    const invoice = await ipc(IPC_CHANNELS.INVOICES_CREATE, {
-      customerId: customer.id,
-      invoiceDate: '2026-09-24',
-      tax: 0,
-      autoTax: false,
-      paymentMode: 'upi',
-      items: [{ productId: product.id, qty: 1, rate: 5000, metalRate: 5000, netWeight: 8, huid: product.huids[0] }],
-    })
-    const finalized = await ipc(IPC_CHANNELS.INVOICES_FINALIZE, invoice.id)
-
-    const ledger = await ipc(IPC_CHANNELS.DUES_LIST)
-    const column = ledger.columns.find((entry) => entry.customerId === customer.id)
-    const dueEntry = column?.entries.find((e) => e.invoiceId === finalized.id && e.kind === 'due')
-    expect(dueEntry).toBeDefined()
-
-    const payment = await ipc(IPC_CHANNELS.DUES_RECORD_PAYMENT, {
-      dueEntryId: dueEntry!.id,
-      amount: 1500,
-      entryDate: '2026-09-25',
-      note: 'Test payment',
-    })
-
-    const afterPay = await ipc(IPC_CHANNELS.INVOICES_GET, finalized.id)
-    expect(afterPay.amountPaid).toBe(1500)
-    expect(afterPay.balanceDue).toBe(afterPay.total - 1500)
-
-    await ipc(IPC_CHANNELS.DUES_DELETE, payment.id)
-
-    const afterDelete = await ipc(IPC_CHANNELS.INVOICES_GET, finalized.id)
-    expect(afterDelete.amountPaid).toBe(0)
-    expect(afterDelete.balanceDue).toBe(afterDelete.total)
-
-    const editDue = await invokeIpcForTests(IPC_CHANNELS.DUES_UPDATE, {
-      id: dueEntry!.id,
-      entryDate: '2026-09-24',
-      kind: 'due',
-      amount: 100,
-      note: 'Changed',
-    })
-    expect(editDue.ok).toBe(false)
-    expect(editDue.error).toMatch(/Bill-linked entries cannot be edited/i)
-  })
 
   it('posts Adagu pledge outstanding onto the dues ledger and accepts collection', async () => {
     const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
@@ -271,5 +93,91 @@ describe('dues IPC', () => {
     expect(adagu?.receiptNo).toBe(pledge.receiptNo)
     expect(adagu?.monthlyInterest).toBeGreaterThan(0)
     expect(adagu?.remaining).toBeGreaterThan(0)
+  })
+
+  it('records a manual due entry, takes a payment, and allows editing the entry', async () => {
+    const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
+      name: 'Manual Due Customer',
+      phone: '9000000013',
+      address: 'Salem',
+      notes: '',
+    })
+
+    const due = await ipc(IPC_CHANNELS.DUES_CREATE, {
+      customerId: customer.id,
+      entryDate: '2026-09-24',
+      kind: 'due',
+      amount: 1500,
+      note: 'Opening balance',
+    })
+    expect(due.kind).toBe('due')
+    expect(due.pledgeId).toBeNull()
+
+    const edited = await ipc(IPC_CHANNELS.DUES_UPDATE, {
+      id: due.id,
+      entryDate: '2026-09-24',
+      kind: 'due',
+      amount: 1200,
+      note: 'Corrected balance',
+    })
+    expect(edited.amount).toBe(1200)
+
+    const payment = await ipc(IPC_CHANNELS.DUES_RECORD_PAYMENT, {
+      dueEntryId: due.id,
+      amount: 500,
+      entryDate: '2026-09-25',
+      note: 'Part payment',
+    })
+    expect(payment.kind).toBe('payment')
+
+    const ledger = await ipc(IPC_CHANNELS.DUES_LIST)
+    const column = ledger.columns.find((entry) => entry.customerId === customer.id)
+    expect(column?.balance).toBe(700)
+
+    await ipc(IPC_CHANNELS.DUES_DELETE, payment.id)
+    const afterDelete = await ipc(IPC_CHANNELS.DUES_LIST)
+    const colAfterDelete = afterDelete.columns.find((entry) => entry.customerId === customer.id)
+    expect(colAfterDelete?.balance).toBe(1200)
+  })
+
+  it('blocks editing or deleting an Adagu-linked due entry', async () => {
+    const customer = await ipc(IPC_CHANNELS.CUSTOMERS_CREATE, {
+      name: 'Adagu Guard Customer',
+      phone: '9000000014',
+      address: 'Salem',
+      notes: '',
+    })
+
+    const created = await getTestAgent().post('/api/pledges').send({
+      customerId: customer.id,
+      pledgeDate: '2026-09-26',
+      assessedValue: 20000,
+      loanAmount: 10000,
+      interestPct: 2.1,
+      repaymentDueDate: '2026-10-26',
+      items: [
+        { description: 'Chain', metal: 'Gold', purity: '22K', grossWeight: 8, netWeight: 8, pieces: 1 },
+      ],
+    })
+    const pledge = created.body as { id: number }
+    await getTestAgent().post(`/api/pledges/${pledge.id}/sanction`)
+
+    const ledger = await ipc(IPC_CHANNELS.DUES_LIST)
+    const column = ledger.columns.find((entry) => entry.customerId === customer.id)
+    const dueEntry = column?.entries.find((e) => e.pledgeId === pledge.id && e.kind === 'due')!
+
+    const editDue = await invokeIpcForTests(IPC_CHANNELS.DUES_UPDATE, {
+      id: dueEntry.id,
+      entryDate: '2026-09-24',
+      kind: 'due',
+      amount: 100,
+      note: 'Changed',
+    })
+    expect(editDue.ok).toBe(false)
+    expect(editDue.error).toMatch(/Adagu-linked entries cannot be edited/i)
+
+    const deleteDue = await invokeIpcForTests(IPC_CHANNELS.DUES_DELETE, dueEntry.id)
+    expect(deleteDue.ok).toBe(false)
+    expect(deleteDue.error).toMatch(/Adagu-linked due entries cannot be deleted/i)
   })
 })

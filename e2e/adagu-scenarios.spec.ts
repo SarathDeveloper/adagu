@@ -18,7 +18,7 @@
  *       ADG ticket and links both tickets.
  *   P3  assessed value, the LTV max line and the "Use max" helper.
  *   P4  auction notice, then auction settlement to an outside buyer and to the
- *       shop (stock buyback).
+ *       shop (no stock posting either way).
  *   P5  KYC enforcement, photo upload and the reminder list with its WhatsApp
  *       opener.
  *
@@ -45,7 +45,7 @@ import {
   sanctionAdaguLoan,
   setAdaguSettings,
   setBillDate,
-} from './helpers/inventoryBilling'
+} from './helpers/adagu'
 
 /** A 1x1 PNG, enough for the photo upload endpoints. */
 const PNG_1PX = Buffer.from(
@@ -175,7 +175,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     await sanctioned.or(crashed).waitFor({ state: 'visible', timeout: 15_000 })
     await closePrintPreview(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const row = await adaguDueRow(window, customerName)
     const receiptNo = await receiptNoFromDueRow(row)
     const cells = row.locator('td')
@@ -266,7 +266,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
 
     await sanctionAdaguLoan(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const row = await adaguDueRow(window, customerName)
     const receiptNo = await receiptNoFromDueRow(row)
     // 30 days is the minimum one month: 50000 × 0.02 × 1 = 1,000 → due 51,000
@@ -313,7 +313,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     })
     await sanctionAdaguLoan(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const row = await adaguDueRow(window, customerName)
     const receiptNo = await receiptNoFromDueRow(row)
 
@@ -407,7 +407,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     })
     await sanctionAdaguLoan(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const row = await adaguDueRow(window, customerName)
     const receiptNo = await receiptNoFromDueRow(row)
 
@@ -441,7 +441,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     await expect(renewLink).toBeVisible()
     const newReceiptNo = (await renewLink.innerText()).replace('Renewed to', '').trim()
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const newTicket = await adaguDueRow(window, newReceiptNo)
     await expect(newTicket.locator('td').nth(3)).toHaveText(inr(50_000))
     // The fresh ticket charges its own minimum month from the renewal date.
@@ -496,7 +496,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     })
     await sanctionAdaguLoan(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const row = await adaguDueRow(window, customerName)
     const receiptNo = await receiptNoFromDueRow(row)
 
@@ -526,7 +526,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     )
   })
 
-  test('P4b — a shop buyback needs a stock category for the item', async ({ window }) => {
+  test('P4b — a shop buyback records the auction without a stock step', async ({ window }) => {
     const stamp = Date.now()
     const customerName = `Buyback Adagu ${stamp}`
 
@@ -541,7 +541,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     })
     await sanctionAdaguLoan(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const row = await adaguDueRow(window, customerName)
     const receiptNo = await receiptNoFromDueRow(row)
 
@@ -550,25 +550,15 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
 
     const auction = await openAuctionModal(window, drawer, receiptNo)
     await auction.getByLabel('Buyer').selectOption('shop')
-    const itemCategories = auction.locator('.adagu-auction-item select')
-    await expect(itemCategories.first()).toBeVisible()
-    const recordButton = auction.getByRole('button', { name: 'Record auction' })
+    // Auctions never post to stock in this edition, so there is no category picker.
+    await expect(auction.locator('.adagu-auction-item select')).toHaveCount(0)
+    await auction.getByRole('button', { name: 'Record auction' }).click()
+    await expect(window.getByText(`Auction recorded for ${receiptNo}`)).toBeVisible()
 
-    const categoryOptions = await itemCategories.first().locator('option').count()
-    if (categoryOptions > 1) {
-      for (let index = 0; index < (await itemCategories.count()); index += 1) {
-        await itemCategories.nth(index).selectOption({ index: 1 })
-      }
-      await expect(recordButton).toBeEnabled()
-      await recordButton.click()
-      await expect(window.getByText(`Auction recorded for ${receiptNo}`)).toBeVisible()
-      await closeDrawer(window, drawer)
-    } else {
-      // No stock categories in this shop yet, and the metal cannot be bought in without one.
-      await expect(recordButton).toBeDisabled()
-      await auction.getByRole('button', { name: 'Cancel' }).click()
-      await closeDrawer(window, drawer)
-    }
+    await closeDrawer(window, drawer)
+    await window.locator('.filter-bar').getByRole('tab', { name: 'Auctioned' }).click()
+    const auctioned = await adaguDueRow(window, receiptNo)
+    await expect(auctioned.locator('td').nth(8)).toHaveText(inr(0))
   })
 
   test('P5a — KYC is required, photos upload, then sanction', async ({ window }) => {
@@ -609,7 +599,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
 
     await sanctionAdaguLoan(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     const row = await adaguDueRow(window, customerName)
     const receiptNo = await receiptNoFromDueRow(row)
     const drawer = await openAdaguDueDrawer(window, receiptNo, customerName)
@@ -633,7 +623,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     })
     await sanctionAdaguLoan(window)
 
-    await openDuesTab(window, 'Adagu Dues')
+    await openDuesTab(window)
     await window.locator('.filter-bar').getByRole('tab', { name: 'Reminders' }).click()
 
     const reminderRow = window.locator('tbody tr').filter({ hasText: customerName })

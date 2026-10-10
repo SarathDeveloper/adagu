@@ -62,10 +62,6 @@ function ReportPanel({ report }: { report: ReportDefinition }) {
   const [from, setFrom] = useState(() => defaultFrom(report, todayIso()))
   const [to, setTo] = useState(() => todayIso())
   const [customerId, setCustomerId] = useState('')
-  const [supplierId, setSupplierId] = useState('')
-  const [productId, setProductId] = useState('')
-  const [metal, setMetal] = useState('')
-  const [qtyCutoff, setQtyCutoff] = useState('1')
   const [result, setResult] = useState<ReportResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,10 +82,6 @@ function ReportPanel({ report }: { report: ReportDefinition }) {
         from: report.dateScope === 'none' ? undefined : asOf ? to : from,
         to: report.dateScope === 'none' ? undefined : to,
         customerId: customerId ? Number(customerId) : undefined,
-        supplierId: supplierId ? Number(supplierId) : undefined,
-        productId: productId ? Number(productId) : undefined,
-        metal: metal || undefined,
-        qtyCutoff: report.filters.includes('qtyCutoff') ? Number(qtyCutoff) || 0 : undefined,
       })
       .then((data) => {
         if (!cancelled) setResult(data)
@@ -106,7 +98,7 @@ function ReportPanel({ report }: { report: ReportDefinition }) {
     return () => {
       cancelled = true
     }
-  }, [report, from, to, customerId, supplierId, productId, metal, qtyCutoff])
+  }, [report, from, to, customerId])
 
   const group = REPORT_GROUPS.find((item) => item.id === report.group)
 
@@ -175,54 +167,6 @@ function ReportPanel({ report }: { report: ReportDefinition }) {
                     </option>
                   ))}
                 </select>
-              </label>
-            ) : null}
-            {report.filters.includes('supplier') ? (
-              <label>
-                Supplier
-                <select className="select" value={supplierId} onChange={(event) => setSupplierId(event.target.value)}>
-                  <option value="">All suppliers</option>
-                  {lookups.suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {report.filters.includes('product') ? (
-              <label>
-                Product
-                <select className="select" value={productId} onChange={(event) => setProductId(event.target.value)}>
-                  <option value="">All products</option>
-                  {lookups.products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {report.filters.includes('metal') ? (
-              <label>
-                Metal
-                <select className="select" value={metal} onChange={(event) => setMetal(event.target.value)}>
-                  <option value="">All metals</option>
-                  <option value="Gold">Gold</option>
-                  <option value="Silver">Silver</option>
-                </select>
-              </label>
-            ) : null}
-            {report.filters.includes('qtyCutoff') ? (
-              <label>
-                Qty at or below
-                <input
-                  className="input"
-                  type="number"
-                  min={0}
-                  value={qtyCutoff}
-                  onChange={(event) => setQtyCutoff(event.target.value)}
-                />
               </label>
             ) : null}
           </div>

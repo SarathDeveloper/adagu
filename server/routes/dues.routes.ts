@@ -5,7 +5,6 @@ import {
   duePaymentInputSchema,
 } from '@shared/schemas'
 import { daysBetween } from '@shared/billing/pledgeMath'
-import { resolveAmountPayable } from '@shared/billing/billSummary'
 import { localTodayIso } from '@shared/localDate'
 import type {
   AdaguDueSummary,
@@ -14,7 +13,6 @@ import type {
   DueEntryInput,
   DueEntryKind,
   DueEntryUpdateInput,
-  DueInvoiceItemSummary,
   DuePaymentInput,
   DuesLedger,
   PledgeStatus,
@@ -40,11 +38,6 @@ type DueEntryRow = {
   kind: DueEntryKind
   amount: number
   note: string
-  invoice_id: number | null
-  invoice_no: string | null
-  invoice_total: number | null
-  amount_paid: number | null
-  balance_due: number | null
   pledge_id: number | null
   pledge_receipt_no: string | null
   pledge_loan_amount: number | null
@@ -62,20 +55,6 @@ type CustomerRow = {
   phone: string
 }
 
-type InvoiceItemRow = {
-  product_name: string
-  net_weight: number
-  line_total: number
-}
-
-function mapItems(rows: InvoiceItemRow[]): DueInvoiceItemSummary[] {
-  return rows.map((row) => ({
-    productName: row.product_name || 'Old gold exchange',
-    netWeight: row.net_weight,
-    lineTotal: row.line_total,
-  }))
-}
-
 function pledgeRemainingFromRow(db: Database.Database, row: DueEntryRow): number | null {
   if (row.pledge_id === null) {
     return null
@@ -88,11 +67,7 @@ function pledgeRemainingFromRow(db: Database.Database, row: DueEntryRow): number
   return payoff ? payoff.payoff : null
 }
 
-function mapDueEntry(
-  db: Database.Database,
-  row: DueEntryRow,
-  items: DueInvoiceItemSummary[] = [],
-): DueEntry {
+function mapDueEntry(db: Database.Database, row: DueEntryRow): DueEntry {
   const pledgeRemaining = pledgeRemainingFromRow(db, row)
   return {
     id: row.id,
@@ -101,23 +76,14 @@ function mapDueEntry(
     kind: row.kind,
     amount: row.amount,
     note: row.note,
-    invoiceId: row.invoice_id,
-    invoiceNo: row.invoice_no,
     pledgeId: row.pledge_id,
     pledgeReceiptNo: row.pledge_receipt_no,
     createdAt: row.created_at,
-    invoiceTotal: row.invoice_total,
-    amountPaid: row.amount_paid ?? (row.pledge_id !== null ? row.pledge_amount_collected : null),
-    balanceDue: row.balance_due ?? pledgeRemaining,
-    items,
+    balanceDue: pledgeRemaining,
   }
 }
 
-function emptyDueEntryStub(
-  customerId: number,
-  kind: DueEntryKind,
-  amount: number,
-): DueEntry {
+function emptyDueEntryStub(customerId: number, kind: DueEntryKind, amount: number): DueEntry {
   return {
     id: 0,
     customerId,
@@ -125,15 +91,10 @@ function emptyDueEntryStub(
     kind,
     amount,
     note: '',
-    invoiceId: null,
-    invoiceNo: null,
     pledgeId: null,
     pledgeReceiptNo: null,
     createdAt: '',
-    invoiceTotal: null,
-    amountPaid: null,
     balanceDue: null,
-    items: [],
   }
 }
 
@@ -151,10 +112,6 @@ function balanceForEntries(entries: DueEntry[]): number {
 
 const entrySelectSql = `
   SELECT d.*,
-         i.invoice_no,
-         i.total AS invoice_total,
-         i.amount_paid,
-         i.balance_due,
          p.receipt_no AS pledge_receipt_no,
          p.loan_amount AS pledge_loan_amount,
          p.interest_pct AS pledge_interest_pct,
@@ -163,38 +120,18 @@ const entrySelectSql = `
          p.status AS pledge_status,
          p.redeemed_date AS pledge_redeemed_date
   FROM customer_dues d
-  LEFT JOIN invoices i ON i.id = d.invoice_id
   LEFT JOIN pledges p ON p.id = d.pledge_id
 `
-
-function loadItemsForInvoice(db: Database.Database, invoiceId: number | null): DueInvoiceItemSummary[] {
-  if (invoiceId === null) {
-    return []
-  }
-  const rows = db
-    .prepare(
-      `SELECT p.name AS product_name, ii.net_weight, ii.line_total
-       FROM invoice_items ii
-       LEFT JOIN products p ON p.id = ii.product_id
-       WHERE ii.invoice_id = ?
-       ORDER BY ii.id ASC`,
-    )
-    .all(invoiceId) as InvoiceItemRow[]
-  return mapItems(rows)
-}
 
 function loadDueEntry(db: Database.Database, id: number): DueEntry {
   const row = db.prepare(`${entrySelectSql} WHERE d.id = ?`).get(id) as DueEntryRow | undefined
   if (!row) {
     throw new Error('Due entry not found')
   }
-  return mapDueEntry(db, row, loadItemsForInvoice(db, row.invoice_id))
+  return mapDueEntry(db, row)
 }
 
-function loadDueEntryForPledgePayment(
-  db: Database.Database,
-  pledgePaymentId: number,
-): DueEntry {
+function loadDueEntryForPledgePayment(db: Database.Database, pledgePaymentId: number): DueEntry {
   const row = db
     .prepare('SELECT id FROM customer_dues WHERE pledge_payment_id = ?')
     .get(pledgePaymentId) as { id: number } | undefined
@@ -207,16 +144,6 @@ function loadDueEntryForPledgePayment(
 function remainingForDue(db: Database.Database, entry: DueEntry): number {
   if (entry.kind !== 'due') {
     throw new Error('Payments can only be recorded against a due entry')
-  }
-
-  if (entry.invoiceId !== null) {
-    const invoice = db
-      .prepare('SELECT balance_due FROM invoices WHERE id = ?')
-      .get(entry.invoiceId) as { balance_due: number } | undefined
-    if (!invoice) {
-      throw new Error('Invoice not found')
-    }
-    return Math.max(0, invoice.balance_due)
   }
 
   if (entry.pledgeId !== null) {
@@ -258,7 +185,7 @@ type PledgeListRow = {
   auction_date: string | null
 }
 
-function buildAdaguDues(
+export function buildAdaguDues(
   db: Database.Database,
   term: string,
 ): { adaguDues: AdaguDueSummary[]; adaguOutstanding: number } {
@@ -324,37 +251,8 @@ function buildAdaguDues(
   return { adaguDues, adaguOutstanding }
 }
 
-function loadInvoicePaymentState(
-  db: Database.Database,
-  invoiceId: number,
-): { payable: number; amountPaid: number } {
-  const invoice = db
-    .prepare(
-      `SELECT total, amount_paid, COALESCE(amount_payable, total) AS amount_payable
-       FROM invoices WHERE id = ?`,
-    )
-    .get(invoiceId) as
-    | { total: number; amount_paid: number; amount_payable: number }
-    | undefined
-  if (!invoice) {
-    throw new Error('Invoice not found')
-  }
-  return {
-    payable: resolveAmountPayable(invoice.amount_payable, invoice.total),
-    amountPaid: invoice.amount_paid,
-  }
-}
-
-/** Fallback mode for a bill payment that arrived without an explicit mode. */
-function invoicePaymentMode(db: Database.Database, invoiceId: number | null): string | null {
-  if (invoiceId === null) return null
-  const row = db.prepare('SELECT payment_mode FROM invoices WHERE id = ?').get(invoiceId) as
-    | { payment_mode: string }
-    | undefined
-  return row?.payment_mode ?? null
-}
-
-export function insertPayment(
+/** Cash / UPI payment recorded against a manual due entry. */
+function insertPayment(
   db: Database.Database,
   input: {
     customerId: number
@@ -362,70 +260,17 @@ export function insertPayment(
     amount: number
     note: string
     mode: string | null
-    invoiceId: number | null
     pledgeId: number | null
   },
 ): DueEntry {
-  // Validate the linked document before writing, so a rejected payment does not
-  // leave an orphan payment row in the ledger.
-  if (input.invoiceId !== null) {
-    const invoice = loadInvoicePaymentState(db, input.invoiceId)
-    if (invoice.amountPaid + input.amount - invoice.payable > 0.009) {
-      throw new Error('Payment cannot exceed the balance due')
-    }
-  }
-
   const result = db
     .prepare(
       `INSERT INTO customer_dues (customer_id, entry_date, kind, amount, note, mode, invoice_id, pledge_id, created_at)
-       VALUES (?, ?, 'payment', ?, ?, ?, ?, ?, datetime('now'))`,
+       VALUES (?, ?, 'payment', ?, ?, ?, NULL, ?, datetime('now'))`,
     )
-    .run(
-      input.customerId,
-      input.entryDate,
-      input.amount,
-      input.note,
-      input.mode,
-      input.invoiceId,
-      input.pledgeId,
-    )
-
-  if (input.invoiceId !== null) {
-    const invoice = loadInvoicePaymentState(db, input.invoiceId)
-    const amountPaid = invoice.amountPaid + input.amount
-    const balanceDue = Math.max(0, invoice.payable - amountPaid)
-    db.prepare('UPDATE invoices SET amount_paid = ?, balance_due = ? WHERE id = ?').run(
-      amountPaid,
-      balanceDue,
-      input.invoiceId,
-    )
-  }
+    .run(input.customerId, input.entryDate, input.amount, input.note, input.mode, input.pledgeId)
 
   return loadDueEntry(db, Number(result.lastInsertRowid))
-}
-
-function syncInvoicePaidFromPayments(db: Database.Database, invoiceId: number): void {
-  const invoice = db
-    .prepare(`SELECT total, COALESCE(amount_payable, total) AS amount_payable FROM invoices WHERE id = ?`)
-    .get(invoiceId) as { total: number; amount_payable: number } | undefined
-  if (!invoice) {
-    throw new Error('Invoice not found')
-  }
-  const paidRow = db
-    .prepare(
-      `SELECT COALESCE(SUM(amount), 0) AS paid
-       FROM customer_dues
-       WHERE invoice_id = ? AND kind = 'payment'`,
-    )
-    .get(invoiceId) as { paid: number }
-  const amountPaid = paidRow.paid
-  const payable = resolveAmountPayable(invoice.amount_payable, invoice.total)
-  const balanceDue = Math.max(0, payable - amountPaid)
-  db.prepare('UPDATE invoices SET amount_paid = ?, balance_due = ? WHERE id = ?').run(
-    amountPaid,
-    balanceDue,
-    invoiceId,
-  )
 }
 
 router.get(
@@ -463,7 +308,7 @@ router.get(
       }
 
       const rows = entryStmt.all(customer.id) as DueEntryRow[]
-      const entries = rows.map((row) => mapDueEntry(db, row, loadItemsForInvoice(db, row.invoice_id)))
+      const entries = rows.map((row) => mapDueEntry(db, row))
       const balance = balanceForEntries(entries)
       totalOutstanding += balance
 
@@ -510,14 +355,11 @@ router.put(
     const input = parseBody(dueEntryUpdateInputSchema, { ...req.body, id }) as DueEntryUpdateInput
     const db = getDatabase()
     const existing = db
-      .prepare('SELECT id, invoice_id, pledge_id FROM customer_dues WHERE id = ?')
-      .get(input.id) as { id: number; invoice_id: number | null; pledge_id: number | null } | undefined
+      .prepare('SELECT id, pledge_id FROM customer_dues WHERE id = ?')
+      .get(input.id) as { id: number; pledge_id: number | null } | undefined
 
     if (!existing) {
       throw new Error('Due entry not found')
-    }
-    if (existing.invoice_id !== null) {
-      throw new Error('Bill-linked entries cannot be edited')
     }
     if (existing.pledge_id !== null) {
       throw new Error('Adagu-linked entries cannot be edited')
@@ -539,10 +381,9 @@ router.delete(
     const id = parseIdParam(req.params.id)
     const db = getDatabase()
     const existing = db
-      .prepare('SELECT id, invoice_id, pledge_id, kind, pledge_payment_id FROM customer_dues WHERE id = ?')
+      .prepare('SELECT id, pledge_id, kind, pledge_payment_id FROM customer_dues WHERE id = ?')
       .get(id) as {
       id: number
-      invoice_id: number | null
       pledge_id: number | null
       kind: DueEntryKind
       pledge_payment_id: number | null
@@ -551,16 +392,11 @@ router.delete(
     if (!existing) {
       throw new Error('Due entry not found')
     }
-    if (existing.invoice_id !== null && existing.kind === 'due') {
-      throw new Error('Bill-linked due entries cannot be deleted')
-    }
     if (existing.pledge_id !== null && existing.kind === 'due') {
       throw new Error('Adagu-linked due entries cannot be deleted')
     }
 
-    const invoiceId = existing.invoice_id
     const pledgeId = existing.pledge_id
-    const linkedInvoicePayment = invoiceId !== null && existing.kind === 'payment'
     const linkedPledgePayment = pledgeId !== null && existing.kind === 'payment'
 
     const tx = db.transaction(() => {
@@ -574,9 +410,6 @@ router.delete(
       const result = db.prepare('DELETE FROM customer_dues WHERE id = ?').run(id)
       if (result.changes === 0) {
         throw new Error('Due entry not found')
-      }
-      if (linkedInvoicePayment) {
-        syncInvoicePaidFromPayments(db, invoiceId)
       }
       if (linkedPledgePayment) {
         refreshActivePledgeDues(db)
@@ -604,11 +437,7 @@ router.post(
         throw new Error(`Payment exceeds remaining balance of ${remaining}`)
       }
 
-      const label = due.invoiceNo
-        ? `Payment for ${due.invoiceNo}`
-        : due.pledgeReceiptNo
-          ? `Payment for ${due.pledgeReceiptNo}`
-          : 'Payment'
+      const label = due.pledgeReceiptNo ? `Payment for ${due.pledgeReceiptNo}` : 'Payment'
       const note = input.note || label
 
       if (due.pledgeId !== null) {
@@ -633,8 +462,7 @@ router.post(
         entryDate: input.entryDate,
         amount: input.amount,
         note,
-        mode: input.mode ?? invoicePaymentMode(db, due.invoiceId),
-        invoiceId: due.invoiceId,
+        mode: input.mode ?? 'cash',
         pledgeId: null,
       })
     })
@@ -656,11 +484,7 @@ router.post(
       }
 
       const entryDate = localTodayIso()
-      const label = due.invoiceNo
-        ? `Settled ${due.invoiceNo}`
-        : due.pledgeReceiptNo
-          ? `Settled ${due.pledgeReceiptNo}`
-          : 'Settled'
+      const label = due.pledgeReceiptNo ? `Settled ${due.pledgeReceiptNo}` : 'Settled'
 
       if (due.pledgeId !== null) {
         const payment = recordPledgePayment(db, {
@@ -679,8 +503,7 @@ router.post(
         entryDate,
         amount: remaining,
         note: label,
-        mode: invoicePaymentMode(db, due.invoiceId),
-        invoiceId: due.invoiceId,
+        mode: 'cash',
         pledgeId: null,
       })
     })
