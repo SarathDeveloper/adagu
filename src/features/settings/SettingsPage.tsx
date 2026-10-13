@@ -20,7 +20,7 @@ import type { AppInfo, ShopSettings } from '@shared/types'
 import { PageHeader } from '../../components/PageHeader'
 import { api } from '../../lib/api'
 import { useToast } from '../../components/toastContext'
-import { defaultShopLogoUrl, localImageSrc, shopSettingsToDisplay } from '../print/mapShopDisplay'
+import { localImageSrc, shopSettingsToDisplay } from '../print/mapShopDisplay'
 import { storeSampleBillPrint, type SampleBillKind } from './sampleBillPrintStore'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
 import { printPreviewPaths } from '../print/printPreviewPaths'
@@ -157,7 +157,7 @@ export function SettingsPage() {
   const [samplePrintKind, setSamplePrintKind] = useState<SampleBillKind | null>(null)
 
   const shopDisplay = shopSettingsToDisplay(shop)
-  const headerLogoSrc = localImageSrc(shop?.logoImagePath, defaultShopLogoUrl)
+  const headerLogoSrc = localImageSrc(shop?.logoImagePath, '')
 
   function updateShop(
     next: ShopSettings | null | ((current: ShopSettings | null) => ShopSettings | null),
@@ -285,7 +285,11 @@ export function SettingsPage() {
         actions={
           <>
             <div className="settings-header-chip">
-              <img className="settings-header-chip-logo" src={headerLogoSrc} alt="" />
+              {headerLogoSrc ? (
+                <img className="settings-header-chip-logo" src={headerLogoSrc} alt="" />
+              ) : (
+                <Store className="settings-header-chip-icon" size={18} strokeWidth={1.75} aria-hidden />
+              )}
               <div className="settings-header-chip-text">
                 <strong>{shopDisplay.name}</strong>
                 <span>v{info?.version ?? '1.0.0'}</span>
@@ -457,9 +461,13 @@ export function SettingsPage() {
                       title="Upload Shop Logo"
                       hint="PNG, JPG (Max 2MB)"
                       preview={
-                        <span className="settings-image-preview">
-                          <img src={localImageSrc(shop.logoImagePath, defaultShopLogoUrl)} alt="" />
-                        </span>
+                        shop.logoImagePath ? (
+                          <span className="settings-image-preview">
+                            <img src={localImageSrc(shop.logoImagePath, '')} alt="" />
+                          </span>
+                        ) : (
+                          <Image className="settings-upload-icon" size={18} strokeWidth={1.75} aria-hidden />
+                        )
                       }
                       onPick={(file) => void pickImage('logoImagePath', file)}
                     />

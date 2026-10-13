@@ -1,8 +1,8 @@
 [package]
 name = "jeweltrackerpro"
 version = "1.0.0"
-description = "JewelTrackerPro Adagu — pledges and gold savings"
-authors = ["JewelTrackerPro"]
+description = "AdaguTrackerPro — pledges and gold savings"
+authors = ["AdaguTrackerPro"]
 edition = "2021"
 rust-version = "1.77"
 

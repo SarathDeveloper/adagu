@@ -45,6 +45,34 @@
       await invoke('write_backup_file', { path: path, bytes: bytes });
       return { canceled: false, filePath: path };
     },
+    exportFullBackup: async function () {
+      var suggested = 'jeweltrackerpro-full-' + new Date().toISOString().slice(0, 10) + '.zip';
+      var path = await invoke('choose_backup_path', {
+        defaultFilename: suggested,
+        filterName: 'Zip archive',
+        extension: 'zip',
+      });
+      if (!path) {
+        return { canceled: true };
+      }
+      var response = await fetch('/api/backup/export-full', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path }),
+      });
+      if (!response.ok) {
+        var message = 'Full backup failed';
+        try {
+          var payload = await response.json();
+          if (payload && payload.error) message = payload.error;
+        } catch (_error) {
+          // Keep the generic message when the server sent no JSON.
+        }
+        throw new Error(message);
+      }
+      return { canceled: false, filePath: path };
+    },
     exportExcel: async function () {
       var suggested = 'jeweltrackerpro-tables-' + new Date().toISOString().slice(0, 10) + '.xlsx';
       var path = await invoke('choose_backup_path', {

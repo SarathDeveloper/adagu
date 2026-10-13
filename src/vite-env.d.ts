@@ -7,6 +7,7 @@ type DesktopExportResult = {
 
 type DesktopAPI = {
   exportDatabase: () => Promise<DesktopExportResult>
+  exportFullBackup: () => Promise<DesktopExportResult>
   exportExcel: () => Promise<DesktopExportResult>
   savePdf: (bytes: Uint8Array, defaultFilename: string) => Promise<DesktopExportResult>
   chooseBackupFolder: () => Promise<string | null>

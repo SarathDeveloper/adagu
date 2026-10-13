@@ -1,4 +1,4 @@
-# JewelTrackerPro Adagu
+# AdaguTrackerPro
 
 Adagu (pledge loan) and Gold Savings software for a jewellery pawn shop. Tracks pledges from sanction through interest collections, renewals, redemption, forfeit and auction; and monthly gold savings schemes from enrollment through collections and a maturity cash payout. Ships as a **desktop app** (Windows and macOS) and can still run as a localhost web app.
 
@@ -72,10 +72,10 @@ npm run tauri:build:win  # Windows NSIS .exe (Windows, or macOS with cargo-xwin)
 npm run tauri:build:mac  # Apple Silicon .dmg (must run on a Mac)
 ```
 
-Installers land in `src-tauri/target/release/bundle/` (or `src-tauri/target/<triple>/release/bundle/` for a cross target), and the Windows installer is copied to `release/JewelTrackerPro-Adagu-Setup-1.0.0.exe`. Shop data (database, uploads, logs, backups) is stored in the app's own user-data folder, so it sits beside a full JewelTrackerPro install:
+Installers land in `src-tauri/target/release/bundle/` (or `src-tauri/target/<triple>/release/bundle/` for a cross target), and the Windows installer is copied to `release/AdaguTrackerPro-Setup-1.0.0.exe`. Shop data (database, uploads, logs, backups) is stored in the app's own user-data folder, so it sits beside a full JewelTrackerPro install. The first launch moves an existing `JewelTrackerPro Adagu` folder to `AdaguTrackerPro` when the new folder is not already there.
 
-- Windows: `%APPDATA%\JewelTrackerPro Adagu\`
-- macOS: `~/Library/Application Support/JewelTrackerPro Adagu/`
+- Windows: `%APPDATA%\AdaguTrackerPro\`
+- macOS: `~/Library/Application Support/AdaguTrackerPro/`
 
 ### macOS (Apple Silicon)
 
@@ -96,14 +96,14 @@ The build runs in order: the frontend, the Node sidecar (ad-hoc signed), the pac
 Copy the result to `release/`:
 
 ```bash
-cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/JewelTrackerPro\ Adagu_1.0.0_aarch64.dmg \
-  release/JewelTrackerPro-Adagu-Setup-1.0.0-mac-arm64.dmg
+cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/AdaguTrackerPro_1.0.0_aarch64.dmg \
+  release/AdaguTrackerPro-Setup-1.0.0-mac-arm64.dmg
 ```
 
 The app is ad-hoc signed, not notarized with an Apple Developer ID, so the first launch on another Mac is blocked by Gatekeeper. On macOS 15 open **System Settings → Privacy & Security**, click **Open Anyway**, and confirm. On older versions right-click the app and choose **Open**. The alternative for either:
 
 ```bash
-xattr -cr "/Applications/JewelTrackerPro Adagu.app"
+xattr -cr "/Applications/AdaguTrackerPro.app"
 ```
 
 If the window ever goes blank, what happened is written to `logs/crash.log` in that folder and reported with a `JTP-ERR-…` reference ID the user can quote. The log folder is also shown under **Settings → Data**.

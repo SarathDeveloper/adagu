@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, rmSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Database } from 'better-sqlite3'
 import { backupExcelName, backupKindForName, selectBackupsToKeep } from '@shared/backupRetention'
@@ -26,12 +26,35 @@ export function premigrateSnapshotName(fromVersion: number, stamp = localNowStam
   return `jeweltrackerpro-premigrate-v${fromVersion}-${stamp}.db`
 }
 
+const STALE_PARTIAL_RE = /^~\$jeweltrackerpro-.+\.tmp$/
+
+/** Deletes half-written snapshots left behind when a backup was interrupted. */
+export function removeStalePartials(dir: string): void {
+  if (!existsSync(dir)) return
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name)
+    if (STALE_PARTIAL_RE.test(name)) {
+      rmSync(path, { force: true, recursive: true })
+      rmSync(`${path}-wal`, { force: true })
+      rmSync(`${path}-shm`, { force: true })
+      continue
+    }
+    if (name.endsWith('.replacing')) {
+      const original = name.slice(0, -'.replacing'.length)
+      if (original && existsSync(join(dir, original))) {
+        rmSync(path, { force: true })
+      }
+    }
+  }
+}
+
 /**
  * Deletes backup files that fall outside the retention tiers, along with their
  * Excel sibling. Files that are not recognised backup names are left alone.
  */
 export function pruneBackupFiles(dir: string): void {
   if (!existsSync(dir)) return
+  removeStalePartials(dir)
   const names = readdirSync(dir)
   const keep = selectBackupsToKeep(names)
   for (const name of names) {

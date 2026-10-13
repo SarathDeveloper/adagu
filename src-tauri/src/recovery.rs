@@ -62,7 +62,7 @@ pub fn error_dialog(app: &AppHandle, message: &str) {
 
     app.dialog()
         .message(message)
-        .title("JewelTrackerPro Adagu")
+        .title("AdaguTrackerPro")
         .kind(MessageDialogKind::Error)
         .blocking_show();
 }
@@ -270,7 +270,7 @@ fn handle_failure(app: &AppHandle, api_port: Option<u16>, failure: Failure) {
             error_dialog(
                 app,
                 &format!(
-                    "{}\n\nThe window could not be recovered after {MAX_AUTO_RELOADS} reload attempts.\nReference ID: {reference_id}\n\nClose JewelTrackerPro Adagu and start it again. Details are saved in the log folder shown under Settings > Data.",
+                    "{}\n\nThe window could not be recovered after {MAX_AUTO_RELOADS} reload attempts.\nReference ID: {reference_id}\n\nClose AdaguTrackerPro and start it again. Details are saved in the log folder shown under Settings > Data.",
                     failure.message
                 ),
             );
@@ -280,7 +280,7 @@ fn handle_failure(app: &AppHandle, api_port: Option<u16>, failure: Failure) {
             error_dialog(
                 app,
                 &format!(
-                    "{}\n\nJewelTrackerPro Adagu has to close.\nReference ID: {reference_id}\n\nStart it again to continue; everything already saved is safe.",
+                    "{}\n\nAdaguTrackerPro has to close.\nReference ID: {reference_id}\n\nStart it again to continue; everything already saved is safe.",
                     failure.message
                 ),
             );
@@ -307,7 +307,7 @@ pub fn report_sidecar_exit(app: &AppHandle, code: Option<i32>) {
     error_dialog(
         app,
         &format!(
-            "{message}\n\nJewelTrackerPro Adagu has to close because it cannot read or save data without it.\nReference ID: {reference_id}\n\nStart it again to continue; everything already saved is safe."
+            "{message}\n\nAdaguTrackerPro has to close because it cannot read or save data without it.\nReference ID: {reference_id}\n\nStart it again to continue; everything already saved is safe."
         ),
     );
     crate::stop_sidecar(app);

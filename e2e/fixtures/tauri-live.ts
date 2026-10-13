@@ -38,9 +38,13 @@ async function signIn(page: Page): Promise<void> {
     await page.getByRole('button', { name: 'Sign in' }).click()
   }
 
-  await sidebar.waitFor({ state: 'visible', timeout: 20_000 })
+  const setupHeading = page.getByRole('heading', { name: 'Set up your shop' })
+  await sidebar.or(setupHeading).waitFor({ state: 'visible', timeout: 20_000 })
   if (page.url().includes('change-password')) {
     throw new Error('Admin must finish the password change before live Tauri E2E tests can run')
+  }
+  if (page.url().includes('/setup')) {
+    throw new Error('Enter the shop details in the app before live Tauri E2E tests can run')
   }
 }
 

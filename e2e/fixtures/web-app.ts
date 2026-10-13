@@ -42,6 +42,19 @@ export const test = base.extend<Fixtures>({
     if (!login.ok()) {
       throw new Error(`E2E admin login failed: ${await login.text()}`)
     }
+    const settingsResponse = await page.request.get(`${origin}/api/settings`)
+    if (!settingsResponse.ok()) {
+      throw new Error(`E2E settings load failed: ${await settingsResponse.text()}`)
+    }
+    const settings = (await settingsResponse.json()) as { shopName?: string }
+    if (!String(settings.shopName ?? '').trim()) {
+      const saved = await page.request.put(`${origin}/api/settings`, {
+        data: { ...settings, shopName: 'E2E Shop' },
+      })
+      if (!saved.ok()) {
+        throw new Error(`E2E shop setup failed: ${await saved.text()}`)
+      }
+    }
     await page.goto(`${origin}/dashboard`)
     await use(page)
     await page.close()

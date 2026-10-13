@@ -6,29 +6,34 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import type { BackupFile, BackupInspection, BackupStatus, Customer } from '@shared/types'
 import {
+  allowFullBackupEntry,
   assertSqliteIntegrity,
   backupDatabaseTo,
   copyNewestBackupOffsite,
   ensureDailyBackup,
   ensureScheduledBackup,
   LAST_BACKUP_AT_KEY,
+  LAST_SCHEDULED_BACKUP_AT_KEY,
+  rememberChangeBaseline,
   proveBackupRestores,
   restoreDatabaseFrom,
   tickScheduledBackup,
 } from '../../server/db/backup'
 import { getDatabase, getUserDataDir } from '../../server/db'
 import { latestMigrationVersion } from '../../server/db/migrations'
-import { writePremigrateSnapshot } from '../../server/db/snapshot'
+import { pruneBackupFiles, writePremigrateSnapshot } from '../../server/db/snapshot'
 import { getUploadsDir } from '../../server/lib/paths'
-import { setShopSetting } from '../../server/lib/settingsStore'
+import { crc32, extractZipFile } from '../../server/lib/zip'
+import { getShopSetting, setShopSetting } from '../../server/lib/settingsStore'
 import { localDateIso } from '../../shared/localDate'
 import { getTestAgent, IPC_CHANNELS, ipc, useIntegrationEnv, uniqueCustomerPhone } from './helpers/testEnv'
 
@@ -177,16 +182,16 @@ describe('database backup and restore', () => {
     const today = localDateIso()
     const dailyPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.db`)
 
-    setShopSetting(db, LAST_BACKUP_AT_KEY, new Date(Date.now() - 3 * 86_400_000).toISOString())
+    setShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, new Date(Date.now() - 3 * 86_400_000).toISOString())
     await ensureScheduledBackup()
     expect(existsSync(dailyPath)).toBe(true)
     assertSqliteIntegrity(dailyPath)
 
-    const before = db.prepare('SELECT value FROM shop_settings WHERE key = ?').get(LAST_BACKUP_AT_KEY) as {
+    const before = db.prepare('SELECT value FROM shop_settings WHERE key = ?').get(LAST_SCHEDULED_BACKUP_AT_KEY) as {
       value: string
     }
     await ensureScheduledBackup()
-    const after = db.prepare('SELECT value FROM shop_settings WHERE key = ?').get(LAST_BACKUP_AT_KEY) as {
+    const after = db.prepare('SELECT value FROM shop_settings WHERE key = ?').get(LAST_SCHEDULED_BACKUP_AT_KEY) as {
       value: string
     }
     expect(after.value).toBe(before.value)
@@ -343,7 +348,7 @@ describe('database backup and restore', () => {
     expect(body.toString('utf8')).toContain('pledges')
   })
 
-  it('rejects a file that is not a JewelTrackerPro backup without touching live data', async () => {
+  it('rejects a file that is not an AdaguTrackerPro backup without touching live data', async () => {
     await seedCustomer()
     const agent = getTestAgent()
     const backupsDir = join(getUserDataDir(), 'backups')
@@ -357,7 +362,7 @@ describe('database backup and restore', () => {
       .post('/api/backup/restore-local')
       .send({ name: 'jeweltrackerpro-2020-01-01.db' })
     expect(response.status).toBe(400)
-    expect(response.body.error).toBe('This file is not a JewelTrackerPro Adagu backup')
+    expect(response.body.error).toBe('This file is not an AdaguTrackerPro backup')
     expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(1)
   })
 
@@ -501,4 +506,317 @@ describe('database backup and restore', () => {
     }
     expect(existsSync(exportPath)).toBe(false)
   })
+
+  it('keeps this computer\'s backup settings and off-machine photos when restoring', async () => {
+    await seedCustomer()
+    const agent = getTestAgent()
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-restore-settings-'))
+    const backupsDir = join(getUserDataDir(), 'backups')
+    const snapshot = join(backupsDir, 'jeweltrackerpro-manual-19990101-000002.db')
+    mkdirSync(backupsDir, { recursive: true })
+    await backupDatabaseTo(snapshot)
+
+    try {
+      const saved = await agent.put('/api/backup/settings').send({
+        frequency: 'weekly',
+        time: '09:30',
+        offsiteDir,
+      })
+      expect(saved.status).toBe(200)
+      const scheduledAt = new Date().toISOString()
+      setShopSetting(getDatabase(), LAST_SCHEDULED_BACKUP_AT_KEY, scheduledAt)
+
+      const imageName = 'logo-keep.png'
+      mkdirSync(join(offsiteDir, 'uploads'), { recursive: true })
+      writeFileSync(join(offsiteDir, 'uploads', imageName), 'logo-bytes')
+      const poisoned = new Database(snapshot)
+      poisoned
+        .prepare(
+          `INSERT INTO shop_settings (key, value) VALUES ('backup_offsite_dir', '')
+           ON CONFLICT(key) DO UPDATE SET value = ''`,
+        )
+        .run()
+      poisoned
+        .prepare(
+          `INSERT INTO shop_settings (key, value) VALUES ('backup_frequency', 'daily')
+           ON CONFLICT(key) DO UPDATE SET value = 'daily'`,
+        )
+        .run()
+      poisoned.close()
+
+      await restoreDatabaseFrom(snapshot)
+
+      const status = await agent.get('/api/backup/status')
+      expect(status.body.frequency).toBe('weekly')
+      expect(status.body.time).toBe('09:30')
+      expect(status.body.offsiteDir).toBe(resolve(offsiteDir))
+      expect(getShopSetting(getDatabase(), LAST_SCHEDULED_BACKUP_AT_KEY, '')).toBe(scheduledAt)
+      expect(existsSync(join(getUploadsDir(), imageName))).toBe(true)
+      expect(readFileSync(join(getUploadsDir(), imageName)).toString()).toBe('logo-bytes')
+
+      const daily = join(backupsDir, `jeweltrackerpro-${localDateIso()}.db`)
+      const before = existsSync(daily) ? statSync(daily).mtimeMs : null
+      await tickScheduledBackup()
+      const after = existsSync(daily) ? statSync(daily).mtimeMs : null
+      expect(after).toBe(before)
+      expect(getShopSetting(getDatabase(), LAST_SCHEDULED_BACKUP_AT_KEY, '')).toBe(scheduledAt)
+    } finally {
+      rmSync(offsiteDir, { recursive: true, force: true })
+    }
+  })
+
+  it('leaves the previous backup in place when a snapshot fails and removes leftover temp files', async () => {
+    const dir = join(getUserDataDir(), 'backups')
+    mkdirSync(dir, { recursive: true })
+    const today = localDateIso()
+    const dest = join(dir, `jeweltrackerpro-${today}.db`)
+    await backupDatabaseTo(dest)
+    const before = readFileSync(dest)
+    const partial = join(dir, `~$jeweltrackerpro-${today}.db.tmp`)
+    const database = getDatabase()
+    const originalBackup = database.backup.bind(database)
+    database.backup = async () => {
+      throw new Error('disk full')
+    }
+
+    try {
+      await expect(backupDatabaseTo(dest)).rejects.toThrow('disk full')
+    } finally {
+      database.backup = originalBackup
+    }
+    expect(readFileSync(dest).equals(before)).toBe(true)
+    expect(existsSync(partial)).toBe(false)
+
+    const stale = join(dir, '~$jeweltrackerpro-stale.db.tmp')
+    writeFileSync(stale, 'partial')
+    pruneBackupFiles(dir)
+    expect(existsSync(stale)).toBe(false)
+    expect(existsSync(dest)).toBe(true)
+  })
+
+  it('records a failed automatic backup and clears it after the next success', async () => {
+    const agent = getTestAgent()
+    const dir = join(getUserDataDir(), 'backups')
+    mkdirSync(dir, { recursive: true })
+    setShopSetting(
+      getDatabase(),
+      LAST_SCHEDULED_BACKUP_AT_KEY,
+      new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    )
+    const database = getDatabase()
+    const originalBackup = database.backup.bind(database)
+    let attempts = 0
+    database.backup = async () => {
+      attempts += 1
+      throw new Error('disk full')
+    }
+
+    try {
+      await tickScheduledBackup()
+      const failed = await agent.get('/api/backup/status')
+      expect(failed.status).toBe(200)
+      expect(failed.body.lastBackupError).toContain('disk full')
+      expect(attempts).toBe(1)
+
+      await tickScheduledBackup()
+      const cooled = await agent.get('/api/backup/status')
+      expect(cooled.body.lastBackupError).toBe(failed.body.lastBackupError)
+      expect(attempts).toBe(1)
+    } finally {
+      database.backup = originalBackup
+    }
+
+    const created = await agent.post('/api/backup/create')
+    expect(created.status).toBe(200)
+    const cleared = await agent.get('/api/backup/status')
+    expect(cleared.body.lastBackupError).toBeNull()
+  })
+
+  it('backs up every few hours only after data has changed', async () => {
+    const now = new Date(2026, 9, 13, 10, 0, 0)
+    const earlier = new Date(now.getTime() - 4 * 60 * 60 * 1000)
+    const db = getDatabase()
+    setShopSetting(db, 'backup_frequency', 'daily')
+    setShopSetting(db, 'backup_time', '21:00')
+    setShopSetting(db, LAST_BACKUP_AT_KEY, earlier.toISOString())
+    setShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, earlier.toISOString())
+    rememberChangeBaseline()
+
+    const daily = join(getUserDataDir(), 'backups', `jeweltrackerpro-${localDateIso(now)}.db`)
+    await tickScheduledBackup(now)
+    expect(existsSync(daily)).toBe(false)
+    expect(getShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, '')).toBe(earlier.toISOString())
+
+    await seedCustomer('Changed after backup')
+    await tickScheduledBackup(now)
+    expect(existsSync(daily)).toBe(true)
+    assertSqliteIntegrity(daily)
+    expect(getShopSetting(getDatabase(), LAST_SCHEDULED_BACKUP_AT_KEY, '')).toBe(earlier.toISOString())
+    expect(getShopSetting(getDatabase(), LAST_BACKUP_AT_KEY, '')).not.toBe(earlier.toISOString())
+  })
+
+  it('does not treat an off-machine copy as a reason to back up again', async () => {
+    const now = new Date(2026, 9, 13, 10, 0, 0)
+    const earlier = new Date(now.getTime() - 4 * 60 * 60 * 1000)
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-unchanged-'))
+    const agent = getTestAgent()
+    const daily = join(getUserDataDir(), 'backups', `jeweltrackerpro-${localDateIso(now)}.db`)
+
+    try {
+      const saved = await agent.put('/api/backup/settings').send({
+        frequency: 'daily',
+        time: '21:00',
+        offsiteDir,
+      })
+      expect(saved.status).toBe(200)
+      await backupDatabaseTo(daily)
+      const db = getDatabase()
+      setShopSetting(db, LAST_BACKUP_AT_KEY, earlier.toISOString())
+      setShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, earlier.toISOString())
+      rememberChangeBaseline()
+      const before = statSync(daily).mtimeMs
+
+      await tickScheduledBackup(now)
+      await tickScheduledBackup(now)
+
+      expect(statSync(daily).mtimeMs).toBe(before)
+      expect(getShopSetting(getDatabase(), LAST_BACKUP_AT_KEY, '')).toBe(earlier.toISOString())
+      expect(getShopSetting(getDatabase(), LAST_SCHEDULED_BACKUP_AT_KEY, '')).toBe(earlier.toISOString())
+      expect(existsSync(join(offsiteDir, `jeweltrackerpro-${localDateIso(now)}.db`))).toBe(true)
+    } finally {
+      rmSync(offsiteDir, { recursive: true, force: true })
+    }
+  })
+
+  it('round-trips a full zip backup with photos and rejects a path-escaping archive', async () => {
+    const customer = await seedCustomer('Zip customer')
+    const agent = getTestAgent()
+    const uploadsDir = getUploadsDir()
+    const imageName = 'pledge-photo.png'
+    writeFileSync(join(uploadsDir, imageName), 'photo-bytes')
+
+    const exported = await agent
+      .get('/api/backup/export-full')
+      .buffer(true)
+      .parse((res, callback) => {
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => {
+          chunks.push(Buffer.from(chunk))
+        })
+        res.on('end', () => {
+          callback(null, Buffer.concat(chunks))
+        })
+      })
+    expect(exported.status).toBe(200)
+    const body = Buffer.isBuffer(exported.body) ? exported.body : Buffer.from(exported.body)
+    expect(body.subarray(0, 2).toString()).toBe('PK')
+
+    const zipPath = join(tmpdir(), `jtp-full-${Date.now()}.zip`)
+    const extracted = mkdtempSync(join(tmpdir(), 'jtp-full-extract-'))
+    writeFileSync(zipPath, body)
+    try {
+      await extractZipFile(zipPath, extracted, allowFullBackupEntry)
+      expect(readFileSync(join(extracted, 'uploads', imageName)).toString()).toBe('photo-bytes')
+      expect(existsSync(join(extracted, 'jeweltrackerpro.db'))).toBe(true)
+
+      const relative = await agent.post('/api/backup/export-full').send({ path: 'relative.zip' })
+      expect(relative.status).toBe(400)
+
+      rmSync(join(uploadsDir, imageName))
+      await seedCustomer('After export')
+      expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(2)
+
+      const restored = await agent.post('/api/backup/restore').attach('file', zipPath)
+      expect(restored.status).toBe(200)
+      const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
+      expect(customers).toHaveLength(1)
+      expect(customers[0]?.name).toBe(customer.name)
+      expect(readFileSync(join(getUploadsDir(), imageName)).toString()).toBe('photo-bytes')
+
+      const evilPath = join(tmpdir(), `jtp-evil-${Date.now()}.zip`)
+      writeFileSync(evilPath, storedZip([{ name: '../evil', data: Buffer.from('x') }]))
+      await seedCustomer('Still here')
+      const rejected = await agent.post('/api/backup/restore').attach('file', evilPath)
+      expect(rejected.status).toBe(400)
+      expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(2)
+      rmSync(evilPath, { force: true })
+    } finally {
+      rmSync(zipPath, { force: true })
+      rmSync(extracted, { recursive: true, force: true })
+    }
+  })
 })
+
+function u16(value: number): Buffer {
+  const buffer = Buffer.alloc(2)
+  buffer.writeUInt16LE(value, 0)
+  return buffer
+}
+
+function u32(value: number): Buffer {
+  const buffer = Buffer.alloc(4)
+  buffer.writeUInt32LE(value, 0)
+  return buffer
+}
+
+function storedZip(entries: { name: string; data: Buffer }[]): Buffer {
+  const locals: Buffer[] = []
+  const centrals: Buffer[] = []
+  let offset = 0
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8')
+    const crc = crc32(entry.data)
+    const size = entry.data.length
+    const local = Buffer.concat([
+      u32(0x04034b50),
+      u16(20),
+      u16(0),
+      u16(0),
+      u16(0),
+      u16(0),
+      u32(crc),
+      u32(size),
+      u32(size),
+      u16(name.length),
+      u16(0),
+      name,
+      entry.data,
+    ])
+    const central = Buffer.concat([
+      u32(0x02014b50),
+      u16(20),
+      u16(20),
+      u16(0),
+      u16(0),
+      u16(0),
+      u16(0),
+      u32(crc),
+      u32(size),
+      u32(size),
+      u16(name.length),
+      u16(0),
+      u16(0),
+      u16(0),
+      u16(0),
+      u32(0),
+      u32(offset),
+      name,
+    ])
+    locals.push(local)
+    centrals.push(central)
+    offset += local.length
+  }
+  const localBytes = Buffer.concat(locals)
+  const centralBytes = Buffer.concat(centrals)
+  const eocd = Buffer.concat([
+    u32(0x06054b50),
+    u16(0),
+    u16(0),
+    u16(entries.length),
+    u16(entries.length),
+    u32(centralBytes.length),
+    u32(localBytes.length),
+    u16(0),
+  ])
+  return Buffer.concat([localBytes, centralBytes, eocd])
+}

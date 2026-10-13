@@ -8,6 +8,9 @@ export interface BackupSchedule {
 export const DEFAULT_BACKUP_FREQUENCY: BackupFrequency = 'daily'
 export const DEFAULT_BACKUP_TIME = '21:00'
 
+/** How often to snapshot again while the app stays open and data has changed. */
+export const CHANGE_BACKUP_INTERVAL_HOURS = 3
+
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/
 
 export function parseBackupFrequency(raw: string | null | undefined): BackupFrequency {

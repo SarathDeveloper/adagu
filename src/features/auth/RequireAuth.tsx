@@ -1,17 +1,23 @@
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { useShopBranding } from '../settings/shopBrandingContext'
 import { useAuth } from './authContext'
+
+function AuthLoading() {
+  return (
+    <div className="auth-screen">
+      <p className="muted">Loading…</p>
+    </div>
+  )
+}
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
+  const { ready, needsSetup } = useShopBranding()
   const location = useLocation()
 
   if (loading) {
-    return (
-      <div className="auth-screen">
-        <p className="muted">Loading…</p>
-      </div>
-    )
+    return <AuthLoading />
   }
 
   if (!user) {
@@ -23,7 +29,18 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (!user.mustChangePassword && location.pathname === '/change-password') {
-    return <Navigate to="/dashboard" replace />
+    if (!ready) return <AuthLoading />
+    return <Navigate to={needsSetup ? '/setup' : '/dashboard'} replace />
+  }
+
+  if (!user.mustChangePassword && location.pathname !== '/change-password') {
+    if (!ready) return <AuthLoading />
+    if (needsSetup && location.pathname !== '/setup') {
+      return <Navigate to="/setup" replace />
+    }
+    if (!needsSetup && location.pathname === '/setup') {
+      return <Navigate to="/dashboard" replace />
+    }
   }
 
   if (location.pathname === '/login') {

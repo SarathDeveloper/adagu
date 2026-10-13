@@ -46,22 +46,21 @@ describe('settings IPC', () => {
     expect(viaIpc.billTemplate.cashTitle).toBe('ESTIMATE')
   })
 
-  it('returns Amman Jewellers shop identity by default', async () => {
+  it('starts with a blank shop identity', async () => {
     const settings = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
-    expect(settings.shopName).toBe('AMMAN JEWELLERS')
+    expect(settings.shopName).toBe('')
     expect(settings.tagline).toBe('')
-    expect(settings.gstin).toBe('33BKJPP1190A1ZJ')
-    expect(settings.phone1).toBe('8903457570')
-    expect(settings.phone2).toBe('9583512688')
-    expect(settings.addressLine1).toBe('No. 4, Kavitha Complex')
-    expect(settings.addressLine2).toBe(
-      'Karumandurai, Salem Main Road, Periya Karaiyan Hills, Vadakku Nadu',
-    )
-    expect(settings.city).toBe('Salem')
-    expect(settings.state).toBe('Tamil Nadu')
-    expect(settings.pincode).toBe('636138')
+    expect(settings.gstin).toBe('')
+    expect(settings.phone1).toBe('')
+    expect(settings.phone2).toBe('')
+    expect(settings.addressLine1).toBe('')
+    expect(settings.addressLine2).toBe('')
+    expect(settings.city).toBe('')
+    expect(settings.state).toBe('')
+    expect(settings.pincode).toBe('')
     expect(settings.proprietorLine1).toBe('')
     expect(settings.promoLine).toBe('')
+    expect(settings.logoImagePath).toBe('')
     expect(settings.pawnbrokerLicenseNo).toBe('')
   })
 
@@ -93,10 +92,10 @@ describe('settings IPC', () => {
 
     const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {
       ...current,
-      shopName: 'AMMAN JEWELLERS',
+      shopName: 'Sample Jewellers',
       appSubtitle: 'Gold and silver',
     })
-    expect(updated.shopName).toBe('AMMAN JEWELLERS')
+    expect(updated.shopName).toBe('Sample Jewellers')
     expect(updated.appSubtitle).toBe('Gold and silver')
 
     const db = getDatabase()
@@ -207,6 +206,7 @@ describe('settings IPC', () => {
     const current = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
     const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {
       ...current,
+      shopName: 'Passbook Shop',
       passbookBannerPath: '/uploads/passbook-banner.png',
       passbookSideImagePath: '/uploads/passbook-side.png',
     })

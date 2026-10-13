@@ -2,9 +2,9 @@
   "name": "jeweltrackerpro",
   "private": true,
   "version": "1.0.0",
-  "description": "JewelTrackerPro Adagu pledges and gold savings",
-  "author": "JewelTrackerPro",
-  "productName": "JewelTrackerPro Adagu",
+  "description": "AdaguTrackerPro pledges and gold savings",
+  "author": "AdaguTrackerPro",
+  "productName": "AdaguTrackerPro",
   "type": "module",
   "scripts": {
     "dev": "concurrently --names vite,api \"vite\" \"tsx watch --tsconfig tsconfig.server.json server/index.ts\"",

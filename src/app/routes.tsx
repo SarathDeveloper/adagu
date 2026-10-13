@@ -15,6 +15,7 @@ import {
   AccountsListPage,
   AdaguListPage,
   ChangePasswordPage,
+  ShopSetupPage,
   CollectionsPage,
   CustomersPage,
   DashboardPage,
@@ -56,6 +57,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <ChangePasswordPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: '/setup',
+        element: (
+          <RequireAuth>
+            <ShopSetupPage />
           </RequireAuth>
         ),
       },

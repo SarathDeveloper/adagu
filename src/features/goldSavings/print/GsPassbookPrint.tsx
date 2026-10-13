@@ -1,6 +1,6 @@
 import type { GoldSavingLedgerEntry, GoldSavingPassbook } from '@shared/types'
 import { formatDisplayDate } from '../../../lib/format'
-import { defaultShopLogoUrl, EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../print/mapShopDisplay'
+import { EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../print/mapShopDisplay'
 import { currentBonusGold, progressPct, projectedBonusGold } from '../gsProjection'
 import './GsPassbookPrint.css'
 
@@ -47,6 +47,7 @@ export function GsPassbookPrint({
   const rows = Array.from({ length: totalRows }, (_, index) => byInstallment.get(index + 1) ?? null)
   const [phone1, phone2] = shopInfo.phones
   const phones = [phone1, phone2].filter(Boolean)
+  const logoSrc = localImageSrc(shopInfo.logoImagePath, '')
   const promo = shopInfo.promoLine.trim() || DEFAULT_PROMO
   const bannerSrc = (shopInfo.passbookBannerPath ?? '').trim()
     ? localImageSrc(shopInfo.passbookBannerPath, '')
@@ -109,12 +110,8 @@ export function GsPassbookPrint({
             <div className="gs-passbook-hero-right">
               <div className="gs-passbook-brand">
                 <div className="gs-passbook-brand-top">
-                  {vis.showLogo ? (
-                    <img
-                      className="gs-passbook-logo"
-                      src={localImageSrc(shopInfo.logoImagePath, defaultShopLogoUrl)}
-                      alt=""
-                    />
+                  {vis.showLogo && logoSrc ? (
+                    <img className="gs-passbook-logo" src={logoSrc} alt="" />
                   ) : null}
                   {vis.showBisLogo && shopInfo.bisLogoPath ? (
                     <div className="gs-passbook-bis-wrap">
@@ -132,7 +129,7 @@ export function GsPassbookPrint({
                   ) : null}
                 </div>
                 <div className="gs-passbook-shop">
-                  <h1>{shopInfo.name || 'Amman Jewellers'}</h1>
+                  {shopInfo.name ? <h1>{shopInfo.name}</h1> : null}
                   {shopInfo.tagline ? <p className="gs-passbook-tagline">{shopInfo.tagline}</p> : null}
                   {shopInfo.addressLines.map((line) => (
                     <p key={line}>{line}</p>

@@ -244,6 +244,7 @@ export interface BackupStatus {
   offsiteDir: string
   lastOffsiteAt: string | null
   lastOffsiteError: string | null
+  lastBackupError: string | null
 }
 
 export type BackupKind = 'daily' | 'manual' | 'dayclose' | 'prerestore' | 'premigrate'

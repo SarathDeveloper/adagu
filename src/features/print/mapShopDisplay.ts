@@ -8,9 +8,11 @@ import {
 } from '@shared/billTemplate'
 import { shopMediaSrc } from '@shared/shopMedia'
 import type { ShopSettings } from '@shared/types'
-import defaultShopLogoUrl from '../../images/amman-jeweller-logo.png'
 
-export { defaultShopLogoUrl }
+export function goldSavingsThanks(shopName: string): string {
+  const name = shopName.trim()
+  return name ? `நன்றி · Thank you for saving with ${name}.` : 'நன்றி · Thank you.'
+}
 
 export interface ShopDisplayInfo {
   name: string

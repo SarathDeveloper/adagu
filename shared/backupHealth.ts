@@ -28,7 +28,15 @@ export function offsiteCopyCurrent(
   return !lastOffsiteError && Boolean(lastOffsiteAt)
 }
 
-export function healthTone(days: number | null, offsiteCurrent: boolean): BackupHealthTone {
+export function healthTone(
+  days: number | null,
+  offsiteCurrent: boolean,
+  backupFailed = false,
+): BackupHealthTone {
+  if (backupFailed) {
+    if (days === null || days >= 8) return 'stale'
+    return 'warn'
+  }
   if (!offsiteCurrent) {
     if (days === null || days >= 8) return 'stale'
     return 'warn'
@@ -38,7 +46,8 @@ export function healthTone(days: number | null, offsiteCurrent: boolean): Backup
   return 'ok'
 }
 
-export function healthTitle(days: number | null, offsiteCurrent: boolean): string {
+export function healthTitle(days: number | null, offsiteCurrent: boolean, backupFailed = false): string {
+  if (backupFailed) return 'Last automatic backup failed'
   if (!offsiteCurrent) return 'Off-machine copy is not current'
   if (days === null) return 'No backup yet'
   if (days === 0) return 'Backed up today'
@@ -54,6 +63,7 @@ export function healthTitle(days: number | null, offsiteCurrent: boolean): strin
  * yet is not a warning; the next backup or Copy now covers it.
  */
 export function needsAttention(status: BackupStatus, now = new Date()): boolean {
+  if (status.lastBackupError) return true
   const days = daysSinceBackup(status.lastBackupAt, now)
   if (days === null || days >= ATTENTION_DAYS) return true
   if (!status.offsiteDir.trim()) return true
@@ -64,6 +74,9 @@ export function needsAttention(status: BackupStatus, now = new Date()): boolean 
 }
 
 export function backupAttentionMessage(status: BackupStatus, now = new Date()): string {
+  if (status.lastBackupError) {
+    return `The last automatic backup failed: ${status.lastBackupError}`
+  }
   const days = daysSinceBackup(status.lastBackupAt, now)
   if (days === null) return 'No database backup has been taken yet.'
   if (days >= ATTENTION_DAYS) return `The last database backup was ${days} days ago.`

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Download, FileSpreadsheet, FolderOpen, ShieldAlert, ShieldCheck, Upload } from 'lucide-react'
+import { AlertTriangle, Archive, Download, FileSpreadsheet, FolderOpen, ShieldAlert, ShieldCheck, Upload } from 'lucide-react'
 import type { BackupFile, BackupInspection, BackupKind, BackupStatus } from '@shared/types'
+import { CHANGE_BACKUP_INTERVAL_HOURS } from '@shared/backupSchedule'
 import { BACKUP_STATUS_EVENT, daysSinceBackup, healthTitle, healthTone, offsiteCopyCurrent } from '@shared/backupHealth'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Modal } from '../../components/Modal'
@@ -8,6 +9,7 @@ import { TimeInput } from '../../components/DateInput'
 import { LoadingState } from '../../components/LoadingState'
 import { useToast } from '../../components/toastContext'
 import { api } from '../../lib/api'
+import { isMacPlatform } from '../../lib/platform'
 import { formatDisplayClock, formatDisplayDateTime } from '../../lib/format'
 
 type PendingAction =
@@ -42,6 +44,7 @@ export function BackupSettings() {
   const [offsiteDir, setOffsiteDir] = useState('')
   const [lastOffsiteAt, setLastOffsiteAt] = useState<string | null>(null)
   const [lastOffsiteError, setLastOffsiteError] = useState<string | null>(null)
+  const [lastBackupError, setLastBackupError] = useState<string | null>(null)
   const [backups, setBackups] = useState<BackupFile[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -58,6 +61,7 @@ export function BackupSettings() {
     setOffsiteDir(status.offsiteDir ?? '')
     setLastOffsiteAt(status.lastOffsiteAt ?? null)
     setLastOffsiteError(status.lastOffsiteError ?? null)
+    setLastBackupError(status.lastBackupError ?? null)
     window.dispatchEvent(new CustomEvent<BackupStatus>(BACKUP_STATUS_EVENT, { detail: status }))
   }
 
@@ -82,7 +86,7 @@ export function BackupSettings() {
 
   const days = daysSinceBackup(lastBackup)
   const offsiteCurrent = offsiteCopyCurrent(offsiteDir, lastOffsiteAt, lastOffsiteError)
-  const tone = healthTone(days, offsiteCurrent)
+  const tone = healthTone(days, offsiteCurrent, Boolean(lastBackupError))
 
   async function backupNow() {
     setBusy(true)
@@ -123,6 +127,25 @@ export function BackupSettings() {
       setError(null)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Export failed'
+      if (message === 'Export cancelled') {
+        return
+      }
+      setError(message)
+      showToast(message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function exportFull() {
+    setBusy(true)
+    try {
+      await api.exportFullBackup()
+      await refresh()
+      showToast('Full backup downloaded', 'success')
+      setError(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Full backup failed'
       if (message === 'Export cancelled') {
         return
       }
@@ -245,12 +268,15 @@ export function BackupSettings() {
           </span>
           <div>
             <h2 className="settings-section-title">Database Backup</h2>
-            <p className="backup-health-status">{healthTitle(days, offsiteCurrent)}</p>
+            <p className="backup-health-status">{healthTitle(days, offsiteCurrent, Boolean(lastBackupError))}</p>
             <p className="muted">
               {lastBackup
                 ? `Last backup ${formatDisplayDateTime(lastBackup)}`
                 : 'Take a backup now so you can restore if this computer fails.'}
             </p>
+            {lastBackupError ? (
+              <p className="muted">Last automatic backup failed: {lastBackupError}</p>
+            ) : null}
             <p className="muted">
               Automatic: {frequencyLabel} at {formatDisplayClock(time)}
             </p>
@@ -275,6 +301,10 @@ export function BackupSettings() {
             <Download size={16} strokeWidth={1.75} aria-hidden />
             Export Copy
           </button>
+          <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportFull()}>
+            <Archive size={16} strokeWidth={1.75} aria-hidden />
+            Full Backup (.zip)
+          </button>
           <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportExcel()}>
             <FileSpreadsheet size={16} strokeWidth={1.75} aria-hidden />
             Export Excel
@@ -284,7 +314,7 @@ export function BackupSettings() {
             Restore from File
             <input
               type="file"
-              accept=".db"
+              accept=".db,.zip"
               hidden
               disabled={busy}
               onChange={(event) => {
@@ -297,6 +327,9 @@ export function BackupSettings() {
             />
           </label>
         </div>
+        <p className="muted">
+          Export Copy downloads the database only. Full Backup includes pledge photos and shop images.
+        </p>
       </div>
 
       <div className="card padded backup-schedule">
@@ -304,9 +337,10 @@ export function BackupSettings() {
           <div>
             <h2 className="settings-section-title">Automatic backup</h2>
             <p className="muted settings-card-subtitle">
-              The app takes a backup at this time when it is open. If it was closed through the
-              scheduled slot, it catches up on the next launch. Each backup includes a .db file for
-              restore and an Excel workbook of every table.
+              The app takes a backup at this time when it is open, and again every{' '}
+              {CHANGE_BACKUP_INTERVAL_HOURS} hours while it stays open if anything has changed. If it
+              was closed through the scheduled slot, it catches up on the next launch. Each backup
+              includes a .db file for restore and an Excel workbook of every table.
             </p>
           </div>
         </div>
@@ -363,7 +397,7 @@ export function BackupSettings() {
             <input
               className="input"
               aria-label="Off-machine folder"
-              placeholder="E:\JewelTrackerPro Adagu"
+              placeholder={isMacPlatform() ? '/Volumes/AdaguTrackerPro' : 'E:\\AdaguTrackerPro'}
               value={offsiteDir}
               disabled={busy}
               onChange={(event) => setOffsiteDir(event.target.value)}

@@ -141,10 +141,24 @@ fn sqlite_addon_name() -> &'static str {
     }
 }
 
+const DATA_DIR_NAME: &str = "AdaguTrackerPro";
+const LEGACY_DATA_DIR_NAME: &str = "JewelTrackerPro Adagu";
+
 fn resolve_data_dir() -> Result<PathBuf, String> {
-    let dir = dirs::data_dir()
-        .ok_or_else(|| "Could not resolve the application data directory".to_string())?
-        .join("JewelTrackerPro Adagu");
+    let base = dirs::data_dir()
+        .ok_or_else(|| "Could not resolve the application data directory".to_string())?;
+    let dir = base.join(DATA_DIR_NAME);
+    if !dir.exists() {
+        let legacy = base.join(LEGACY_DATA_DIR_NAME);
+        if legacy.exists() {
+            std::fs::rename(&legacy, &dir).map_err(|error| {
+                format!(
+                    "Could not move shop data from \"{LEGACY_DATA_DIR_NAME}\" to \"{DATA_DIR_NAME}\": {error}"
+                )
+            })?;
+            return Ok(dir);
+        }
+    }
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     Ok(dir)
 }
@@ -278,7 +292,7 @@ async fn start_sidecar(app: &AppHandle) -> Result<u16, String> {
 fn open_main_window(app: &AppHandle, url: &str, api_port: Option<u16>) -> Result<(), String> {
     let parsed = url.parse().map_err(|error| format!("{error}"))?;
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
-        .title("JewelTrackerPro Adagu")
+        .title("AdaguTrackerPro")
         .inner_size(1280.0, 840.0)
         .min_inner_size(1024.0, 700.0)
         .visible(false)
@@ -472,7 +486,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("failed to build JewelTrackerPro Adagu")
+        .expect("failed to build AdaguTrackerPro")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 stop_sidecar(app);

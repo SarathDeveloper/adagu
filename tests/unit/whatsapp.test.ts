@@ -24,14 +24,14 @@ describe('whatsappLink', () => {
 describe('goldSavingsReminderMessage', () => {
   it('includes the shop, customer, account, installment, due date and amount', () => {
     const message = goldSavingsReminderMessage({
-      shopName: 'Amman Jewellers',
+      shopName: 'Sample Jewellers',
       customerName: 'Ravi Kumar',
       accountNo: 'GS-0001',
       installmentNo: 4,
       dueDate: '2026-09-22',
       amount: 5000,
     })
-    expect(message).toContain('Amman Jewellers')
+    expect(message).toContain('Sample Jewellers')
     expect(message).toContain('Dear Ravi Kumar,')
     expect(message).toContain('GS-0001')
     expect(message).toContain('installment #4')

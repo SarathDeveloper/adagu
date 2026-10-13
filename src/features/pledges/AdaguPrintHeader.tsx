@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react'
-import {
-  defaultShopLogoUrl,
-  localImageSrc,
-  type ShopDisplayInfo,
-} from '../print/mapShopDisplay'
+import { localImageSrc, type ShopDisplayInfo } from '../print/mapShopDisplay'
 
 export function AdaguPrintSheet({
   shop,
@@ -16,6 +12,8 @@ export function AdaguPrintSheet({
   layout?: 'classic' | 'receipt'
   children: ReactNode
 }) {
+  const logoSrc = localImageSrc(shop.logoImagePath, '')
+
   return (
     <div
       className={`tax-invoice-root paper-a4 adagu-print-sheet${
@@ -25,12 +23,7 @@ export function AdaguPrintSheet({
       data-print-fit="page"
     >
       <article className="tax-invoice">
-        <img
-          className="print-watermark"
-          src={localImageSrc(shop.logoImagePath, defaultShopLogoUrl)}
-          alt=""
-          aria-hidden
-        />
+        {logoSrc ? <img className="print-watermark" src={logoSrc} alt="" aria-hidden /> : null}
         <AdaguPrintHeader shop={shop} layout={layout} />
         {children}
       </article>
@@ -55,17 +48,14 @@ export function AdaguPrintHeader({
     .filter(Boolean)
     .join(' · ')
   const license = shop.pawnbrokerLicenseNo.trim()
+  const logoSrc = localImageSrc(shop.logoImagePath, '')
 
   if (layout === 'receipt') {
     return (
       <header className="adagu-receipt-header">
         <div className="adagu-receipt-header-logo">
-          {vis.showLogo ? (
-            <img
-              className="tax-invoice-logo"
-              src={localImageSrc(shop.logoImagePath, defaultShopLogoUrl)}
-              alt=""
-            />
+          {vis.showLogo && logoSrc ? (
+            <img className="tax-invoice-logo" src={logoSrc} alt="" />
           ) : null}
         </div>
         <div className="adagu-receipt-header-shop">
@@ -120,13 +110,7 @@ export function AdaguPrintHeader({
             ) : null}
           </div>
           <div className="tax-invoice-identity">
-            {vis.showLogo ? (
-              <img
-                className="tax-invoice-logo"
-                src={localImageSrc(shop.logoImagePath, defaultShopLogoUrl)}
-                alt=""
-              />
-            ) : null}
+            {vis.showLogo && logoSrc ? <img className="tax-invoice-logo" src={logoSrc} alt="" /> : null}
             {shop.name ? <h1 className="tax-invoice-shop">{shop.name}</h1> : null}
             {vis.showTagline && shop.tagline ? (
               <p className="tax-invoice-tagline">{shop.tagline}</p>

@@ -129,31 +129,21 @@ function loadTaxVisibility(db: ReturnType<typeof getDatabase>): TaxInvoiceVisibi
   return visibility
 }
 
-const DEFAULT_SHOP_NAME = 'AMMAN JEWELLERS'
-const DEFAULT_GSTIN = '33BKJPP1190A1ZJ'
-const DEFAULT_PHONE1 = '8903457570'
-const DEFAULT_PHONE2 = '9583512688'
-const DEFAULT_ADDRESS_LINE1 = 'No. 4, Kavitha Complex'
-const DEFAULT_ADDRESS_LINE2 = 'Karumandurai, Salem Main Road, Periya Karaiyan Hills, Vadakku Nadu'
-const DEFAULT_CITY = 'Salem'
-const DEFAULT_STATE = 'Tamil Nadu'
-const DEFAULT_PINCODE = '636138'
-
 export function loadShopSettings(db: ReturnType<typeof getDatabase>): ShopSettings {
   return {
-    shopName: getShopSetting(db, SHOP_KEYS.shopName, DEFAULT_SHOP_NAME).trim() || DEFAULT_SHOP_NAME,
+    shopName: getShopSetting(db, SHOP_KEYS.shopName, '').trim(),
     tagline: getShopSetting(db, SHOP_KEYS.tagline, ''),
     appSubtitle:
       getShopSetting(db, SHOP_KEYS.appSubtitle, 'Adagu & Gold Savings').trim() || 'Adagu & Gold Savings',
-    gstin: getShopSetting(db, SHOP_KEYS.gstin, DEFAULT_GSTIN),
-    phone1: getShopSetting(db, SHOP_KEYS.phone1, DEFAULT_PHONE1),
-    phone2: getShopSetting(db, SHOP_KEYS.phone2, DEFAULT_PHONE2),
-    addressLine1: getShopSetting(db, SHOP_KEYS.addressLine1, DEFAULT_ADDRESS_LINE1),
-    addressLine2: getShopSetting(db, SHOP_KEYS.addressLine2, DEFAULT_ADDRESS_LINE2),
+    gstin: getShopSetting(db, SHOP_KEYS.gstin, ''),
+    phone1: getShopSetting(db, SHOP_KEYS.phone1, ''),
+    phone2: getShopSetting(db, SHOP_KEYS.phone2, ''),
+    addressLine1: getShopSetting(db, SHOP_KEYS.addressLine1, ''),
+    addressLine2: getShopSetting(db, SHOP_KEYS.addressLine2, ''),
     addressLine3: getShopSetting(db, SHOP_KEYS.addressLine3, ''),
-    city: getShopSetting(db, SHOP_KEYS.city, DEFAULT_CITY),
-    state: getShopSetting(db, SHOP_KEYS.state, DEFAULT_STATE),
-    pincode: getShopSetting(db, SHOP_KEYS.pincode, DEFAULT_PINCODE),
+    city: getShopSetting(db, SHOP_KEYS.city, ''),
+    state: getShopSetting(db, SHOP_KEYS.state, ''),
+    pincode: getShopSetting(db, SHOP_KEYS.pincode, ''),
     proprietorLine1: getShopSetting(db, SHOP_KEYS.proprietorLine1, ''),
     proprietorLine2: getShopSetting(db, SHOP_KEYS.proprietorLine2, ''),
     proprietorLine3: getShopSetting(db, SHOP_KEYS.proprietorLine3, ''),

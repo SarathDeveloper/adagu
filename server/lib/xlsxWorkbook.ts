@@ -1,21 +1,5 @@
 import { writeFileSync } from 'node:fs'
-
-const CRC_TABLE = new Uint32Array(256)
-for (let i = 0; i < 256; i++) {
-  let crc = i
-  for (let j = 0; j < 8; j++) {
-    crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1
-  }
-  CRC_TABLE[i] = crc >>> 0
-}
-
-function crc32(buffer: Buffer): number {
-  let crc = 0xffffffff
-  for (let i = 0; i < buffer.length; i++) {
-    crc = CRC_TABLE[(crc ^ buffer[i]!) & 0xff]! ^ (crc >>> 8)
-  }
-  return (crc ^ 0xffffffff) >>> 0
-}
+import { crc32 } from './zip'
 
 function u16(value: number): Buffer {
   const buffer = Buffer.alloc(2)

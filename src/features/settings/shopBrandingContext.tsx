@@ -2,20 +2,26 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api } from '../../lib/api'
 
 export const DEFAULT_APP_SUBTITLE = 'Adagu & Gold Savings'
-export const DEFAULT_WINDOW_TITLE = 'JewelTrackerPro Adagu'
+export const DEFAULT_WINDOW_TITLE = 'AdaguTrackerPro'
 
 interface ShopBranding {
   shopName: string
   appSubtitle: string
   logoImagePath: string
-  refresh: () => void
+  /** False until the first settings load finishes. */
+  ready: boolean
+  /** True when settings loaded and the shop still has no name. */
+  needsSetup: boolean
+  refresh: () => Promise<boolean>
 }
 
 const ShopBrandingContext = createContext<ShopBranding>({
   shopName: '',
   appSubtitle: DEFAULT_APP_SUBTITLE,
   logoImagePath: '',
-  refresh: () => undefined,
+  ready: false,
+  needsSetup: false,
+  refresh: async () => false,
 })
 
 function applyWindowTitle(shopName: string) {
@@ -26,30 +32,48 @@ export function ShopBrandingProvider({ children }: { children: ReactNode }) {
   const [shopName, setShopName] = useState('')
   const [appSubtitle, setAppSubtitle] = useState(DEFAULT_APP_SUBTITLE)
   const [logoImagePath, setLogoImagePath] = useState('')
+  const [ready, setReady] = useState(false)
+  const [needsSetup, setNeedsSetup] = useState(false)
 
-  const refresh = useCallback(() => {
-    void (async () => {
-      try {
-        const settings = await api.getShopSettings()
-        const nextName = settings.shopName.trim()
-        setShopName(nextName)
-        setAppSubtitle(settings.appSubtitle.trim() || DEFAULT_APP_SUBTITLE)
-        setLogoImagePath(settings.logoImagePath.trim())
-        applyWindowTitle(nextName)
-      } catch {
-        /* keep last branding */
-      }
-    })()
+  const refresh = useCallback(async () => {
+    try {
+      const settings = await api.getShopSettings()
+      const nextName = settings.shopName.trim()
+      setShopName(nextName)
+      setAppSubtitle(settings.appSubtitle.trim() || DEFAULT_APP_SUBTITLE)
+      setLogoImagePath(settings.logoImagePath.trim())
+      setNeedsSetup(!nextName)
+      setReady(true)
+      applyWindowTitle(nextName)
+      return true
+    } catch {
+      return false
+    }
   }, [])
 
   useEffect(() => {
+    let cancelled = false
     applyWindowTitle('')
-    refresh()
+
+    async function load() {
+      // The API can still be starting when the window opens. A failed first
+      // read must not be treated as "this shop is already configured".
+      for (let attempt = 0; attempt < 8 && !cancelled; attempt += 1) {
+        if (await refresh()) return
+        await new Promise((resolve) => window.setTimeout(resolve, 400))
+      }
+      if (!cancelled) setReady(true)
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [refresh])
 
   const value = useMemo(
-    () => ({ shopName, appSubtitle, logoImagePath, refresh }),
-    [shopName, appSubtitle, logoImagePath, refresh],
+    () => ({ shopName, appSubtitle, logoImagePath, ready, needsSetup, refresh }),
+    [shopName, appSubtitle, logoImagePath, ready, needsSetup, refresh],
   )
 
   return <ShopBrandingContext.Provider value={value}>{children}</ShopBrandingContext.Provider>

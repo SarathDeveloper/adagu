@@ -1,7 +1,7 @@
 import { amountInWords } from '@shared/billing/amountInWords'
 import type { GoldSavingPayment } from '@shared/types'
 import { formatDisplayDate } from '../../../lib/format'
-import { defaultShopLogoUrl, EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../print/mapShopDisplay'
+import { EMPTY_SHOP_DISPLAY, goldSavingsThanks, localImageSrc, type ShopDisplayInfo } from '../../print/mapShopDisplay'
 import { paperClassName } from '../../print/paperSize'
 import { formatGsPaymentMode } from '../gsLabels'
 import './GsReceiptPrint.css'
@@ -21,6 +21,7 @@ export function GsReceiptPrint({
 }) {
   const shopInfo = shop ?? EMPTY_SHOP_DISPLAY
   const vis = shopInfo.cashVisibility
+  const logoSrc = localImageSrc(shopInfo.logoImagePath, '')
   const [phone1, phone2] = shopInfo.phones
   const phoneLine = [phone1, phone2].filter(Boolean).join(' · ')
   const primary = payments[0]
@@ -39,11 +40,9 @@ export function GsReceiptPrint({
       <article className="gs-receipt">
         <header className="gs-receipt-header">
           <div className="gs-receipt-brand">
-            {vis.showLogo ? (
-              <img className="gs-receipt-logo" src={localImageSrc(shopInfo.logoImagePath, defaultShopLogoUrl)} alt="" />
-            ) : null}
+            {vis.showLogo && logoSrc ? <img className="gs-receipt-logo" src={logoSrc} alt="" /> : null}
             <div>
-              <h1>{shopInfo.name || 'Amman Jewellers'}</h1>
+              {shopInfo.name ? <h1>{shopInfo.name}</h1> : null}
               {shopInfo.addressLines.map((line) => (
                 <p key={line}>{line}</p>
               ))}
@@ -150,7 +149,7 @@ export function GsReceiptPrint({
             <span>Authorized signature / அங்கீகரிக்கப்பட்ட கையொப்பம்</span>
           </div>
         </footer>
-        <p className="gs-receipt-thanks">நன்றி · Thank you for saving with Amman Jewellers.</p>
+        <p className="gs-receipt-thanks">{goldSavingsThanks(shopInfo.name)}</p>
       </article>
     </div>
   )

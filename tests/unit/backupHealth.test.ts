@@ -19,6 +19,7 @@ function status(overrides: Partial<BackupStatus> = {}): BackupStatus {
     offsiteDir: 'E:\\JewelTrackerPro',
     lastOffsiteAt: now.toISOString(),
     lastOffsiteError: null,
+    lastBackupError: null,
     ...overrides,
   }
 }
@@ -44,6 +45,15 @@ describe('backup health', () => {
     expect(needsAttention(status({ lastOffsiteError: 'Off-machine folder was not found' }), now)).toBe(true)
     expect(needsAttention(status({ lastOffsiteAt: null }), now)).toBe(false)
     expect(needsAttention(status({ lastOffsiteAt: new Date(2026, 9, 7, 9).toISOString() }), now)).toBe(true)
+  })
+
+  it('asks for attention when the last automatic backup failed', () => {
+    expect(needsAttention(status({ lastBackupError: 'disk full' }), now)).toBe(true)
+    expect(backupAttentionMessage(status({ lastBackupError: 'disk full' }), now)).toBe(
+      'The last automatic backup failed: disk full',
+    )
+    expect(healthTitle(0, true, true)).toBe('Last automatic backup failed')
+    expect(healthTone(0, true, true)).toBe('warn')
   })
 
   it('explains why attention is needed', () => {

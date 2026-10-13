@@ -382,6 +382,10 @@ export const inspectBackupSchema = z.object({
   name: z.string().trim().min(1).max(160),
 })
 
+export const exportFullBackupSchema = z.object({
+  path: z.string().trim().min(1).max(1024),
+})
+
 export const backupSettingsSchema = z.object({
   frequency: z.enum(['daily', 'weekly']),
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Time must be HH:mm'),

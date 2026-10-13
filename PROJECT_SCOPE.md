@@ -1,4 +1,4 @@
-# JewelTrackerPro Adagu — Project Scope
+# AdaguTrackerPro — Project Scope
 
 Fullstack software for a jewellery pawn shop's **Adagu (pledge loan)** and **Gold Savings** business. Runs as a Tauri desktop app that starts a local API on `127.0.0.1`, and still runs as a localhost web app for development.
 
@@ -10,7 +10,7 @@ This edition ships separately from the full JewelTrackerPro: its own product nam
 
 | Aspect | Detail |
 |--------|--------|
-| **Product name** | JewelTrackerPro Adagu |
+| **Product name** | AdaguTrackerPro |
 | **Identifier** | `com.jeweltrackerpro.adagu` |
 | **Type** | Fullstack app (Express + React) packaged as a Tauri desktop app |
 | **Platforms** | Windows and macOS desktop; also runs in a browser on localhost |
@@ -24,7 +24,7 @@ This edition ships separately from the full JewelTrackerPro: its own product nam
 - In production the Tauri shell (`src-tauri/src/main.rs`) starts the bundled Node API sidecar on a random `127.0.0.1` port, waits for `GET /api/version`, then opens the webview at that URL.
 - The same Express app serves the built `dist/` front end, so a plain `npm run dev` browser session works too (Vite on 5173, API on 3000).
 - The window receives an injected `window.desktopAPI` for native save-file and folder pickers. In a browser those fall back to normal downloads.
-- Database location: `%APPDATA%\JewelTrackerPro Adagu\jeweltrackerpro.db` on Windows, `~/Library/Application Support/JewelTrackerPro Adagu/jeweltrackerpro.db` on macOS (`JEWELTRACKERPRO_DATA_DIR`), or `data/jeweltrackerpro.db` in dev.
+- Database location: `%APPDATA%\AdaguTrackerPro\jeweltrackerpro.db` on Windows, `~/Library/Application Support/AdaguTrackerPro/jeweltrackerpro.db` on macOS (`JEWELTRACKERPRO_DATA_DIR`), or `data/jeweltrackerpro.db` in dev. The first desktop launch moves an existing `JewelTrackerPro Adagu` folder to `AdaguTrackerPro` when the new folder is not already there.
 
 ### Main modules (sidebar)
 
@@ -282,9 +282,9 @@ Tabs: **Adagu Settings**, **Printers**, **Backup**, **Data**.
 ## 12. Desktop packaging
 
 - Tauri 2 shell, Node SEA sidecar, NSIS installer on Windows and an ad-hoc-signed DMG on Apple Silicon.
-- Product name **JewelTrackerPro Adagu**, identifier `com.jeweltrackerpro.adagu`, own data folder.
-- Windows installer: `npm run tauri:build:win`, copied to `release/JewelTrackerPro-Adagu-Setup-1.0.0.exe`.
-- macOS installer: `npm run tauri:build:mac` on a Mac.
+- Product name **AdaguTrackerPro**, identifier `com.jeweltrackerpro.adagu`, own data folder.
+- Windows installer: `npm run tauri:build:win`, copied to `release/AdaguTrackerPro-Setup-1.0.0.exe`.
+- macOS installer: `npm run tauri:build:mac` on a Mac, copied to `release/AdaguTrackerPro-Setup-1.0.0-mac-arm64.dmg`. The app bundle is `AdaguTrackerPro.app`.
 - The build pipeline, its invariants, and the verification steps are documented in `.cursor/rules/tauri-build-setup.mdc`.
 
 ---
@@ -325,5 +325,5 @@ The protected print test asserts that a `/print/*` frame loads the print chunk, 
 ## 15. Docs
 
 - `README.md` — setup, dev, desktop builds, printing.
-- `docs/gold-savings-user-manual.md` — Gold Savings walkthrough for shop staff.
+- `docs/user-manual.md` — shop-staff guide for sign-in, shop setup, Adagu, Gold Savings cash payout, dues, customers, reports, rates, settings, users, and printing.
 - `.cursor/rules/` — protected setups (desktop build, print preview, module tabs, date format).

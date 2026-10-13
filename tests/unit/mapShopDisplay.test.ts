@@ -5,15 +5,15 @@ import { composeShopAddressLines, localImageSrc, shopSettingsToDisplay } from '.
 
 function shop(overrides: Partial<ShopSettings> = {}): ShopSettings {
   return {
-    shopName: 'AMMAN JEWELLERS',
+    shopName: 'Sample Jewellers',
     tagline: 'GOLD - SILVER JEWELLERY',
     appSubtitle: 'Billing & inventory',
-    gstin: '33BKJPP1190A1ZJ',
-    phone1: '8903457570',
-    phone2: '9583512688',
-    addressLine1: 'No. 4, Kavitha Complex',
-    addressLine2: 'Karumandurai, Salem Main Road, Periya Karaiyan Hills',
-    addressLine3: 'Vadakku Nadu, Salem, Tamil Nadu - 636 138',
+    gstin: '33AAAAA0000A1Z5',
+    phone1: '9800000001',
+    phone2: '9800000002',
+    addressLine1: '12 Market Street',
+    addressLine2: 'Near the bus stand',
+    addressLine3: 'Ward 2, Sample Town, Tamil Nadu - 636 001',
     city: '',
     state: '',
     pincode: '',
@@ -54,9 +54,9 @@ function shop(overrides: Partial<ShopSettings> = {}): ShopSettings {
 describe('composeShopAddressLines', () => {
   it('keeps the third address line when city, state, and pincode are empty', () => {
     expect(composeShopAddressLines(shop())).toEqual([
-      'No. 4, Kavitha Complex',
-      'Karumandurai, Salem Main Road, Periya Karaiyan Hills',
-      'Vadakku Nadu, Salem, Tamil Nadu - 636 138',
+      '12 Market Street',
+      'Near the bus stand',
+      'Ward 2, Sample Town, Tamil Nadu - 636 001',
     ])
   })
 
@@ -70,8 +70,8 @@ describe('composeShopAddressLines', () => {
         }),
       ),
     ).toEqual([
-      'No. 4, Kavitha Complex',
-      'Karumandurai, Salem Main Road, Periya Karaiyan Hills',
+      '12 Market Street',
+      'Near the bus stand',
       'Salem, Tamil Nadu - 636138',
     ])
   })
@@ -92,7 +92,7 @@ describe('shopSettingsToDisplay', () => {
   it('includes the saved logo path', () => {
     const display = shopSettingsToDisplay(shop({ logoImagePath: '/tmp/logo.png' }))
     expect(display.logoImagePath).toBe('/tmp/logo.png')
-    expect(display.name).toBe('AMMAN JEWELLERS')
+    expect(display.name).toBe('Sample Jewellers')
   })
 
   it('includes BIS logo and QR code paths', () => {

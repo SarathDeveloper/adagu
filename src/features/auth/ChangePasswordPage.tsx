@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../lib/api'
+import { useShopBranding } from '../settings/shopBrandingContext'
 import { useAuth } from './authContext'
 
 export function ChangePasswordPage() {
   const { refresh, user } = useAuth()
+  const { ready, needsSetup } = useShopBranding()
   const navigate = useNavigate()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -27,7 +29,7 @@ export function ChangePasswordPage() {
     try {
       await api.changePassword({ currentPassword, newPassword })
       await refresh()
-      navigate('/dashboard', { replace: true })
+      navigate(ready && needsSetup ? '/setup' : '/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not change password')
     } finally {

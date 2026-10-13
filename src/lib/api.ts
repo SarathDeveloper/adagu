@@ -400,6 +400,26 @@ export const api = {
     link.click()
     URL.revokeObjectURL(url)
   },
+  exportFullBackup: async () => {
+    if (window.desktopAPI) {
+      const result = await window.desktopAPI.exportFullBackup()
+      if (result.canceled) {
+        throw new Error('Export cancelled')
+      }
+      return
+    }
+    const response = await fetch('/api/backup/export-full', { credentials: 'same-origin' })
+    if (!response.ok) {
+      throw new Error('Full backup failed')
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `jeweltrackerpro-full-${new Date().toISOString().slice(0, 10)}.zip`
+    link.click()
+    URL.revokeObjectURL(url)
+  },
   exportExcel: async () => {
     if (window.desktopAPI) {
       const result = await window.desktopAPI.exportExcel()

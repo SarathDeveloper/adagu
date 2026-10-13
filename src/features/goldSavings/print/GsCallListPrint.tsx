@@ -1,11 +1,6 @@
 import type { GoldSavingReportResult } from '@shared/types'
 import { formatCurrency, formatDisplayDate } from '../../../lib/format'
-import {
-  defaultShopLogoUrl,
-  EMPTY_SHOP_DISPLAY,
-  localImageSrc,
-  type ShopDisplayInfo,
-} from '../../print/mapShopDisplay'
+import { EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../../print/mapShopDisplay'
 import { paperClassName } from '../../print/paperSize'
 import { groupCallList } from './gsCallListRows'
 import './GsCallListPrint.css'
@@ -24,6 +19,7 @@ export function GsCallListPrint({
   paperSize?: 'a4' | 'a5'
 }) {
   const shopInfo = shop ?? EMPTY_SHOP_DISPLAY
+  const logoSrc = localImageSrc(shopInfo.logoImagePath, '')
   const [phone1, phone2] = shopInfo.phones
   const phoneLine = [phone1, phone2].filter(Boolean).join(' · ')
   const rows = groupCallList(report, bucket)
@@ -36,13 +32,9 @@ export function GsCallListPrint({
       <article className="gs-call-list">
         <header className="gs-call-list-header">
           <div className="gs-call-list-brand">
-            <img
-              className="gs-call-list-logo"
-              src={localImageSrc(shopInfo.logoImagePath, defaultShopLogoUrl)}
-              alt=""
-            />
+            {logoSrc ? <img className="gs-call-list-logo" src={logoSrc} alt="" /> : null}
             <div>
-              <h1>{shopInfo.name || 'Amman Jewellers'}</h1>
+              {shopInfo.name ? <h1>{shopInfo.name}</h1> : null}
               {shopInfo.addressLines.map((line) => (
                 <p key={line}>{line}</p>
               ))}

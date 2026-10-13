@@ -94,6 +94,11 @@ export const ChangePasswordPage = lazy(() =>
     default: module.ChangePasswordPage,
   })),
 )
+export const ShopSetupPage = lazy(() =>
+  import('../features/settings/ShopSetupPage').then((module) => ({
+    default: module.ShopSetupPage,
+  })),
+)
 export const SettingsPage = lazy(() =>
   import('../features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })),
 )

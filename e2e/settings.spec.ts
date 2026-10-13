@@ -17,7 +17,8 @@ test('settings shows version and database path', async ({ window }) => {
 test('shop details form saves shop name and tagline', async ({ window }) => {
   await sidebarLink(window, 'Settings').click()
   await expect(window.getByRole('heading', { name: 'Shop Identity' })).toBeVisible()
-  await expect(window.locator('.settings-image-preview img')).toBeVisible()
+  await expect(window.locator('.settings-image-preview img')).toHaveCount(0)
+  await expect(window.getByLabel('Upload Shop Logo', { exact: true })).toBeAttached()
   await window.getByRole('textbox', { name: /Shop Name/ }).fill('JewelTrackerPro')
   await window.getByRole('textbox', { name: /App subtitle/ }).fill('Gold and silver')
   await window.getByRole('textbox', { name: /Phone 1/ }).fill('9000000000')

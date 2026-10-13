@@ -1,10 +1,23 @@
 import { createHash } from 'node:crypto'
-import { createReadStream, copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs'
-import { basename, isAbsolute, join, resolve } from 'node:path'
+import {
+  copyFileSync,
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  unlinkSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import Database from 'better-sqlite3'
 import type { BackupFile, BackupInspection, BackupKind, BackupStatus } from '@shared/types'
 import { backupKindForName } from '@shared/backupRetention'
 import {
+  CHANGE_BACKUP_INTERVAL_HOURS,
   DEFAULT_BACKUP_FREQUENCY,
   DEFAULT_BACKUP_TIME,
   isBackupDue,
@@ -20,9 +33,11 @@ import { HttpError } from '../lib/http'
 import { logDiagnostic } from '../lib/logger'
 import { closeDatabase, getDatabase, getDbPath, initDatabase } from './index'
 import { excelPathFor, writeExcelBackupFromSqliteFile } from './excelBackup'
+import { getAppVersion } from '../lib/appPaths'
 import { latestMigrationVersion } from './migrations'
 import { offsiteDirError } from './offsitePath'
 import { prerestoreSnapshotName, pruneBackupFiles, removeBackupSiblings } from './snapshot'
+import { writeZipFile, type ZipSource } from '../lib/zip'
 
 export const LAST_BACKUP_AT_KEY = 'last_backup_at'
 export const LAST_SCHEDULED_BACKUP_AT_KEY = 'last_scheduled_backup_at'
@@ -32,6 +47,24 @@ export const OFFSITE_DIR_KEY = 'backup_offsite_dir'
 export const LAST_OFFSITE_AT_KEY = 'last_offsite_at'
 export const LAST_OFFSITE_ERROR_KEY = 'last_offsite_error'
 export const LAST_OFFSITE_SOURCE_KEY = 'last_offsite_source'
+export const LAST_BACKUP_ERROR_KEY = 'last_backup_error'
+
+const BACKUP_STATE_KEYS = [
+  BACKUP_FREQUENCY_KEY,
+  BACKUP_TIME_KEY,
+  OFFSITE_DIR_KEY,
+  LAST_OFFSITE_AT_KEY,
+  LAST_OFFSITE_ERROR_KEY,
+  LAST_OFFSITE_SOURCE_KEY,
+  LAST_BACKUP_AT_KEY,
+  LAST_SCHEDULED_BACKUP_AT_KEY,
+  LAST_BACKUP_ERROR_KEY,
+] as const
+
+const LOCAL_BACKUP_RETRY_MS = 15 * 60 * 1000
+const changeBaseline = new WeakMap<Database.Database, number>()
+let cooldownDatabase: Database.Database | null = null
+let localBackupFailedAt = 0
 
 const RESTORE_REQUIRED_TABLES = [
   'schema_migrations',
@@ -137,27 +170,87 @@ export function getBackupStatus(now = new Date()): BackupStatus {
     offsiteDir: getOffsiteDir(),
     lastOffsiteAt: settingOrNull(LAST_OFFSITE_AT_KEY),
     lastOffsiteError: settingOrNull(LAST_OFFSITE_ERROR_KEY),
+    lastBackupError: settingOrNull(LAST_BACKUP_ERROR_KEY),
   }
+}
+
+function totalChanges(db: Database.Database): number {
+  return (db.prepare('SELECT total_changes() AS n').get() as { n: number }).n
+}
+
+function noteBackupBaseline(db: Database.Database = getDatabase()): void {
+  changeBaseline.set(db, totalChanges(db))
+}
+
+/** Remembers the current database as unchanged, so a later edit can be detected. */
+export function rememberChangeBaseline(): void {
+  noteBackupBaseline()
+}
+
+function dataChangedSinceBackup(db: Database.Database): boolean {
+  const baseline = changeBaseline.get(db)
+  if (baseline === undefined) return true
+  return totalChanges(db) > baseline
+}
+
+/**
+ * Off-machine bookkeeping writes shop_settings, which SQLite counts in
+ * total_changes(). Those writes are not shop data, so they must not make the
+ * 3-hour backup look due.
+ */
+function withoutChangeBaseline<T>(work: () => T): T {
+  const db = getDatabase()
+  const before = totalChanges(db)
+  const baseline = changeBaseline.get(db)
+  try {
+    return work()
+  } finally {
+    if (baseline !== undefined) {
+      changeBaseline.set(db, baseline + (totalChanges(db) - before))
+    }
+  }
+}
+
+function syncCooldown(db: Database.Database): void {
+  if (cooldownDatabase !== db) {
+    cooldownDatabase = db
+    localBackupFailedAt = 0
+  }
+}
+
+function localBackupCoolingDown(now: Date): boolean {
+  return localBackupFailedAt > 0 && now.getTime() - localBackupFailedAt < LOCAL_BACKUP_RETRY_MS
 }
 
 function markBackupCompleted(options: { scheduled?: boolean } = {}): BackupStatus {
   const db = getDatabase()
   setShopSetting(db, LAST_BACKUP_AT_KEY, new Date().toISOString())
+  setShopSetting(db, LAST_BACKUP_ERROR_KEY, '')
   if (options.scheduled) {
     setShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, new Date().toISOString())
   }
+  noteBackupBaseline(db)
+  localBackupFailedAt = 0
   return getBackupStatus()
 }
 
+function recordBackupError(message: string): void {
+  setShopSetting(getDatabase(), LAST_BACKUP_ERROR_KEY, message)
+}
+
 function recordOffsiteError(message: string): void {
-  setShopSetting(getDatabase(), LAST_OFFSITE_ERROR_KEY, message)
+  withoutChangeBaseline(() => {
+    setShopSetting(getDatabase(), LAST_OFFSITE_ERROR_KEY, message)
+  })
 }
 
 function recordOffsiteSuccess(sourceKey: string): void {
-  const db = getDatabase()
-  setShopSetting(db, LAST_OFFSITE_AT_KEY, new Date().toISOString())
-  setShopSetting(db, LAST_OFFSITE_ERROR_KEY, '')
-  setShopSetting(db, LAST_OFFSITE_SOURCE_KEY, sourceKey)
+  withoutChangeBaseline(() => {
+    const db = getDatabase()
+    setShopSetting(db, LAST_OFFSITE_AT_KEY, new Date().toISOString())
+    setShopSetting(db, LAST_OFFSITE_ERROR_KEY, '')
+    setShopSetting(db, LAST_OFFSITE_SOURCE_KEY, sourceKey)
+  })
 }
 
 export function assertSqliteIntegrity(filePath: string): void {
@@ -205,7 +298,7 @@ function schemaVersionOf(db: Database.Database, tables: Set<string>): number {
 }
 
 /**
- * Rejects anything that is not a healthy JewelTrackerPro backup this build can
+ * Rejects anything that is not a healthy AdaguTrackerPro backup this build can
  * open, before the live database is touched.
  */
 export function assertRestorableBackup(filePath: string): void {
@@ -220,7 +313,7 @@ export function assertRestorableBackup(filePath: string): void {
     const tables = listTableNames(db)
     const missing = RESTORE_REQUIRED_TABLES.filter((table) => !tables.has(table))
     if (missing.length > 0) {
-      throw new HttpError(400, 'This file is not a JewelTrackerPro Adagu backup')
+      throw new HttpError(400, 'This file is not an AdaguTrackerPro backup')
     }
     if (schemaVersionOf(db, tables) > latestMigrationVersion()) {
       throw new HttpError(
@@ -297,12 +390,92 @@ export async function proveBackupRestores(copyPath: string, sourcePath: string):
   }
 }
 
+function discardPartial(partial: string): void {
+  rmSync(partial, { force: true, recursive: true })
+  rmSync(`${partial}-wal`, { force: true })
+  rmSync(`${partial}-shm`, { force: true })
+}
+
+/**
+ * Replaces `destinationPath` with a verified temp file. The previous file is
+ * moved aside first, so a failed rename puts it back.
+ */
+function commitPartialFile(partial: string, destinationPath: string): void {
+  removeSidecarFiles(partial)
+  const holding = `${destinationPath}.replacing`
+  // A crash between the two renames leaves the good file only as `.replacing`.
+  if (!existsSync(destinationPath) && existsSync(holding)) {
+    renameSync(holding, destinationPath)
+  }
+  let movedAside = false
+  try {
+    if (existsSync(destinationPath)) {
+      if (existsSync(holding)) {
+        rmSync(holding, { force: true })
+      }
+      removeSidecarFiles(destinationPath)
+      renameSync(destinationPath, holding)
+      movedAside = true
+    }
+    renameSync(partial, destinationPath)
+    if (existsSync(holding)) {
+      rmSync(holding, { force: true })
+    }
+    removeSidecarFiles(destinationPath)
+  } catch (error) {
+    if (movedAside && !existsSync(destinationPath) && existsSync(holding)) {
+      try {
+        renameSync(holding, destinationPath)
+      } catch (rollbackError) {
+        logDiagnostic('backup', 'Could not put the previous file back', rollbackError)
+      }
+    }
+    throw error
+  }
+}
+
+/**
+ * Writes a snapshot beside the real file, checks it, then renames it into place.
+ * A failed write leaves the previous file unchanged.
+ */
+export async function writeVerifiedSnapshot(db: Database.Database, destinationPath: string): Promise<void> {
+  const partial = join(dirname(destinationPath), `~$${basename(destinationPath)}.tmp`)
+  discardPartial(partial)
+  try {
+    await db.backup(partial)
+    const check = new Database(partial, sqliteNativeOptions({ readonly: true, fileMustExist: true }))
+    try {
+      if (check.pragma('quick_check', { simple: true }) !== 'ok') {
+        throw new Error('Backup file is damaged and cannot be used')
+      }
+    } finally {
+      check.close()
+    }
+    commitPartialFile(partial, destinationPath)
+  } catch (error) {
+    discardPartial(partial)
+    throw error
+  }
+}
+
+function replaceDatabaseFile(sourcePath: string, dest: string): void {
+  const partial = `${dest}.restore.tmp`
+  discardPartial(partial)
+  try {
+    copyFileSync(sourcePath, partial)
+    assertSqliteIntegrity(partial)
+    commitPartialFile(partial, dest)
+  } catch (error) {
+    discardPartial(partial)
+    throw error
+  }
+}
+
 export async function backupDatabaseTo(
   destinationPath: string,
   options: { scheduled?: boolean } = {},
 ): Promise<BackupStatus> {
-  const db = getDatabase()
-  await db.backup(destinationPath)
+  await writeVerifiedSnapshot(getDatabase(), destinationPath)
   return markBackupCompleted(options)
 }
 
@@ -340,6 +513,21 @@ async function runScheduledBackup(now: Date): Promise<void> {
   const dir = getBackupsDir()
   const destinationPath = join(dir, `jeweltrackerpro-${localDateIso(now)}.db`)
   await backupDatabaseTo(destinationPath, { scheduled: true })
+  await writeExcelBeside(destinationPath)
+  pruneBackupFiles(dir)
+}
+
+async function runPeriodicBackup(now: Date): Promise<void> {
+  const last = settingOrNull(LAST_BACKUP_AT_KEY)
+  if (!last) return
+  const lastAt = new Date(last)
+  if (Number.isNaN(lastAt.getTime())) return
+  if (now.getTime() - lastAt.getTime() < CHANGE_BACKUP_INTERVAL_HOURS * 60 * 60 * 1000) return
+  const db = getDatabase()
+  if (!dataChangedSinceBackup(db)) return
+  const dir = getBackupsDir()
+  const destinationPath = join(dir, `jeweltrackerpro-${localDateIso(now)}.db`)
+  await backupDatabaseTo(destinationPath)
   await writeExcelBeside(destinationPath)
   pruneBackupFiles(dir)
 }
@@ -470,13 +658,29 @@ async function runOffsiteCopy(options: { forceFresh?: boolean }, now: Date): Pro
   }
 }
 
-export async function tickScheduledBackup(): Promise<void> {
+export async function tickScheduledBackup(now = new Date()): Promise<void> {
   if (isBackupBusy()) return
   await withBackupLock(async () => {
+    const db = getDatabase()
+    syncCooldown(db)
     try {
-      await runScheduledBackup(new Date())
+      if (!localBackupCoolingDown(now)) {
+        try {
+          await runScheduledBackup(now)
+          await runPeriodicBackup(now)
+        } catch (error) {
+          localBackupFailedAt = now.getTime()
+          const message = error instanceof Error ? error.message : 'Automatic backup failed'
+          try {
+            recordBackupError(message)
+          } catch (recordError) {
+            logDiagnostic('backup', 'Could not record the backup error', recordError)
+          }
+          logDiagnostic('backup', 'Scheduled database backup failed', error)
+        }
+      }
     } finally {
-      await runOffsiteCopy({}, new Date())
+      await runOffsiteCopy({}, now)
     }
   })
 }
@@ -515,49 +719,71 @@ function removeSidecarFiles(dbPath: string): void {
 async function writePrerestoreSnapshot(): Promise<string> {
   const dir = getBackupsDir()
   const destination = join(dir, prerestoreSnapshotName())
-  if (existsSync(destination)) {
-    unlinkSync(destination)
-  }
-  await getDatabase().backup(destination)
+  await writeVerifiedSnapshot(getDatabase(), destination)
   pruneBackupFiles(dir)
   return destination
 }
 
-function restoreShopImages(): void {
-  const offsiteDir = getOffsiteDir()
-  if (!offsiteDir) return
-
-  const sourceDir = join(offsiteDir, 'uploads')
+function copyNewFiles(sourceDir: string, targetDir: string, logLabel: string): void {
   if (!existsSync(sourceDir)) return
-
-  const targetDir = getUploadsDir()
+  mkdirSync(targetDir, { recursive: true })
   for (const name of readdirSync(sourceDir)) {
     try {
       const source = join(sourceDir, name)
       if (!statSync(source).isFile()) continue
+      if (basename(name) !== name) continue
       const target = join(targetDir, name)
       if (existsSync(target)) continue
       copyFileSync(source, target)
     } catch (error) {
-      logDiagnostic('backup', 'Shop image could not be restored', error)
+      logDiagnostic('backup', logLabel, error)
     }
   }
 }
 
-export async function restoreDatabaseFrom(sourcePath: string): Promise<BackupStatus> {
-  return withBackupLock(() => runRestore(sourcePath))
+function restoreShopImages(offsiteDir: string): void {
+  if (!offsiteDir) return
+  copyNewFiles(join(offsiteDir, 'uploads'), getUploadsDir(), 'Shop image could not be restored')
 }
 
-async function runRestore(sourcePath: string): Promise<BackupStatus> {
+function readBackupState(): Map<string, string> {
+  const db = getDatabase()
+  const state = new Map<string, string>()
+  for (const key of BACKUP_STATE_KEYS) {
+    state.set(key, getShopSetting(db, key, ''))
+  }
+  return state
+}
+
+function writeBackupState(state: Map<string, string>): void {
+  const db = getDatabase()
+  const apply = db.transaction(() => {
+    for (const [key, value] of state) {
+      setShopSetting(db, key, value)
+    }
+  })
+  apply()
+  noteBackupBaseline(db)
+}
+
+export async function restoreDatabaseFrom(
+  sourcePath: string,
+  options: { uploadsDir?: string } = {},
+): Promise<BackupStatus> {
+  return withBackupLock(() => runRestore(sourcePath, options.uploadsDir))
+}
+
+async function runRestore(sourcePath: string, uploadsDir?: string): Promise<BackupStatus> {
   assertRestorableBackup(sourcePath)
 
+  const preserved = readBackupState()
+  const offsiteDir = preserved.get(OFFSITE_DIR_KEY) ?? ''
   const dest = getDbPath()
   const safetyCopy = await writePrerestoreSnapshot()
 
   closeDatabase()
   try {
-    copyFileSync(sourcePath, dest)
-    removeSidecarFiles(dest)
+    replaceDatabaseFile(sourcePath, dest)
     initDatabase()
   } catch (error) {
     try {
@@ -565,8 +791,7 @@ async function runRestore(sourcePath: string): Promise<BackupStatus> {
       // Close it first, or the re-init below would hand back the broken file.
       closeDatabase()
       if (existsSync(safetyCopy)) {
-        copyFileSync(safetyCopy, dest)
-        removeSidecarFiles(dest)
+        replaceDatabaseFile(safetyCopy, dest)
       }
     } catch (rollbackError) {
       logDiagnostic('backup', 'Restore rollback failed', rollbackError)
@@ -580,8 +805,85 @@ async function runRestore(sourcePath: string): Promise<BackupStatus> {
     throw new HttpError(400, 'Backup could not be opened. Your current data was kept.')
   }
 
-  restoreShopImages()
+  try {
+    writeBackupState(preserved)
+  } catch (error) {
+    logDiagnostic('backup', "Restored database could not keep this computer's backup settings", error)
+    try {
+      noteBackupBaseline()
+    } catch (baselineError) {
+      logDiagnostic('backup', 'Could not reset the backup change baseline', baselineError)
+    }
+  }
+  restoreShopImages(offsiteDir)
+  if (uploadsDir) {
+    copyNewFiles(uploadsDir, getUploadsDir(), 'Backup photo could not be restored')
+  }
   return getBackupStatus()
+}
+
+export function allowFullBackupEntry(name: string): boolean {
+  if (name === 'manifest.json' || name === 'jeweltrackerpro.db') return true
+  if (!name.startsWith('uploads/')) return false
+  const base = name.slice('uploads/'.length)
+  return base.length > 0 && !base.includes('/') && basename(base) === base
+}
+
+export function assertFullBackupDestination(filePath: string): string {
+  if (!isAbsolute(filePath)) {
+    throw new HttpError(400, 'Choose a .zip file path')
+  }
+  const resolved = resolve(filePath)
+  if (!resolved.toLowerCase().endsWith('.zip')) {
+    throw new HttpError(400, 'Choose a .zip file path')
+  }
+  const dataDir = resolve(getDataDir())
+  if (resolved === dataDir || resolved.startsWith(dataDir + sep)) {
+    throw new HttpError(400, "Choose a folder outside this computer's app data")
+  }
+  const parent = dirname(resolved)
+  if (!existsSync(parent) || !statSync(parent).isDirectory()) {
+    throw new HttpError(400, 'The folder for the backup was not found')
+  }
+  return resolved
+}
+
+export async function writeFullBackup(destinationPath: string): Promise<void> {
+  const scratch = mkdtempSync(join(tmpdir(), 'jtp-full-'))
+  const partialZip = `${destinationPath}.partial`
+  try {
+    const dbPath = join(scratch, 'jeweltrackerpro.db')
+    await writeVerifiedSnapshot(getDatabase(), dbPath)
+    const manifest = Buffer.from(
+      JSON.stringify({
+        app: 'AdaguTrackerPro',
+        appVersion: getAppVersion(),
+        schemaVersion: latestMigrationVersion(),
+        createdAt: new Date().toISOString(),
+      }),
+    )
+    const entries: ZipSource[] = [
+      { name: 'manifest.json', data: manifest, compress: true },
+      { name: 'jeweltrackerpro.db', filePath: dbPath, compress: true },
+    ]
+    const uploadsDir = getUploadsDir()
+    if (existsSync(uploadsDir)) {
+      for (const name of readdirSync(uploadsDir)) {
+        if (basename(name) !== name) continue
+        const source = join(uploadsDir, name)
+        if (!statSync(source).isFile()) continue
+        entries.push({ name: `uploads/${name}`, filePath: source, compress: false })
+      }
+    }
+    await writeZipFile(partialZip, entries)
+    commitPartialFile(partialZip, destinationPath)
+    markBackupCompleted()
+  } catch (error) {
+    rmSync(partialZip, { force: true })
+    throw error
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
 }
 
 function backupKind(name: string): BackupKind | null {

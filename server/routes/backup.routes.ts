@@ -1,10 +1,12 @@
-import { existsSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Router } from 'express'
 import multer from 'multer'
-import { backupSettingsSchema, inspectBackupSchema, restoreBackupNameSchema } from '@shared/schemas'
+import { backupSettingsSchema, exportFullBackupSchema, inspectBackupSchema, restoreBackupNameSchema } from '@shared/schemas'
 import {
+  allowFullBackupEntry,
+  assertFullBackupDestination,
   backupDatabaseTo,
   copyNewestBackupOffsite,
   createManualBackup,
@@ -17,14 +19,16 @@ import {
   restoreDatabaseFrom,
   updateBackupSchedule,
   withBackupLock,
+  writeFullBackup,
 } from '../db/backup'
+import { extractZipFile, isZipFile } from '../lib/zip'
 import { writeExcelBackupFromDatabaseYielding } from '../db/excelBackup'
 import { getDatabase, getDbPath } from '../db'
 import { asyncHandler, HttpError, parseBody } from '../lib/http'
 
 const upload = multer({
   dest: tmpdir(),
-  limits: { fileSize: 200 * 1024 * 1024 },
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 },
 })
 
 const router = Router()
@@ -104,6 +108,30 @@ router.get(
 )
 
 router.get(
+  '/export-full',
+  asyncHandler(async (_req, res) => {
+    const filename = `jeweltrackerpro-full-${new Date().toISOString().slice(0, 10)}.zip`
+    const destination = join(tmpdir(), `jeweltrackerpro-full-${Date.now()}.zip`)
+    await withBackupLock(async () => {
+      await writeFullBackup(destination)
+    })
+    res.download(destination, filename, () => removeTempFile(destination))
+  }),
+)
+
+router.post(
+  '/export-full',
+  asyncHandler(async (req, res) => {
+    const { path: filePath } = parseBody(exportFullBackupSchema, req.body)
+    const destination = assertFullBackupDestination(filePath)
+    await withBackupLock(async () => {
+      await writeFullBackup(destination)
+    })
+    res.json({ ok: true })
+  }),
+)
+
+router.get(
   '/export-excel',
   asyncHandler(async (_req, res) => {
     const filename = `jeweltrackerpro-tables-${new Date().toISOString().slice(0, 10)}.xlsx`
@@ -122,11 +150,32 @@ router.post(
     if (!req.file) {
       throw new HttpError(400, 'Backup file is required')
     }
+    const uploaded = req.file.path
+    let extracted: string | null = null
     try {
-      const status = await restoreDatabaseFrom(req.file.path)
+      if (isZipFile(uploaded)) {
+        extracted = mkdtempSync(join(tmpdir(), 'jtp-restore-'))
+        try {
+          await extractZipFile(uploaded, extracted, allowFullBackupEntry)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Backup file could not be opened'
+          throw new HttpError(400, message)
+        }
+        const dbPath = join(extracted, 'jeweltrackerpro.db')
+        if (!existsSync(dbPath)) {
+          throw new HttpError(400, 'This file is not an AdaguTrackerPro backup')
+        }
+        const status = await restoreDatabaseFrom(dbPath, { uploadsDir: join(extracted, 'uploads') })
+        res.json(status)
+        return
+      }
+      const status = await restoreDatabaseFrom(uploaded)
       res.json(status)
     } finally {
-      removeTempFile(req.file.path)
+      removeTempFile(uploaded)
+      if (extracted) {
+        rmSync(extracted, { recursive: true, force: true })
+      }
     }
   }),
 )

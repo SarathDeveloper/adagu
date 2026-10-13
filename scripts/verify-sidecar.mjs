@@ -69,7 +69,7 @@ const macAppBundle = join(
   'release',
   'bundle',
   'macos',
-  'JewelTrackerPro.app',
+  'AdaguTrackerPro.app',
 )
 
 // Thin 64-bit little-endian Mach-O (arm64) and a universal (fat) binary.

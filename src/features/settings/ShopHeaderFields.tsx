@@ -1,6 +1,6 @@
 import { Upload } from 'lucide-react'
 import type { ShopSettings } from '@shared/types'
-import { defaultShopLogoUrl, localImageSrc } from '../print/mapShopDisplay'
+import { localImageSrc } from '../print/mapShopDisplay'
 
 export function RequiredMark() {
   return (
@@ -153,7 +153,11 @@ export function ShopHeaderFields({
         <span>Shop Logo</span>
         <div className="settings-image-picker">
           <div className="settings-image-preview">
-            <img src={localImageSrc(shop.logoImagePath, defaultShopLogoUrl)} alt="" />
+            {shop.logoImagePath ? (
+              <img src={localImageSrc(shop.logoImagePath, '')} alt="" />
+            ) : (
+              <span className="settings-signature-placeholder muted">No logo</span>
+            )}
           </div>
           <div className="settings-image-meta">
             <label className="btn secondary">

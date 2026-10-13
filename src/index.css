@@ -6789,6 +6789,28 @@ button.dashboard-rate-ticker[aria-expanded="true"] {
   display: grid;
   gap: 0.85rem;
 }
+.auth-card--setup {
+  width: min(36rem, 100%);
+}
+.setup-place {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 0.8fr;
+  gap: 0.75rem;
+}
+.setup-logo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.setup-logo .muted {
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .setup-place {
+    grid-template-columns: 1fr;
+  }
+}
 .auth-brand {
   text-align: center;
   display: grid;
