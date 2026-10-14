@@ -57,6 +57,23 @@ export function pledgeAsOfDate(pledge: {
   return pledge.redeemed_date || localTodayIso()
 }
 
+/**
+ * A forfeited (auctioned) pledge stops accruing interest on its auction date,
+ * so both the as-of date and every payment date are capped there. Without this
+ * a shortfall collected weeks later would keep growing.
+ */
+export function pledgeLedgerCap(pledge: {
+  status: string
+  redeemed_date: string | null
+}): string | null {
+  return pledge.status === 'forfeited' ? pledge.redeemed_date : null
+}
+
+/** Clamp a ledger date to the forfeit cap, when there is one. */
+export function capLedgerDate(date: string, cap: string | null): string {
+  return cap && date > cap ? cap : date
+}
+
 export function loadPledgeCore(
   db: Database.Database,
   pledgeId: number,
@@ -130,11 +147,15 @@ export function replayForPledge(
 ): { result: PledgeLedgerResult; payments: PledgePayment[] } {
   const { base, topups } = loadPledgeTranches(db, pledge)
   const payments = loadPledgePayments(db, pledge.id)
+  const cap = pledgeLedgerCap(pledge)
   const result = replayPledge({
     base,
     topups,
-    payments: toLedgerPayments(payments),
-    asOfDate,
+    payments: toLedgerPayments(payments).map((payment) => ({
+      ...payment,
+      date: capLedgerDate(payment.date, cap),
+    })),
+    asOfDate: capLedgerDate(asOfDate, cap),
   })
   return { result, payments }
 }

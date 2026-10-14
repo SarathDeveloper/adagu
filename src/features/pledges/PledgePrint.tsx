@@ -1,9 +1,6 @@
 import { amountInWords } from '@shared/billing/amountInWords'
-import {
-  monthlyPledgeInterestAmount,
-  netPaidAmount,
-  totalPayableAfterOneYear,
-} from '@shared/billing/pledgeMath'
+import { monthlyPledgeInterestAmount, netPaidAmount } from '@shared/billing/pledgeMath'
+import { payableAfterOneYear } from '@shared/billing/pledgeLedger'
 import type { Pledge } from '@shared/types'
 import { formatDisplayDate, formatInr } from '../../lib/format'
 import { EMPTY_SHOP_DISPLAY, localImageSrc, type ShopDisplayInfo } from '../print/mapShopDisplay'
@@ -36,7 +33,7 @@ export function PledgePrint({
   const charges = pledge.charges ?? 0
   const netPaid = netPaidAmount(pledge.loanAmount, charges)
   const monthlyInterest = monthlyPledgeInterestAmount(pledge.loanAmount, pledge.interestPct)
-  const payableOneYear = totalPayableAfterOneYear(
+  const payableOneYear = payableAfterOneYear(
     pledge.loanAmount,
     pledge.interestPct,
     pledge.pledgeDate,

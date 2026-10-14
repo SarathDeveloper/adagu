@@ -13,6 +13,7 @@ import {
   pledgeRedeemInputSchema,
   pledgeRenewInputSchema,
   pledgeSanctionInputSchema,
+  pledgeShortfallInputSchema,
   pledgeTopupInputSchema,
   pledgeUpdateInputSchema,
 } from '@shared/schemas'
@@ -38,6 +39,7 @@ import type {
   PledgePhotoKind,
   PledgeRedeemInput,
   PledgeRenewInput,
+  PledgeShortfallInput,
   PledgeStatus,
   PledgeTopupInput,
 } from '@shared/types'
@@ -47,9 +49,9 @@ import { asyncHandler, HttpError, parseBody, parseIdParam, parsePaging, queryStr
 import { getUploadsDir } from '../lib/paths'
 import { loadShopSettings } from '../lib/settingsStore'
 import { loadPledgeAuction } from '../pledges/auctions'
-import { loadPledgePayments } from '../pledges/ledger'
+import { loadPledgeCore, loadPledgePayments } from '../pledges/ledger'
 import { addPledgePhoto, deletePledgePhoto, loadPledgePhotos } from '../pledges/photos'
-import { computePledgePayoff, recordPledgePayment } from '../pledges/payments'
+import { computePledgePayoff, deleteLatestPledgePayment, recordPledgePayment } from '../pledges/payments'
 import { buildPledgeReminders } from '../pledges/reminders'
 import { loadPledgeTopups } from '../pledges/topups'
 import { getLatestMetalRates } from './metalRates.routes'
@@ -209,7 +211,9 @@ function mapPledge(db: ReturnType<typeof getDatabase>, row: PledgeRow): Pledge {
   }
 }
 
-function mapPledgeSummary(row: PledgeRow & { item_count?: number }): Pledge {
+function mapPledgeSummary(
+  row: PledgeRow & { item_count?: number; total_net_weight?: number },
+): Pledge {
   return {
     id: row.id,
     customerId: row.customer_id,
@@ -234,6 +238,7 @@ function mapPledgeSummary(row: PledgeRow & { item_count?: number }): Pledge {
     createdAt: row.created_at,
     items: [],
     itemCount: Number(row.item_count ?? 0),
+    totalNetWeight: Number(row.total_net_weight ?? 0),
     topups: [],
     payments: [],
     photos: [],
@@ -486,14 +491,25 @@ router.get(
     const rows = db
       .prepare(
         `SELECT p.*, c.name AS customer_name, c.phone AS customer_phone,
-                (SELECT COUNT(*) FROM pledge_items WHERE pledge_id = p.id) AS item_count
+                (SELECT COUNT(*) FROM pledge_items WHERE pledge_id = p.id) AS item_count,
+                (SELECT COALESCE(SUM(net_weight), 0) FROM pledge_items WHERE pledge_id = p.id) AS total_net_weight
          ${fromSql}
          ORDER BY p.pledge_date ${sort}, p.id ${sort}
          LIMIT ? OFFSET ?`,
       )
-      .all(...params, pageSize, offset) as Array<PledgeRow & { item_count: number }>
+      .all(...params, pageSize, offset) as Array<
+      PledgeRow & { item_count: number; total_net_weight: number }
+    >
     res.json({
-      items: rows.map((row) => mapPledgeSummary(row)),
+      items: rows.map((row) => {
+        const pledge = mapPledgeSummary(row)
+        // Only an active loan has a live balance (interest still accrues); a
+        // closed ticket's balance is historical and stays off the list.
+        if (row.status === 'active') {
+          pledge.outstanding = computePledgePayoff(db, row.id)?.payoff
+        }
+        return pledge
+      }),
       total,
       page,
       pageSize,
@@ -640,6 +656,29 @@ router.get(
     const id = parseIdParam(req.params.id)
     getPledgeRow(db, id)
     res.json(loadPledgePayments(db, id))
+  }),
+)
+
+router.delete(
+  '/:id/payments/latest',
+  asyncHandler((req, res) => {
+    if (req.user?.role !== 'admin') {
+      throw new HttpError(403, 'Only an admin can undo a payment')
+    }
+    const id = parseIdParam(req.params.id)
+    const db = getDatabase()
+    const tx = db.transaction(() => {
+      const latest = db
+        .prepare(
+          `SELECT id FROM pledge_payments WHERE pledge_id = ?
+           ORDER BY payment_date DESC, id DESC LIMIT 1`,
+        )
+        .get(id) as { id: number } | undefined
+      if (!latest) throw new HttpError(404, 'No payments to undo')
+      deleteLatestPledgePayment(db, latest.id)
+      return mapPledge(db, getPledgeRow(db, id))
+    })
+    res.json(tx())
   }),
 )
 
@@ -903,6 +942,13 @@ router.post(
       const afterInterest = computePledgePayoff(db, id, input.renewDate)
       const outstanding = afterInterest ? afterInterest.principalOutstanding : 0
       const newLoan = Math.max(0, input.newLoanAmount ?? outstanding)
+      // A renewal that grows the loan is a new loan against the same gold, so
+      // it has to stay inside the shop's LTV band too.
+      assertWithinLtv(
+        db,
+        { assessedValue: row.assessed_value, loanAmount: newLoan, allowAboveLtv: input.allowAboveLtv },
+        req.user?.role === 'admin',
+      )
       const transferAmount = Math.min(newLoan, outstanding)
       const shortfall = Math.max(0, outstanding - newLoan)
 
@@ -930,8 +976,12 @@ router.post(
         })
       }
 
-      // 3. Retire the old ticket.
-      db.prepare(`UPDATE pledges SET status = 'renewed' WHERE id = ?`).run(id)
+      // 3. Retire the old ticket, closed on the renewal date so the list and
+      // reports show when it ended instead of leaving it blank.
+      db.prepare(`UPDATE pledges SET status = 'renewed', redeemed_date = ? WHERE id = ?`).run(
+        input.renewDate,
+        id,
+      )
 
       // 4. Create the new active ticket.
       const settings = loadShopSettings(db)
@@ -956,7 +1006,7 @@ router.post(
           newLoan,
           settings.adaguInterestPct,
           defaultRepaymentDueDate(input.renewDate),
-          input.note ?? `Renewed from ${row.receipt_no}`,
+          input.note?.trim() || `Renewed from ${row.receipt_no}`,
           id,
         )
       const newId = Number(inserted.lastInsertRowid)
@@ -1006,12 +1056,69 @@ router.post(
         throw new HttpError(400, 'Top-up date cannot be before the pledge date')
       }
 
+      // A top-up raises the principal, so it has to stay inside the LTV band
+      // for the same gold unless an admin overrides it.
+      const beforeTopup = computePledgePayoff(db, id, input.topupDate)
+      assertWithinLtv(
+        db,
+        {
+          assessedValue: row.assessed_value,
+          loanAmount: (beforeTopup?.principalOutstanding ?? 0) + input.amount,
+          allowAboveLtv: input.allowAboveLtv,
+        },
+        req.user?.role === 'admin',
+      )
+
       db.prepare(
         `INSERT INTO pledge_topups (pledge_id, topup_date, amount, interest_pct, note)
          VALUES (?, ?, ?, ?, ?)`,
       ).run(id, input.topupDate, input.amount, row.interest_pct, input.note ?? '')
 
       syncDueEntryForPledge(db, id)
+      return mapPledge(db, getPledgeRow(db, id))
+    })
+    res.status(201).json(tx())
+  }),
+)
+
+router.post(
+  '/:id/collect-shortfall',
+  asyncHandler((req, res) => {
+    const id = parseIdParam(req.params.id)
+    const input = parseBody(pledgeShortfallInputSchema, {
+      ...req.body,
+      id,
+    }) as PledgeShortfallInput
+    const db = getDatabase()
+    const tx = db.transaction(() => {
+      const pledge = loadPledgeCore(db, id)
+      if (!pledge) throw new HttpError(404, 'Pledge not found')
+      if (pledge.status !== 'forfeited') {
+        throw new HttpError(400, 'Only a forfeited loan can collect an auction shortfall')
+      }
+      const payoff = computePledgePayoff(db, id)
+      const remaining = Math.max(0, payoff?.payoff ?? 0)
+      if (remaining <= EPSILON) {
+        throw new HttpError(400, 'This loan has no shortfall left to collect')
+      }
+      if (input.amount > remaining + EPSILON) {
+        throw new HttpError(
+          400,
+          `Amount exceeds the remaining shortfall of ${remaining.toFixed(2)}`,
+        )
+      }
+      // Interest is frozen at the auction date, so this settles the books
+      // without reopening the loan. `part` reuses the existing kind CHECK.
+      recordPledgePayment(db, {
+        pledgeId: id,
+        date: input.collectedDate,
+        amount: input.amount,
+        mode: input.mode ?? 'cash',
+        kind: 'part',
+        note: 'Auction shortfall collected',
+        allowForfeited: true,
+        closeWhenSettled: false,
+      })
       return mapPledge(db, getPledgeRow(db, id))
     })
     res.status(201).json(tx())

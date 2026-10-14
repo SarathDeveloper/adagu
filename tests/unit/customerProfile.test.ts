@@ -15,6 +15,7 @@ function entry(overrides: Partial<DueEntry> = {}): DueEntry {
     kind: 'due',
     amount: 500,
     note: '',
+    mode: null,
     pledgeId: null,
     pledgeReceiptNo: null,
     createdAt: '',

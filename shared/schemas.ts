@@ -336,6 +336,7 @@ export const pledgeRenewInputSchema = z.object({
   mode: pledgePaymentModeSchema.optional().default('cash'),
   newLoanAmount: z.number().nonnegative().optional(),
   note: z.string().max(500).optional().default(''),
+  allowAboveLtv: z.boolean().optional(),
 })
 
 export const pledgeTopupInputSchema = z.object({
@@ -343,6 +344,7 @@ export const pledgeTopupInputSchema = z.object({
   topupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amount: z.number().positive(),
   note: z.string().max(500).optional().default(''),
+  allowAboveLtv: z.boolean().optional(),
 })
 
 export const pledgeAuctionNoticeInputSchema = z.object({
@@ -363,6 +365,13 @@ export const pledgeAuctionInputSchema = z.object({
 export const pledgeAuctionSurplusInputSchema = z.object({
   id: z.number().int().positive(),
   surplusPaidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  mode: pledgePaymentModeSchema.optional().default('cash'),
+})
+
+export const pledgeShortfallInputSchema = z.object({
+  id: z.number().int().positive(),
+  collectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount: z.number().positive(),
   mode: pledgePaymentModeSchema.optional().default('cash'),
 })
 

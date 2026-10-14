@@ -28,6 +28,7 @@ import { PrintersSettings } from './PrintersSettings'
 import { BackupSettings } from './BackupSettings'
 import { RequiredMark } from './ShopHeaderFields'
 import { useShopBranding } from './shopBrandingContext'
+import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 
 type SettingsTab = 'invoice' | 'printers' | 'backup' | 'data'
 
@@ -475,7 +476,11 @@ export function SettingsPage() {
                       label="Signature Image"
                       optional
                       title="Upload Signature"
-                      hint="Prints on bills, pledges, and gold savings receipts. PNG, JPG (Max 2MB)"
+                      hint={
+                        GOLD_SAVINGS_VISIBLE
+                          ? 'Prints on bills, pledges, and gold savings receipts. PNG, JPG (Max 2MB)'
+                          : 'Prints on bills and pledges. PNG, JPG (Max 2MB)'
+                      }
                       preview={
                         shop.signatureImagePath ? (
                           <span className="settings-upload-thumb">
@@ -542,6 +547,7 @@ export function SettingsPage() {
                   </div>
                 </section>
 
+                {GOLD_SAVINGS_VISIBLE ? (
                 <section className="settings-identity-panel">
                   <h3 className="settings-identity-panel-title">
                     <BookOpen size={16} strokeWidth={1.75} aria-hidden />
@@ -585,6 +591,7 @@ export function SettingsPage() {
                     />
                   </div>
                 </section>
+                ) : null}
               </div>
 
               <div className="card padded">

@@ -7,6 +7,8 @@ import type {
   CreateUserInput,
   Customer,
   CustomerInput,
+  DashboardSearchResult,
+  MainDashboard,
   DueEntry,
   DueEntryInput,
   DueEntryUpdateInput,
@@ -24,6 +26,7 @@ import type {
   PledgePayment,
   PledgePayoff,
   PledgeRedeemInput,
+  PledgeShortfallInput,
   PledgeTopup,
   PledgeTopupInput,
   PledgeUpdateInput,
@@ -78,6 +81,9 @@ export interface JewelTrackerProApi {
   restoreBackupByName: (name: string) => Promise<BackupStatus>
   deleteBackup: (name: string) => Promise<void>
 
+  getDashboard: () => Promise<MainDashboard>
+  searchDashboard: (q: string) => Promise<DashboardSearchResult>
+
   listCustomers: (search?: string) => Promise<Customer[]>
   getCustomer: (id: number) => Promise<Customer>
   createCustomer: (input: CustomerInput) => Promise<Customer>
@@ -102,6 +108,8 @@ export interface JewelTrackerProApi {
   forfeitPledge: (input: PledgeForfeitInput) => Promise<Pledge>
   listPledgeTopups: (id: number) => Promise<PledgeTopup[]>
   addPledgeTopup: (input: PledgeTopupInput) => Promise<Pledge>
+  collectPledgeShortfall: (input: PledgeShortfallInput) => Promise<Pledge>
+  undoLatestPledgePayment: (id: number) => Promise<Pledge>
   listPledgePayments: (id: number) => Promise<PledgePayment[]>
   getPledgePayoff: (id: number, date?: string) => Promise<PledgePayoff>
 

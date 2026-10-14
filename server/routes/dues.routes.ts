@@ -20,7 +20,7 @@ import type {
 import type Database from 'better-sqlite3'
 import { getDatabase } from '../db'
 import { refreshActivePledgeDues } from '../dues/pledgeSync'
-import { asyncHandler, parseBody, parseIdParam } from '../lib/http'
+import { asyncHandler, HttpError, parseBody, parseIdParam } from '../lib/http'
 import { replayForPledge } from '../pledges/ledger'
 import { loadPledgeTopups } from '../pledges/topups'
 import {
@@ -38,6 +38,7 @@ type DueEntryRow = {
   kind: DueEntryKind
   amount: number
   note: string
+  mode: string | null
   pledge_id: number | null
   pledge_receipt_no: string | null
   pledge_loan_amount: number | null
@@ -76,6 +77,7 @@ function mapDueEntry(db: Database.Database, row: DueEntryRow): DueEntry {
     kind: row.kind,
     amount: row.amount,
     note: row.note,
+    mode: row.mode ?? null,
     pledgeId: row.pledge_id,
     pledgeReceiptNo: row.pledge_receipt_no,
     createdAt: row.created_at,
@@ -91,6 +93,7 @@ function emptyDueEntryStub(customerId: number, kind: DueEntryKind, amount: numbe
     kind,
     amount,
     note: '',
+    mode: null,
     pledgeId: null,
     pledgeReceiptNo: null,
     createdAt: '',
@@ -175,6 +178,7 @@ type PledgeListRow = {
   receipt_no: string
   pledge_date: string
   loan_amount: number
+  assessed_value: number
   interest_pct: number
   amount_collected: number
   status: PledgeStatus
@@ -192,7 +196,8 @@ export function buildAdaguDues(
   const today = localTodayIso()
   const pledges = db
     .prepare(
-      `SELECT p.id, p.customer_id, p.receipt_no, p.pledge_date, p.loan_amount, p.interest_pct,
+      `SELECT p.id, p.customer_id, p.receipt_no, p.pledge_date, p.loan_amount, p.assessed_value,
+              p.interest_pct,
               p.amount_collected, p.status, p.redeemed_date,
               c.name AS customer_name, c.phone AS customer_phone,
               (SELECT notice_date FROM pledge_auctions WHERE pledge_id = p.id) AS auction_notice_date,
@@ -231,6 +236,7 @@ export function buildAdaguDues(
       pledgeDate: pledge.pledge_date,
       principal: result.principalOutstanding,
       principalOutstanding: result.principalOutstanding,
+      assessedValue: pledge.assessed_value,
       interestPct: pledge.interest_pct,
       monthlyInterest: result.monthlyInterest,
       daysActive: daysBetween(pledge.pledge_date, asOf),
@@ -398,6 +404,11 @@ router.delete(
 
     const pledgeId = existing.pledge_id
     const linkedPledgePayment = pledgeId !== null && existing.kind === 'payment'
+
+    // Undoing a pledge payment rewrites the loan, so it stays admin-only.
+    if (linkedPledgePayment && req.user?.role !== 'admin') {
+      throw new HttpError(403, 'Only an admin can undo a payment')
+    }
 
     const tx = db.transaction(() => {
       if (linkedPledgePayment && existing.pledge_payment_id !== null) {

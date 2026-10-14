@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getDatabase } from '../../server/db'
 import { setShopSetting } from '../../server/lib/settingsStore'
-import { getTestAgent, ipc, IPC_CHANNELS, useIntegrationEnv } from './helpers/testEnv'
+import { getTestAgent, ipc, IPC_CHANNELS, loginAsAdmin, useIntegrationEnv } from './helpers/testEnv'
 
 async function createPledgeCustomer(name: string, phone: string): Promise<number> {
   const customer = await ipc<{ id: number }>(IPC_CHANNELS.CUSTOMERS_CREATE, {
@@ -1152,5 +1152,303 @@ describe('pledges API', () => {
     // not a collection, so no collections row may carry pledged principal.
     expect(rows.reduce((sum, row) => sum + row.principal, 0)).toBe(0)
     expect(rows.every((row) => row.amount < 20000)).toBe(true)
+  })
+
+  it('redeems on a back-dated close date using that date\'s payoff', async () => {
+    const customerId = await createPledgeCustomer('Backdated Redeem', '9000000060')
+    const created = await createDraftPledge(customerId, [goldItem('Chain')])
+    const pledgeId = created.body.id
+    await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
+
+    const early = await getTestAgent().get(`/api/pledges/${pledgeId}/payoff?date=2026-08-05`)
+    const later = await getTestAgent().get(`/api/pledges/${pledgeId}/payoff?date=2026-10-05`)
+    expect(early.status).toBe(200)
+    // Two extra months of interest make the later figure larger.
+    expect(later.body.payoff).toBeGreaterThan(early.body.payoff)
+
+    const redeemed = await getTestAgent().post(`/api/pledges/${pledgeId}/redeem`).send({
+      redeemedDate: '2026-08-05',
+      amountCollected: early.body.payoff,
+      mode: 'cash',
+    })
+    expect(redeemed.status).toBe(200)
+    expect(redeemed.body.status).toBe('redeemed')
+    expect(redeemed.body.redeemedDate).toBe('2026-08-05')
+  })
+
+  it('closes a renewal on the renewal date and keeps collection totals clean', async () => {
+    const customerId = await createPledgeCustomer('Renew Close', '9000000061')
+    const created = await createDraftPledge(customerId, [goldItem('Ring')])
+    const oldId = created.body.id
+    await getTestAgent().post(`/api/pledges/${oldId}/sanction`)
+
+    const renewed = await getTestAgent().post(`/api/pledges/${oldId}/renew`).send({
+      renewDate: '2026-08-31',
+      mode: 'cash',
+      newLoanAmount: 20000,
+    })
+    expect(renewed.status).toBe(201)
+    expect(renewed.body.notes).toMatch(/^Renewed from ADG/)
+    // The new ticket keeps the shop's current rate rather than the old ticket's.
+    expect(renewed.body.interestPct).toBe(2.1)
+
+    const oldTicket = await getTestAgent().get(`/api/pledges/${oldId}`)
+    expect(oldTicket.body.status).toBe('renewed')
+    expect(oldTicket.body.redeemedDate).toBe('2026-08-31')
+
+    const payments = await getTestAgent().get(`/api/pledges/${oldId}/payments`)
+    const transfer = payments.body.find((p: { kind: string }) => p.kind === 'transfer')
+    const interest = payments.body.find((p: { kind: string }) => p.kind === 'renewal')
+    expect(transfer.amount).toBe(20000)
+    // Only the renewal interest counts as collected: the transfer is not money in.
+    expect(oldTicket.body.amountCollected).toBeCloseTo(interest.amount, 2)
+    expect(oldTicket.body.amountCollected).toBeLessThan(transfer.amount)
+  })
+
+  it('blocks a top-up above LTV, lets an admin override it and rejects staff overrides', async () => {
+    const customerId = await createPledgeCustomer('Topup LTV', '9000000062')
+    const created = await createDraftPledge(customerId, [goldItem('Bangle')])
+    const pledgeId = created.body.id
+    await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
+
+    const blocked = await getTestAgent().post(`/api/pledges/${pledgeId}/topup`).send({
+      topupDate: '2026-08-10',
+      amount: 50000,
+    })
+    expect(blocked.status).toBe(400)
+    expect(blocked.body.error).toMatch(/ltv/i)
+
+    const staff = await getTestAgent().post('/api/users').send({
+      username: 'adagu-ltv-staff',
+      password: 'staff123',
+      role: 'staff',
+      features: ['adagu'],
+    })
+    expect(staff.status).toBe(201)
+    await getTestAgent().post('/api/auth/logout')
+    expect(
+      (
+        await getTestAgent()
+          .post('/api/auth/login')
+          .send({ username: 'adagu-ltv-staff', password: 'staff123' })
+      ).status,
+    ).toBe(200)
+    const staffOverride = await getTestAgent().post(`/api/pledges/${pledgeId}/topup`).send({
+      topupDate: '2026-08-10',
+      amount: 50000,
+      allowAboveLtv: true,
+    })
+    expect(staffOverride.status).toBe(403)
+
+    await loginAsAdmin()
+    const override = await getTestAgent().post(`/api/pledges/${pledgeId}/topup`).send({
+      topupDate: '2026-08-10',
+      amount: 50000,
+      allowAboveLtv: true,
+    })
+    expect(override.status).toBe(201)
+    expect(override.body.topups).toHaveLength(1)
+  })
+
+  it('blocks a renewal above LTV and lets an admin override it', async () => {
+    const customerId = await createPledgeCustomer('Renew LTV', '9000000063')
+    const created = await createDraftPledge(customerId, [goldItem('Chain')])
+    const oldId = created.body.id
+    await getTestAgent().post(`/api/pledges/${oldId}/sanction`)
+
+    const blocked = await getTestAgent().post(`/api/pledges/${oldId}/renew`).send({
+      renewDate: '2026-08-31',
+      mode: 'cash',
+      newLoanAmount: 50000,
+    })
+    expect(blocked.status).toBe(400)
+    expect(blocked.body.error).toMatch(/ltv/i)
+
+    const override = await getTestAgent().post(`/api/pledges/${oldId}/renew`).send({
+      renewDate: '2026-08-31',
+      mode: 'cash',
+      newLoanAmount: 50000,
+      allowAboveLtv: true,
+    })
+    expect(override.status).toBe(201)
+    expect(override.body.loanAmount).toBe(50000)
+  })
+
+  it('collects an auction shortfall later without interest growing past the auction', async () => {
+    const customerId = await createPledgeCustomer('Shortfall Later', '9000000064')
+    const created = await getTestAgent().post('/api/pledges').send({
+      customerId,
+      pledgeDate: '2026-06-01',
+      assessedValue: 40000,
+      loanAmount: 20000,
+      interestPct: 2,
+      repaymentDueDate: '2026-07-01',
+      items: [goldItem('Chain')],
+    })
+    const pledgeId = created.body.id
+    await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
+    getDatabase()
+      .prepare('UPDATE pledges SET repayment_due_date = ? WHERE id = ?')
+      .run('2026-07-01', pledgeId)
+    await getTestAgent()
+      .post(`/api/pledges/${pledgeId}/auction-notice`)
+      .send({ noticeDate: '2026-07-15' })
+
+    const auction = await getTestAgent().post(`/api/pledges/${pledgeId}/auction`).send({
+      auctionDate: '2026-07-30',
+      buyerType: 'outside',
+      buyerName: 'Ravi',
+      saleAmount: 10000,
+    })
+    expect(auction.status).toBe(200)
+    expect(auction.body.status).toBe('forfeited')
+
+    const atAuction = await getTestAgent().get(`/api/pledges/${pledgeId}/payoff?date=2026-07-30`)
+    const muchLater = await getTestAgent().get(`/api/pledges/${pledgeId}/payoff?date=2026-10-31`)
+    const remaining = Number(atAuction.body.payoff.toFixed(2))
+    expect(remaining).toBeGreaterThan(0)
+    // Interest is frozen at the auction date, so the shortfall stops growing.
+    expect(muchLater.body.payoff).toBeCloseTo(remaining, 2)
+
+    const tooMuch = await getTestAgent().post(`/api/pledges/${pledgeId}/collect-shortfall`).send({
+      collectedDate: '2026-10-31',
+      amount: remaining + 100,
+      mode: 'cash',
+    })
+    expect(tooMuch.status).toBe(400)
+
+    const collected = await getTestAgent().post(`/api/pledges/${pledgeId}/collect-shortfall`).send({
+      collectedDate: '2026-10-31',
+      amount: remaining,
+      mode: 'cash',
+    })
+    expect(collected.status).toBe(201)
+    expect(collected.body.status).toBe('forfeited')
+
+    const ledger = await ipc<{
+      adaguDues?: Array<{ pledgeId: number; remaining: number }>
+    }>(IPC_CHANNELS.DUES_LIST)
+    const due = ledger.adaguDues?.find((entry) => entry.pledgeId === pledgeId)
+    expect(due?.remaining ?? -1).toBe(0)
+  })
+
+  it('undoes the latest payment for an admin only and reopens a redeemed loan', async () => {
+    const customerId = await createPledgeCustomer('Undo Payment', '9000000065')
+    const created = await createDraftPledge(customerId, [goldItem('Chain')])
+    const pledgeId = created.body.id
+    await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
+    await getTestAgent().post(`/api/pledges/${pledgeId}/collect`).send({
+      collectedDate: '2026-08-31',
+      amount: 400,
+      mode: 'cash',
+    })
+
+    const staff = await getTestAgent().post('/api/users').send({
+      username: 'adagu-undo-staff',
+      password: 'staff123',
+      role: 'staff',
+      features: ['adagu'],
+    })
+    expect(staff.status).toBe(201)
+    await getTestAgent().post('/api/auth/logout')
+    expect(
+      (
+        await getTestAgent()
+          .post('/api/auth/login')
+          .send({ username: 'adagu-undo-staff', password: 'staff123' })
+      ).status,
+    ).toBe(200)
+    const denied = await getTestAgent().delete(`/api/pledges/${pledgeId}/payments/latest`)
+    expect(denied.status).toBe(403)
+
+    await loginAsAdmin()
+    const undone = await getTestAgent().delete(`/api/pledges/${pledgeId}/payments/latest`)
+    expect(undone.status).toBe(200)
+    const afterUndo = await getTestAgent().get(`/api/pledges/${pledgeId}`)
+    expect(afterUndo.body.amountCollected).toBe(0)
+    expect(afterUndo.body.status).toBe('active')
+
+    // A redeem payment can be undone and puts the loan back on the books.
+    const redeemPayoff = await getTestAgent().get(
+      `/api/pledges/${pledgeId}/payoff?date=2026-08-31`,
+    )
+    const redeemed = await getTestAgent().post(`/api/pledges/${pledgeId}/redeem`).send({
+      redeemedDate: '2026-08-31',
+      amountCollected: redeemPayoff.body.payoff,
+      mode: 'cash',
+    })
+    expect(redeemed.body.status).toBe('redeemed')
+    const reopened = await getTestAgent().delete(`/api/pledges/${pledgeId}/payments/latest`)
+    expect(reopened.status).toBe(200)
+    const backOnBooks = await getTestAgent().get(`/api/pledges/${pledgeId}`)
+    expect(backOnBooks.body.status).toBe('active')
+    expect(backOnBooks.body.redeemedDate).toBeNull()
+  })
+
+  it('refuses to undo the structural payment on a renewed loan', async () => {
+    const customerId = await createPledgeCustomer('Undo Renewed', '9000000066')
+    const created = await createDraftPledge(customerId, [goldItem('Ring')])
+    const oldId = created.body.id
+    await getTestAgent().post(`/api/pledges/${oldId}/sanction`)
+    await getTestAgent().post(`/api/pledges/${oldId}/renew`).send({
+      renewDate: '2026-08-31',
+      mode: 'cash',
+      newLoanAmount: 20000,
+    })
+
+    const refused = await getTestAgent().delete(`/api/pledges/${oldId}/payments/latest`)
+    expect(refused.status).toBe(400)
+    const stillRenewed = await getTestAgent().get(`/api/pledges/${oldId}`)
+    expect(stillRenewed.body.status).toBe('renewed')
+  })
+
+  it('shows the live outstanding payoff, including top-ups, on the loan list', async () => {
+    const customerId = await createPledgeCustomer('List Balance', '9000000067')
+    const created = await createDraftPledge(customerId, [goldItem('Chain')])
+    const pledgeId = created.body.id
+    await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
+    await getTestAgent().post(`/api/pledges/${pledgeId}/topup`).send({
+      topupDate: '2026-08-10',
+      amount: 2500,
+    })
+
+    const list = await getTestAgent().get('/api/pledges?status=active&q=List Balance')
+    const row = (
+      list.body.items as Array<{
+        id: number
+        outstanding?: number
+        totalNetWeight?: number
+        itemCount?: number
+      }>
+    ).find((item) => item.id === pledgeId)
+    expect(row?.outstanding).toBeDefined()
+    expect(row?.itemCount).toBe(1)
+    expect(row?.totalNetWeight).toBeCloseTo(9.5, 3)
+    // The extra loan is included in the balance the customer sees.
+    expect(row!.outstanding!).toBeGreaterThan(20000)
+
+    const payoff = await getTestAgent().get(`/api/pledges/${pledgeId}/payoff`)
+    expect(row!.outstanding!).toBeCloseTo(payoff.body.payoff, 2)
+  })
+
+  it('counts a renewed loan once in the customer-wise pledges report', async () => {
+    const customerId = await createPledgeCustomer('Renew Report', '9000000068')
+    const created = await createDraftPledge(customerId, [goldItem('Chain')])
+    const oldId = created.body.id
+    await getTestAgent().post(`/api/pledges/${oldId}/sanction`)
+    const renewed = await getTestAgent().post(`/api/pledges/${oldId}/renew`).send({
+      renewDate: '2026-08-31',
+      mode: 'cash',
+      newLoanAmount: 20000,
+    })
+    expect(renewed.status).toBe(201)
+
+    const report = await getTestAgent().get('/api/reports/customer-wise-pledges')
+    expect(report.status).toBe(200)
+    const row = (report.body.rows as Array<{ customer: string; loan: number }>).find(
+      (entry) => entry.customer === 'Renew Report',
+    )
+    // Old ticket + new ticket would be 40000; the renewed chain counts once.
+    expect(row?.loan).toBe(20000)
   })
 })

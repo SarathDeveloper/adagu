@@ -1,3 +1,4 @@
+import { GOLD_SAVINGS_VISIBLE } from '../src/features/goldSavings/visibility'
 import { expect, test } from './fixtures/web-app'
 import { expectPrintPreviewModal, sidebarLink } from './helpers/nav'
 
@@ -100,7 +101,13 @@ test('printers backup and data settings are available', async ({ window }) => {
 
   await window.getByRole('tab', { name: 'Printers' }).click()
   await expect(window.getByRole('heading', { name: 'Printers' })).toBeVisible()
-  await expect(window.getByText('Adagu receipts and Gold Savings vouchers print from the browser')).toBeVisible()
+  await expect(
+    window.getByText(
+      GOLD_SAVINGS_VISIBLE
+        ? 'Adagu receipts and Gold Savings vouchers print from the browser'
+        : 'Adagu receipts print from the browser',
+    ),
+  ).toBeVisible()
   await expect(window.getByLabel('Adagu receipt paper size')).toContainText('A5')
   await expect(window.getByLabel('Adagu receipt copies')).toContainText('1')
 

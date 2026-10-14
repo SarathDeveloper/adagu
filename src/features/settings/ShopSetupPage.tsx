@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import { localImageSrc } from '../print/mapShopDisplay'
 import { useAuth } from '../auth/authContext'
 import { useShopBranding } from './shopBrandingContext'
+import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 
 export function ShopSetupPage() {
   const { isAdmin, logout } = useAuth()
@@ -105,7 +106,9 @@ export function ShopSetupPage() {
         <div className="auth-brand">
           <h1>Set up your shop</h1>
           <p className="muted">
-            These details print on pledge receipts and gold savings documents. You can change them later in Settings.
+            {GOLD_SAVINGS_VISIBLE
+              ? 'These details print on pledge receipts and gold savings documents. You can change them later in Settings.'
+              : 'These details print on pledge receipts. You can change them later in Settings.'}
           </p>
         </div>
         {loading ? <p className="muted">Loading…</p> : null}

@@ -8,6 +8,7 @@ import {
   GoldSavingsIndexRedirect,
   GoldSavingsLayout,
 } from '../features/goldSavings/GoldSavingsLayout'
+import { GOLD_SAVINGS_VISIBLE } from '../features/goldSavings/visibility'
 import { RouteErrorPage } from '../components/RouteErrorPage'
 import { NotFoundPage } from '../components/NotFoundPage'
 import {
@@ -100,7 +101,11 @@ export const router = createBrowserRouter([
           { path: 'rates', element: <MetalRatesPage /> },
           {
             path: 'gold-savings',
-            element: <GoldSavingsLayout />,
+            element: GOLD_SAVINGS_VISIBLE ? (
+              <GoldSavingsLayout />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            ),
             children: [
               { index: true, element: <GoldSavingsIndexRedirect /> },
               { path: 'dashboard', element: <GoldSavingsDashboardPage /> },

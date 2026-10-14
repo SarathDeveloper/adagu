@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { IndianRupee, Pencil, Plus, Trash2 } from 'lucide-react'
 import type { Customer, DuesLedger, GoldSavingAccount } from '@shared/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
@@ -15,16 +16,19 @@ import { useToast } from '../../components/toastContext'
 import { formatCurrency, formatDisplayDate, paginate, TABLE_PAGE_SIZE } from '../../lib/format'
 import { api } from '../../lib/api'
 import { CollectPaymentModal } from '../goldSavings/collections/CollectPaymentModal'
+import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
 import { buildCustomerProfile } from './customerProfile'
 import { monthRange } from '../../lib/dateRange'
 
 export function CustomersPage() {
   const { showToast } = useToast()
+  const [searchParams] = useSearchParams()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [ledger, setLedger] = useState<DuesLedger>({ columns: [], totalOutstanding: 0 })
-  const [search, setSearch] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const queryFromUrl = searchParams.get('q') ?? ''
+  const [search, setSearch] = useState(queryFromUrl)
+  const [searchQuery, setSearchQuery] = useState(queryFromUrl.trim())
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const hasLoadedRef = useRef(false)
@@ -38,6 +42,10 @@ export function CustomersPage() {
   const [collectAccountId, setCollectAccountId] = useState<number | null>(null)
   const [pickAccounts, setPickAccounts] = useState<GoldSavingAccount[] | null>(null)
   const [printPaymentId, setPrintPaymentId] = useState<number | null>(null)
+
+  useEffect(() => {
+    setSearch(queryFromUrl)
+  }, [queryFromUrl])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchQuery(search.trim()), 300)
@@ -81,6 +89,7 @@ export function CustomersPage() {
   // The scheme accounts power the "Collect scheme" row action. A user without
   // the gold savings feature gets a rejected request, which just hides it.
   useEffect(() => {
+    if (!GOLD_SAVINGS_VISIBLE) return
     let active = true
     void api
       .listGsAccounts()
@@ -180,7 +189,11 @@ export function CustomersPage() {
     <div className="app-page app-page-fill">
       <PageHeader
         title="Customers"
-        subtitle="Customer profiles, Adagu loans and Gold Savings accounts"
+        subtitle={
+          GOLD_SAVINGS_VISIBLE
+            ? 'Customer profiles, Adagu loans and Gold Savings accounts'
+            : 'Customer profiles and Adagu loans'
+        }
         actions={
           <>
             <SearchBar value={search} onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search name or phone..." />
@@ -207,7 +220,11 @@ export function CustomersPage() {
       ) : listedCustomers.length === 0 ? (
         <EmptyState
           title="No customers yet"
-          description="Add someone to start an Adagu loan or Gold Savings scheme."
+          description={
+            GOLD_SAVINGS_VISIBLE
+              ? 'Add someone to start an Adagu loan or Gold Savings scheme.'
+              : 'Add someone to start an Adagu loan.'
+          }
         />
       ) : (
         <DataTable footer={<TablePager page={page} total={listedCustomers.length} onPageChange={setPage} />}>
@@ -249,7 +266,7 @@ export function CustomersPage() {
                     <td>{last ? formatDisplayDate(last) : '—'}</td>
                     <td>
                       <div className="row-actions">
-                        {schemeAccounts.length > 0 ? (
+                        {GOLD_SAVINGS_VISIBLE && schemeAccounts.length > 0 ? (
                           <button
                             type="button"
                             className="btn ghost"
@@ -304,7 +321,7 @@ export function CustomersPage() {
         />
       )}
 
-      {pickAccounts ? (
+      {GOLD_SAVINGS_VISIBLE && pickAccounts ? (
         <Modal title="Collect scheme" onClose={() => setPickAccounts(null)}>
           <p className="muted">
             This customer has more than one scheme account. Choose the account to collect.
@@ -328,7 +345,7 @@ export function CustomersPage() {
         </Modal>
       ) : null}
 
-      {collectAccountId ? (
+      {GOLD_SAVINGS_VISIBLE && collectAccountId ? (
         <CollectPaymentModal
           accountId={collectAccountId}
           onClose={() => setCollectAccountId(null)}
@@ -343,7 +360,7 @@ export function CustomersPage() {
         />
       ) : null}
 
-      {printPaymentId ? (
+      {GOLD_SAVINGS_VISIBLE && printPaymentId ? (
         <PrintPreviewModal
           title="Collection receipt"
           path={`/print/gs-batch-receipt/${printPaymentId}`}
@@ -388,6 +405,7 @@ export function CustomersPage() {
               </ul>
             )}
           </div>
+          {GOLD_SAVINGS_VISIBLE ? (
           <div className="drawer-section">
             <h3>Gold Savings accounts</h3>
             {profileSummary.schemes.length === 0 ? (
@@ -407,6 +425,7 @@ export function CustomersPage() {
               </ul>
             )}
           </div>
+          ) : null}
           <div className="drawer-section">
             <h3>Payment History</h3>
             {profileSummary.payments.length === 0 ? (

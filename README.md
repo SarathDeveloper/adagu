@@ -6,7 +6,7 @@ This edition is intentionally small: there is no cash/tax billing, no invoicing,
 
 ## Modules
 
-- **Dashboard** — Adagu outstanding, active loans, overdue interest, month collections, Gold Savings collections today, maturities due, follow-ups and quick actions
+- **Dashboard** — customer and pledge totals, today's pledges, due soon and overdue, and the attention list
 - **Adagu** — pledge receipts list and the pledge editor (sanction, interest, extra loan, renew, redeem, auction, forfeit)
 - **Gold Savings** — dashboard, schemes, enrollment, accounts, collections, ledger, maturity payout, overdue aging, reports
 - **Dues** — Adagu-linked balances and manual customer dues

@@ -154,6 +154,8 @@ export interface DueEntry {
   kind: DueEntryKind
   amount: number
   note: string
+  /** Payment mode for `payment` rows; `transfer` marks a renewal carry-over. */
+  mode: string | null
   pledgeId: number | null
   pledgeReceiptNo: string | null
   createdAt: string
@@ -203,6 +205,8 @@ export interface AdaguDueSummary {
   pledgeDate: string
   principal: number
   principalOutstanding: number
+  /** Value on which the LTV band is measured (the pledge's assessed value). */
+  assessedValue: number
   interestPct: number
   monthlyInterest: number
   daysActive: number
@@ -492,6 +496,9 @@ export interface Pledge {
   createdAt: string
   items: PledgeItem[]
   itemCount?: number
+  totalNetWeight?: number
+  /** Live payoff for an active loan in the list, including top-ups. */
+  outstanding?: number
   topups: PledgeTopup[]
   payments: PledgePayment[]
   photos: PledgePhoto[]
@@ -512,6 +519,8 @@ export interface PledgeTopupInput {
   topupDate: string
   amount: number
   note?: string
+  /** Admin-only override that lets the top-up push the loan above shop LTV. */
+  allowAboveLtv?: boolean
 }
 
 export interface PledgeInput {
@@ -560,6 +569,8 @@ export interface PledgeRenewInput {
   mode?: PledgePaymentMode
   newLoanAmount?: number
   note?: string
+  /** Admin-only override that lets the renewal push above shop LTV. */
+  allowAboveLtv?: boolean
 }
 
 export type PledgeAuctionBuyerType = 'outside' | 'shop'
@@ -603,6 +614,13 @@ export interface PledgeAuctionInput {
 export interface PledgeAuctionSurplusInput {
   id: number
   surplusPaidDate: string
+  mode?: PledgePaymentMode
+}
+
+export interface PledgeShortfallInput {
+  id: number
+  collectedDate: string
+  amount: number
   mode?: PledgePaymentMode
 }
 
@@ -975,6 +993,45 @@ export interface GoldSavingDashboard {
   recentCollections: GoldSavingPayment[]
   recentEnrollments: GoldSavingAccount[]
   maturingAccounts: GoldSavingAccount[]
+}
+
+/** Due-soon rows stay "active"; only a past repayment date is "overdue". */
+export type DashboardAttentionStatus = 'overdue' | 'active'
+
+export interface DashboardAttentionRow {
+  pledgeId: number
+  receiptNo: string
+  customerId: number
+  customerName: string
+  /** Principal: sanctioned loan plus later top-ups. */
+  amount: number
+  startDate: string
+  dueDate: string
+  status: DashboardAttentionStatus
+}
+
+export interface MainDashboard {
+  totalCustomers: number
+  newCustomersThisWeek: number
+  activePledges: number
+  newActivePledgesThisWeek: number
+  todayPledges: number
+  todayPledgesValue: number
+  dueSoon: number
+  overdue: number
+  attention: DashboardAttentionRow[]
+}
+
+export interface DashboardSearchPledge {
+  id: number
+  receiptNo: string
+  customerName: string
+  status: PledgeStatus
+}
+
+export interface DashboardSearchResult {
+  customers: Customer[]
+  pledges: DashboardSearchPledge[]
 }
 
 export interface GoldSavingReportResult {

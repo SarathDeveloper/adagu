@@ -151,7 +151,7 @@ Sample customer: **Meenakshi S**, mobile **9876543210**.
 
 **Preview** opens the pledge receipt. **PDF** saves a copy. **Back** returns to the list. **Reset** clears a draft you have not sanctioned. **Delete** removes a draft.
 
-The receipt list (**Adagu → Receipts**) filters by **All**, **Draft**, **Active**, **Redeemed**, **Forfeited**, and **Renewed**, and by **Today**, **This month**, or **All**. **Forfeited** is a status you can filter. There is no **Forfeit** button. A loan reaches that state through auction.
+The receipt list (**Adagu → Receipts**) filters by **All**, **Draft**, **Active**, **Redeemed**, **Forfeited**, and **Renewed**, and by **Today**, **This month**, or **All**. **Forfeited** is a status you can filter. There is no **Forfeit** button. A loan reaches that state through auction. Active rows show the **live outstanding payoff** (principal, any extra loans, and interest to date), so the list always matches what the customer would pay today.
 
 To open a loan again, use **Adagu → Receipts** and open that row. That opens the same **Adagu Bill**.
 
@@ -192,20 +192,24 @@ For the sample, one month of interest is Rs. 1,050.
 2. Click **Extra**. The window is **Extra loan · ADG0001**.
 3. Enter the extra amount and click **Add extra**.
 
+The extra amount plus the principal still owed must stay inside the shop's LTV limit. If it is above the limit the window says so; an administrator can tick **Allow above LTV** to go ahead anyway.
+
 ### Renew
 
 1. **View** the loan, or open it from **Receipts**.
 2. Click **Renew**. The window is **Renew loan · ADG0001**.
-3. Click **Renew loan**.
+3. The window shows the **new ticket rate** (the shop's current rate from Settings) and, when it differs, the old ticket's rate.
+4. Click **Renew loan**.
 
-The old receipt becomes **Renewed**. The new receipt is a new `ADG` number. A **Renewal ticket** print opens when the renewal is saved from Dues.
+The old receipt becomes **Renewed** and is closed on the renewal date. The new receipt is a new `ADG` number and charges the shop's current rate. The principal carried across is not counted as money collected. A **Renewal ticket** print opens when the renewal is saved from Dues. As with an extra loan, a renewal above the LTV limit needs **Allow above LTV** (administrators only).
 
 ### Redeem and return the gold
 
 1. **View** the loan.
 2. Click **Redeem**. The window is **Close Adagu loan · ADG0001**.
-3. Click **Full redeem** when the customer is paying everything due. **Record collection** is the partial option in the same window.
-4. After the loan is **Redeemed**, click **Release receipt** to print the gold release.
+3. Change the **close date** if the customer is settling on an earlier day — the payoff follows that date.
+4. Click **Full redeem** when the customer is paying everything due. **Record collection** is the partial option in the same window.
+5. After the loan is **Redeemed**, click **Release receipt** to print the gold release.
 
 ### Auction
 
@@ -217,6 +221,15 @@ The old receipt becomes **Renewed**. The new receipt is a new `ADG` number. A **
 6. Click **Record auction**.
 
 The list filter **Auctioned** shows these loans. **Forfeited** on the Adagu receipt list is the closed status after the gold is no longer with the customer.
+
+Interest stops on the auction date, so a shortfall does not grow. If you left the shortfall open (you did not write it off), a **Collect shortfall** button appears on the forfeited loan in Dues. Record what the customer pays; the loan stays **Forfeited** and the balance clears.
+
+### Undo the last payment (administrator)
+
+1. **View** the loan and scroll to **Payment history**.
+2. Click **Undo last payment** and confirm.
+
+Only the latest payment on an **Active** or **Redeemed** loan can be undone, and only by an administrator. Undoing a redemption puts the loan back on the books. Payments that are part of a renewal, transfer or auction, and payments on a renewed loan, cannot be undone.
 
 ---
 
@@ -319,20 +332,19 @@ The Gold Savings **Dashboard** (**Monthly Gold Savings**) shows collections, ove
 
 ## 9. Dashboard
 
-**Dashboard** greets you by name and shows the day's rates.
+**Dashboard** is the home screen. The search box finds pledges and customers. The bell lists pledges that need attention, and Gold Savings alerts when that module is available.
 
 | Card | Meaning |
 | --- | --- |
-| **Adagu outstanding** | Money still to collect on loans and manual dues |
-| **Active Adagu loans** | Loans that are still open |
-| **Interest overdue** | Loans whose interest is late |
-| **Adagu collected (month)** | Interest and settlements recorded this month |
-| **Gold Savings today** | Scheme money collected today. Shown when the user has Gold Savings |
-| **Maturities due** | Scheme accounts coming up for payout |
+| **Total Customers** | Every customer, with how many were added in the last 7 days |
+| **Active Pledges** | Loans that are still open, with how many were started in the last 7 days |
+| **Today's Pledges** | Pledges dated today, and their loan value |
+| **Due Soon** | Open loans whose repayment date falls in the next 30 days |
+| **Overdue** | Open loans whose repayment date has passed |
 
-**Quick actions:** **New Adagu**, **Collect installment**, **Enroll**, **Customers**, and **Collect Adagu**.
+**New Customer** opens the customer form. **New Pledge** opens a new Adagu loan.
 
-**Adagu follow-ups** and **Due collections** jump into **Dues**. **Gold Savings maturing soon** jumps to **Maturity**.
+**Attention Required (Due Soon & Overdue)** lists those loans. The customer name opens the pledge. Overdue rows are marked **Overdue**; loans still inside the 30-day window are marked **Active**.
 
 ---
 

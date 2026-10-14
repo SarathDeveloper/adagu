@@ -22,22 +22,6 @@ export function monthlyPledgeInterestAmount(
   return roundMoney(principal * (interestPctPerMonth / 100))
 }
 
-/** Principal plus interest from pledge date through pledge date + 365 days. */
-export function totalPayableAfterOneYear(
-  principal: number,
-  interestPctPerMonth: number,
-  pledgeDate: string,
-): number {
-  if (principal <= 0) return 0
-  const interest = computePledgeInterest(
-    principal,
-    interestPctPerMonth,
-    pledgeDate,
-    maxRepaymentDueDate(pledgeDate),
-  )
-  return roundMoney(principal + interest)
-}
-
 export function daysBetween(fromDate: string, toDate: string): number {
   const from = Date.parse(`${fromDate}T12:00:00`)
   const to = Date.parse(`${toDate}T12:00:00`)
@@ -108,25 +92,6 @@ export function nextInterestDueDate(pledgeDate: string, asOfDate: string): strin
   return next.toISOString().slice(0, 10)
 }
 
-export function pledgeAmountDue(
-  principal: number,
-  interestPctPerMonth: number,
-  pledgeDate: string,
-  asOfDate: string,
-  amountCollected: number,
-): {
-  days: number
-  interest: number
-  totalDue: number
-  remaining: number
-} {
-  const days = daysBetween(pledgeDate, asOfDate)
-  const interest = computePledgeInterest(principal, interestPctPerMonth, pledgeDate, asOfDate)
-  const totalDue = roundMoney(principal + interest)
-  const remaining = roundMoney(Math.max(0, totalDue - amountCollected))
-  return { days, interest, totalDue, remaining }
-}
-
 export type PledgeTopupSlice = {
   amount: number
   topupDate: string
@@ -139,52 +104,6 @@ export function totalPrincipalWithTopups(
   topups: Array<{ amount: number }>,
 ): number {
   return roundMoney(baseLoanAmount + topups.reduce((sum, item) => sum + item.amount, 0))
-}
-
-/**
- * Interest on the original principal from pledge date, plus interest on each
- * top-up from the date it was disbursed.
- */
-export function pledgeAmountDueWithTopups(
-  basePrincipal: number,
-  topups: PledgeTopupSlice[],
-  baseInterestPct: number,
-  pledgeDate: string,
-  asOfDate: string,
-  amountCollected: number,
-): {
-  days: number
-  interest: number
-  totalDue: number
-  remaining: number
-  principal: number
-  monthlyInterest: number
-} {
-  const principal = totalPrincipalWithTopups(basePrincipal, topups)
-  const baseInterest = computePledgeInterest(basePrincipal, baseInterestPct, pledgeDate, asOfDate)
-  const extraInterest = topups.reduce(
-    (sum, topup) =>
-      sum + computePledgeInterest(topup.amount, topup.interestPct, topup.topupDate, asOfDate),
-    0,
-  )
-  const interest = roundMoney(baseInterest + extraInterest)
-  const totalDue = roundMoney(principal + interest)
-  const remaining = roundMoney(Math.max(0, totalDue - amountCollected))
-  const monthlyInterest = roundMoney(
-    monthlyPledgeInterestAmount(basePrincipal, baseInterestPct) +
-      topups.reduce(
-        (sum, topup) => sum + monthlyPledgeInterestAmount(topup.amount, topup.interestPct),
-        0,
-      ),
-  )
-  return {
-    days: daysBetween(pledgeDate, asOfDate),
-    interest,
-    totalDue,
-    remaining,
-    principal,
-    monthlyInterest,
-  }
 }
 
 /** True once at least one 30-day interest period has elapsed. */

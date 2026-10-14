@@ -22,6 +22,7 @@ import { useShopBranding } from '../../features/settings/shopBrandingContext'
 import { BackupHealthBanner } from '../../features/settings/BackupHealthBanner'
 import { localImageSrc } from '../../features/print/mapShopDisplay'
 import { LoadingState } from '../../components/LoadingState'
+import { GOLD_SAVINGS_VISIBLE } from '../../features/goldSavings/visibility'
 import { warmPrintPreview } from '../../print/warmPrint'
 
 const APP_VERSION = '1.0.0'
@@ -69,6 +70,7 @@ export function AppLayout() {
   const location = useLocation()
   const logoSrc = logoImagePath ? localImageSrc(logoImagePath, '') : ''
   const visibleLinks = links.filter((link) => {
+    if (!GOLD_SAVINGS_VISIBLE && link.feature === 'gold_savings') return false
     if (link.adminOnly || link.feature === 'users') return isAdmin
     return can(link.feature)
   })

@@ -267,3 +267,19 @@ export function replayPledge(input: {
     allocations,
   }
 }
+
+/**
+ * Principal plus interest from the pledge date through pledge date + 365 days,
+ * using the same period engine as collections. A plain days/30 estimate drifts
+ * from this (365 days bills 12.5 months, not 12.17), so receipts must use it.
+ */
+export function payableAfterOneYear(
+  principal: number,
+  rate: number,
+  pledgeDate: string,
+): number {
+  return replayPledge({
+    base: { amount: principal, rate, date: pledgeDate },
+    asOfDate: addDaysIso(pledgeDate, 365),
+  }).payoff
+}

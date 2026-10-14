@@ -251,7 +251,8 @@ const runners: Record<ReportId, (db: ReturnType<typeof getDatabase>, scope: Scop
       db,
       `SELECT c.name AS customer, COUNT(*) AS pledges,
               SUM(CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) AS active,
-              SUM(p.loan_amount) AS loan, SUM(p.amount_collected) AS collected
+              SUM(CASE WHEN p.status != 'renewed' THEN p.loan_amount ELSE 0 END) AS loan,
+              SUM(p.amount_collected) AS collected
        FROM pledges p
        JOIN customers c ON c.id = p.customer_id
        WHERE p.status != 'draft'${customer}

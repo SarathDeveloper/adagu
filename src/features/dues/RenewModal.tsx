@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { maxLoanForValue } from '@shared/billing/pledgeValuation'
 import { localTodayIso } from '@shared/localDate'
 import type { PledgePaymentMode } from '@shared/types'
 import { DateInput } from '../../components/DateInput'
 import { Modal } from '../../components/Modal'
+import { api } from '../../lib/api'
 import { formatCurrency, formatDisplayDate } from '../../lib/format'
 import { PLEDGE_PAYMENT_MODES } from './pledgePaymentModes'
 
@@ -12,15 +14,21 @@ export type RenewModalSummary = {
   principalOutstanding: number
   interestPaidUpto: string
   remaining: number
+  /** Old ticket's rate, shown so the shop rate change is visible. */
+  interestPct: number
+  /** Gold value the new loan is measured against. */
+  assessedValue: number
 }
 
 export function RenewModal({
   summary,
+  isAdmin,
   busy,
   onClose,
   onSubmit,
 }: {
   summary: RenewModalSummary
+  isAdmin: boolean
   busy?: boolean
   onClose: () => void
   onSubmit: (input: {
@@ -28,14 +36,39 @@ export function RenewModal({
     mode: PledgePaymentMode
     newLoanAmount: number
     note: string
+    allowAboveLtv: boolean
   }) => void
 }) {
   const [renewDate, setRenewDate] = useState(localTodayIso())
   const [newLoanAmount, setNewLoanAmount] = useState(summary.principalOutstanding)
   const [mode, setMode] = useState<PledgePaymentMode>('cash')
   const [note, setNote] = useState('')
+  const [allowAboveLtv, setAllowAboveLtv] = useState(false)
+  const [shopRate, setShopRate] = useState(summary.interestPct)
+  const [ltvPct, setLtvPct] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    void api
+      .getShopSettings()
+      .then((settings) => {
+        if (!active) return
+        setShopRate(settings.adaguInterestPct)
+        setLtvPct(settings.pledgeLtvPct)
+      })
+      .catch(() => {
+        // Falls back to the old ticket's rate; the server still applies LTV.
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const difference = newLoanAmount - summary.principalOutstanding
+  const maxPrincipal = ltvPct > 0 ? maxLoanForValue(summary.assessedValue, ltvPct) : 0
+  const aboveLtv = ltvPct > 0 && newLoanAmount > maxPrincipal + 0.01
+  const blocked = aboveLtv && !(isAdmin && allowAboveLtv)
+  const rateChanged = Math.abs(shopRate - summary.interestPct) >= 0.01
 
   return (
     <Modal
@@ -50,8 +83,10 @@ export function RenewModal({
           <button
             type="button"
             className="btn"
-            disabled={busy || newLoanAmount < 0}
-            onClick={() => onSubmit({ renewDate, mode, newLoanAmount, note })}
+            disabled={busy || newLoanAmount < 0 || blocked}
+            onClick={() =>
+              onSubmit({ renewDate, mode, newLoanAmount, note, allowAboveLtv: isAdmin && allowAboveLtv })
+            }
           >
             {busy ? 'Renewing…' : 'Renew loan'}
           </button>
@@ -79,7 +114,39 @@ export function RenewModal({
           <dt>Total payoff</dt>
           <dd className="num">{formatCurrency(summary.remaining)}</dd>
         </div>
+        <div>
+          <dt>New ticket rate</dt>
+          <dd className="num">{shopRate}% / month (shop rate)</dd>
+        </div>
+        {rateChanged ? (
+          <div>
+            <dt>Old ticket rate</dt>
+            <dd className="num">{summary.interestPct}% / month</dd>
+          </div>
+        ) : null}
+        {ltvPct > 0 ? (
+          <div>
+            <dt>LTV limit ({ltvPct}%)</dt>
+            <dd className="num">{formatCurrency(maxPrincipal)}</dd>
+          </div>
+        ) : null}
       </dl>
+      {aboveLtv ? (
+        <p className="muted" style={{ color: 'var(--danger, #b42318)' }}>
+          The new loan is above the {ltvPct}% LTV limit for gold valued at{' '}
+          {formatCurrency(summary.assessedValue)}.
+        </p>
+      ) : null}
+      {isAdmin && aboveLtv ? (
+        <label className="adagu-banner-check">
+          <input
+            type="checkbox"
+            checked={allowAboveLtv}
+            onChange={(event) => setAllowAboveLtv(event.target.checked)}
+          />
+          Allow above LTV (admin override)
+        </label>
+      ) : null}
       <div className="form-grid">
         <label>
           Renewal date

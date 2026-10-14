@@ -81,7 +81,7 @@ export function AdaguRemindersTab({
                     <span className="muted">{row.customerPhone || '—'}</span>
                   </td>
                   <td className="dues-adagu-receipt">
-                    <Link to={`/billing/adagu/${row.pledgeId}`}>{row.receiptNo}</Link>
+                    <Link to={`/adagu/${row.pledgeId}`}>{row.receiptNo}</Link>
                   </td>
                   <td>
                     <span className={`adagu-reminder-badge adagu-reminder-badge--${info.tone}`}>
@@ -115,7 +115,7 @@ export function AdaguRemindersTab({
                         <Percent size={14} strokeWidth={1.75} aria-hidden />
                         Interest
                       </button>
-                      <Link className="btn ghost" to={`/billing/adagu/${row.pledgeId}`}>
+                      <Link className="btn ghost" to={`/adagu/${row.pledgeId}`}>
                         <ExternalLink size={14} strokeWidth={1.75} aria-hidden />
                         Open
                       </Link>

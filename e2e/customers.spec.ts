@@ -1,3 +1,4 @@
+import { GOLD_SAVINGS_VISIBLE } from '../src/features/goldSavings/visibility'
 import { expect, test } from './fixtures/web-app'
 import { sidebarLink } from './helpers/nav'
 import { seedPledge } from './helpers/seed'
@@ -39,7 +40,11 @@ test('customer profile shows Adagu loan and due history', async ({ window }) => 
   await expect(drawer.getByText('Outstanding')).toBeVisible()
   await expect(drawer.getByText('Active Adagu loans')).toBeVisible()
   await expect(drawer.getByRole('heading', { name: 'Adagu loans' })).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Gold Savings accounts' })).toBeVisible()
+  if (GOLD_SAVINGS_VISIBLE) {
+    await expect(drawer.getByRole('heading', { name: 'Gold Savings accounts' })).toBeVisible()
+  } else {
+    await expect(drawer.getByRole('heading', { name: 'Gold Savings accounts' })).toHaveCount(0)
+  }
   await expect(drawer.getByRole('heading', { name: 'Payment History' })).toBeVisible()
   await expect(drawer.getByRole('heading', { name: 'Due History' })).toBeVisible()
   await expect(drawer.getByRole('heading', { name: 'Adagu loans' }).locator('..').getByText(/ADG/)).toBeVisible()

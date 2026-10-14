@@ -71,6 +71,7 @@ export function getMigrations(): { version: number; sql: string; disableForeignK
     { version: 61, sql: loadMigrationSql('061_due_payment_mode.sql') },
     { version: 62, sql: loadMigrationSql('062_adagu_feature_key.sql') },
     { version: 63, sql: loadMigrationSql('063_gs_payout_redemption.sql'), disableForeignKeys: true },
+    { version: 64, sql: loadMigrationSql('064_pledge_lifecycle_backfill.sql') },
   ]
 }
 

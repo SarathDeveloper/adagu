@@ -37,11 +37,7 @@ export function DashboardAlertsMenu({ alerts }: { alerts: DashboardAlert[] }) {
         onClick={() => setOpen((value) => !value)}
       >
         <Bell size={18} strokeWidth={1.75} />
-        {count > 0 ? (
-          <span className="dashboard-bell-badge" aria-hidden>
-            {count > 9 ? '9+' : count}
-          </span>
-        ) : null}
+        {count > 0 ? <span className="main-dash-bell-dot" aria-hidden /> : null}
       </button>
       {open ? (
         <div className="dashboard-alerts-menu" role="menu" aria-label="Notifications">

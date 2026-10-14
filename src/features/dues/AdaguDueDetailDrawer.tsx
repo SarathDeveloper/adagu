@@ -12,10 +12,12 @@ import {
   MoreVertical,
   Phone,
   Printer,
+  RotateCcw,
   User,
   Zap,
 } from 'lucide-react'
 import type { AdaguDueSummary, DueEntry, Pledge, PledgePayment, PledgeStatus } from '@shared/types'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Drawer } from '../../components/Drawer'
 import { LoadingState } from '../../components/LoadingState'
 import {
@@ -25,6 +27,7 @@ import {
   formatWeight,
 } from '../../lib/format'
 import { api } from '../../lib/api'
+import { useAuth } from '../auth/authContext'
 import { AdaguQuickActions } from './AdaguQuickActions'
 import { pledgePaymentModeLabel } from './pledgePaymentModes'
 import { PledgePhotosStrip } from '../pledges/PledgePhotosStrip'
@@ -90,6 +93,8 @@ export function AdaguDueDetailDrawer({
   onPrintNotice,
   onViewBill,
   onReleaseReceipt,
+  onCollectShortfall,
+  onUndoPayment,
 }: {
   summary: AdaguDueSummary
   payments?: DueEntry[]
@@ -104,13 +109,19 @@ export function AdaguDueDetailDrawer({
   onPrintNotice: () => void
   onViewBill: () => void
   onReleaseReceipt: () => void
+  onCollectShortfall?: () => void
+  onUndoPayment?: () => Promise<void>
 }) {
   const [pledge, setPledge] = useState<Pledge | null>(null)
   const [pledgePayments, setPledgePayments] = useState<PledgePayment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [undoOpen, setUndoOpen] = useState(false)
+  const [undoBusy, setUndoBusy] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
   const moreRef = useRef<HTMLDivElement | null>(null)
+  const { isAdmin } = useAuth()
 
   useEffect(() => {
     let active = true
@@ -138,7 +149,7 @@ export function AdaguDueDetailDrawer({
     return () => {
       active = false
     }
-  }, [summary.pledgeId])
+  }, [summary.pledgeId, reloadToken])
 
   useEffect(() => {
     if (!moreOpen) return
@@ -151,7 +162,11 @@ export function AdaguDueDetailDrawer({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [moreOpen])
 
-  const topups = pledge?.topups ?? summary.topups ?? []
+  // Referentially stable so the history memo below does not rebuild each render.
+  const topups = useMemo(
+    () => pledge?.topups ?? summary.topups ?? [],
+    [pledge?.topups, summary.topups],
+  )
   const items = pledge?.items ?? []
   const settled = summary.status === 'redeemed' || summary.remaining <= 0
   const activeLoan = summary.status === 'active' && summary.remaining > 0
@@ -219,6 +234,32 @@ export function AdaguDueDetailDrawer({
 
   function downloadReceipt() {
     onViewBill()
+  }
+
+  const lastPledgePayment = pledgePayments[pledgePayments.length - 1]
+  const lastPaymentIsStructural =
+    lastPledgePayment != null &&
+    (lastPledgePayment.kind === 'transfer' ||
+      lastPledgePayment.kind === 'renewal' ||
+      lastPledgePayment.kind === 'auction')
+  const canUndo =
+    Boolean(isAdmin && onUndoPayment && lastPledgePayment) &&
+    !lastPaymentIsStructural &&
+    (summary.status === 'active' || summary.status === 'redeemed')
+
+  async function undoLastPayment() {
+    if (!onUndoPayment) return
+    setUndoBusy(true)
+    setError(null)
+    try {
+      await onUndoPayment()
+      setReloadToken((token) => token + 1)
+      setUndoOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to undo the payment')
+    } finally {
+      setUndoBusy(false)
+    }
   }
 
   return (
@@ -346,14 +387,14 @@ export function AdaguDueDetailDrawer({
                         Release receipt
                       </button>
                     ) : null}
-                    <a
+                    <Link
                       role="menuitem"
                       className="adagu-detail-more-item"
-                      href={`/billing/adagu/${summary.pledgeId}`}
+                      to={`/adagu/${summary.pledgeId}`}
                       onClick={() => setMoreOpen(false)}
                     >
                       Open loan editor
-                    </a>
+                    </Link>
                   </div>
                 ) : null}
               </div>
@@ -398,7 +439,7 @@ export function AdaguDueDetailDrawer({
                 {pledge?.renewedFromId ? (
                   <p className="muted">
                     Renewed from{' '}
-                    <Link to={`/billing/adagu/${pledge.renewedFromId}`}>
+                    <Link to={`/adagu/${pledge.renewedFromId}`}>
                       {pledge.renewedFromReceiptNo || `ADG #${pledge.renewedFromId}`}
                     </Link>
                   </p>
@@ -406,7 +447,7 @@ export function AdaguDueDetailDrawer({
                 {pledge?.renewedToId ? (
                   <p className="muted">
                     Renewed to{' '}
-                    <Link to={`/billing/adagu/${pledge.renewedToId}`}>
+                    <Link to={`/adagu/${pledge.renewedToId}`}>
                       {pledge.renewedToReceiptNo || `ADG #${pledge.renewedToId}`}
                     </Link>
                   </p>
@@ -621,6 +662,11 @@ export function AdaguDueDetailDrawer({
                     Collect / Redeem
                   </button>
                 ) : null}
+                {summary.status === 'forfeited' && summary.remaining > 0 && onCollectShortfall ? (
+                  <button type="button" className="btn" disabled={busy} onClick={onCollectShortfall}>
+                    Collect shortfall
+                  </button>
+                ) : null}
               </div>
             </section>
           </div>
@@ -630,6 +676,17 @@ export function AdaguDueDetailDrawer({
               <div className="adagu-detail-card-head">
                 <CheckCircle2 size={16} strokeWidth={1.75} aria-hidden />
                 <h3>Payment History</h3>
+                {canUndo ? (
+                  <button
+                    type="button"
+                    className="btn ghost adagu-detail-undo"
+                    disabled={busy || undoBusy}
+                    onClick={() => setUndoOpen(true)}
+                  >
+                    <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
+                    Undo last payment
+                  </button>
+                ) : null}
               </div>
               {history.length === 0 ? (
                 <p className="muted">No collections recorded yet.</p>
@@ -668,11 +725,27 @@ export function AdaguDueDetailDrawer({
                 onPrintNotice={onPrintNotice}
                 onViewBill={onViewBill}
                 onReleaseReceipt={onReleaseReceipt}
+                onCollectShortfall={onCollectShortfall}
               />
             </section>
           </div>
         </div>
       )}
+      {undoOpen ? (
+        <ConfirmDialog
+          title="Undo last payment"
+          message={
+            lastPledgePayment
+              ? `Remove the ${formatCurrency(lastPledgePayment.amount)} payment dated ${formatDisplayDate(lastPledgePayment.paymentDate)}? The loan and dues are rebuilt without it.`
+              : 'Remove the most recent payment?'
+          }
+          confirmLabel={undoBusy ? 'Undoing…' : 'Undo payment'}
+          danger
+          busy={undoBusy}
+          onCancel={() => setUndoOpen(false)}
+          onConfirm={() => void undoLastPayment()}
+        />
+      ) : null}
     </Drawer>
   )
 }

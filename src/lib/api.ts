@@ -8,6 +8,8 @@ import type {
   CreateUserInput,
   Customer,
   CustomerInput,
+  DashboardSearchResult,
+  MainDashboard,
   DueEntry,
   DueEntryInput,
   DueEntryUpdateInput,
@@ -33,6 +35,7 @@ import type {
   PledgeRedeemInput,
   PledgeReminderEntry,
   PledgeRenewInput,
+  PledgeShortfallInput,
   PledgeTopup,
   PledgeTopupInput,
   PledgeUpdateInput,
@@ -144,6 +147,10 @@ export const api = {
     request<User>(`/api/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify(input) }),
   deleteUser: (id: number) => request<void>(`/api/users/${id}`, { method: 'DELETE' }),
 
+  getDashboard: () => request<MainDashboard>('/api/dashboard'),
+  searchDashboard: (q: string) =>
+    request<DashboardSearchResult>(`/api/dashboard/search${qs({ q })}`),
+
   listCustomers: (search?: string) => request<Customer[]>(`/api/customers${qs({ q: search })}`),
   getCustomer: (id: number) => request<Customer>(`/api/customers/${id}`),
   createCustomer: (input: CustomerInput) =>
@@ -218,6 +225,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  collectPledgeShortfall: (input: PledgeShortfallInput) =>
+    request<Pledge>(`/api/pledges/${input.id}/collect-shortfall`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  undoLatestPledgePayment: (id: number) =>
+    request<Pledge>(`/api/pledges/${id}/payments/latest`, { method: 'DELETE' }),
   getPledgeAuction: (id: number) => request<PledgeAuction | null>(`/api/pledges/${id}/auction`),
   sendPledgeAuctionNotice: (input: PledgeAuctionNoticeInput) =>
     request<PledgeAuction>(`/api/pledges/${input.id}/auction-notice`, {

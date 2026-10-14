@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ExternalLink, FileText, Gavel, Handshake, Megaphone, Percent, Plus, RotateCcw } from 'lucide-react'
+import { ExternalLink, FileText, Gavel, Handshake, Megaphone, Percent, Plus, RotateCcw, Scale } from 'lucide-react'
 import type { AdaguDueSummary } from '@shared/types'
 
 export function AdaguQuickActions({
@@ -15,6 +15,7 @@ export function AdaguQuickActions({
   onPrintNotice,
   onViewBill,
   onReleaseReceipt,
+  onCollectShortfall,
 }: {
   summary: AdaguDueSummary
   disabled?: boolean
@@ -28,16 +29,18 @@ export function AdaguQuickActions({
   onPrintNotice?: () => void
   onViewBill?: () => void
   onReleaseReceipt?: () => void
+  onCollectShortfall?: () => void
 }) {
   const active = summary.status === 'active'
   const hasBalance = summary.remaining > 0
   const redeemed = summary.status === 'redeemed'
+  const forfeited = summary.status === 'forfeited'
   const panel = Boolean(stacked)
 
   return (
     <div className={panel ? 'adagu-detail-actions' : 'row-actions'}>
       <Link
-        to={`/billing/adagu/${summary.pledgeId}`}
+        to={`/adagu/${summary.pledgeId}`}
         className={panel ? 'btn adagu-detail-action-primary' : 'btn ghost'}
       >
         {panel ? <ExternalLink size={16} strokeWidth={1.75} aria-hidden /> : null}
@@ -56,6 +59,17 @@ export function AdaguQuickActions({
         >
           {panel ? <FileText size={16} strokeWidth={1.75} aria-hidden /> : null}
           {panel ? 'Release Receipt' : 'Release receipt'}
+        </button>
+      ) : null}
+      {forfeited && hasBalance && onCollectShortfall ? (
+        <button
+          type="button"
+          className={panel ? 'btn secondary' : 'btn ghost'}
+          disabled={disabled}
+          onClick={onCollectShortfall}
+        >
+          {panel ? <Scale size={16} strokeWidth={1.75} aria-hidden /> : null}
+          {panel ? 'Collect shortfall' : 'Shortfall'}
         </button>
       ) : null}
       {active && hasBalance ? (

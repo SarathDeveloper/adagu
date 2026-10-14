@@ -10,13 +10,11 @@ import {
   nextInterestDueDate,
   parseAdgSeq,
   suggestedLoanAmount,
-  pledgeAmountDue,
   monthlyPledgeInterestAmount,
-  totalPayableAfterOneYear,
   totalPrincipalWithTopups,
-  pledgeAmountDueWithTopups,
   isInterestPeriodDue,
 } from '../../shared/billing/pledgeMath'
+import { payableAfterOneYear } from '../../shared/billing/pledgeLedger'
 
 describe('pledgeMath', () => {
   it('computes simple interest and suggested loan', () => {
@@ -24,10 +22,6 @@ describe('pledgeMath', () => {
     expect(computePledgeInterest(20000, 1.5, '2026-08-01', '2026-08-31')).toBe(300)
     expect(suggestedLoanAmount(40000, 75)).toBe(30000)
     expect(nextInterestDueDate('2026-08-01', '2026-08-15')).toBe('2026-08-31')
-    const due = pledgeAmountDue(20000, 1.5, '2026-08-01', '2026-08-31', 5000)
-    expect(due.interest).toBe(300)
-    expect(due.totalDue).toBe(20300)
-    expect(due.remaining).toBe(15300)
   })
 
   it('computes net paid and default repayment due', () => {
@@ -38,25 +32,19 @@ describe('pledgeMath', () => {
 
   it('computes monthly and one-year summary amounts', () => {
     expect(monthlyPledgeInterestAmount(100000, 2.1)).toBe(2100)
-    expect(totalPayableAfterOneYear(100000, 2.1, '2026-09-26')).toBe(125550)
+  })
+
+  it('prices one year with the period engine, not days divided by 30', () => {
+    // 365 days bills 12.5 months (12 full months plus a 5-day part-month), so
+    // this is 50000 + 50000 * 2% * 12.5, not 50000 * 2% * 365/30.
+    expect(payableAfterOneYear(50000, 2, '2026-01-01')).toBe(62500)
+    expect(payableAfterOneYear(100000, 2.1, '2026-09-26')).toBe(126250)
   })
 
   it('adds top-up principal and interest from the top-up date only', () => {
     expect(totalPrincipalWithTopups(10000, [{ amount: 2500 }])).toBe(12500)
     expect(isInterestPeriodDue('2026-08-01', '2026-08-30')).toBe(false)
     expect(isInterestPeriodDue('2026-08-01', '2026-08-31')).toBe(true)
-    const due = pledgeAmountDueWithTopups(
-      10000,
-      [{ amount: 5000, topupDate: '2026-08-31', interestPct: 2 }],
-      2,
-      '2026-08-01',
-      '2026-08-31',
-      0,
-    )
-    expect(due.principal).toBe(15000)
-    expect(due.interest).toBe(200)
-    expect(due.monthlyInterest).toBe(300)
-    expect(due.totalDue).toBe(15200)
   })
 
   it('formats ADG receipt numbers and clamps due dates', () => {

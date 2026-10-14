@@ -84,28 +84,24 @@ The sidebar hides features a user lacks, and visiting a denied route redirects t
 
 ## 3. Dashboard
 
-A counter summary built from the dues ledger, today's metal rates, and the Gold Savings dashboard API.
+A counter summary from `GET /api/dashboard`. Due Soon and Overdue use each pledge's repayment due date.
 
 ### KPIs
 
 | Metric | Description |
 |--------|-------------|
-| **Adagu outstanding** | Total remaining across Adagu-linked and manual dues (links to Dues) |
-| **Active Adagu loans** | Count of active pledges, with the interest-bearing principal as a hint (links to Adagu) |
-| **Interest overdue** | Count of pledges with overdue interest; red when non-zero (links to Dues) |
-| **Adagu collected (month)** | Interest and settlement collections recorded this calendar month |
-| **Gold Savings today** | Collections recorded today, with total accumulated gold as a hint (Gold Savings users only) |
-| **Maturities due** | Upcoming maturities, with overdue installment count as a hint (Gold Savings users only) |
+| **Total Customers** | Every customer, plus how many were added in the last 7 days |
+| **Active Pledges** | Pledges with status `active`, plus how many of those are dated in the last 7 days |
+| **Today's Pledges** | Non-draft pledges dated today, and the sum of their loan amounts |
+| **Due Soon** | Active pledges whose repayment date is today through the next 30 days |
+| **Overdue** | Active pledges whose repayment date is before today |
 
 ### Panels and tools
 
-- Rate tickers for Gold (22K / 24K toggle) and Silver from the latest rates
-- Alerts menu built from overdue interest, backup health and Gold Savings maturities
-- **Adagu follow-ups** table (receipt, customer, interest due, remaining, days)
-- **Due collections** table (customer, amount, days overdue, collect link)
-- **Gold Savings maturing soon** table, when there are maturities
-- Quick actions: New Adagu, Collect installment, Enroll, Customers, Collect Adagu
-- Refresh control
+- Search for customers (name or phone) and pledges (receipt or customer name)
+- Bell for overdue pledges, pledges due within 30 days, and Gold Savings alerts when that module is available
+- **New Customer** opens the customer form. **New Pledge** opens a new Adagu loan
+- **Attention Required (Due Soon & Overdue)** lists those pledges: customer, principal (loan plus top-ups), start date, due date, and an Overdue or Active pill. Overdue rows come first
 
 ---
 
@@ -133,17 +129,18 @@ Pledge loans. A pledge carries the borrower, one or more jewellery items, the as
 - **Draft** — save, edit, or delete a draft.
 - **Sanction** — generates the ADG receipt and a printable pledge receipt; the loan is locked against editing.
 - **Interest collections** — the monthly interest is computed by the pledge ledger. Part-months follow the period engine: the first 30 days (or any part of the first month) cost a full month, 1–15 days of a later month cost half, 16–29 days cost a full month.
-- **Extra loan (top-up)** — increases principal as its own tranche, so it charges its own minimum month from the top-up date.
-- **Renew** — closes the ticket and opens a fresh ADG ticket carrying the outstanding principal.
-- **Redeem / full redeem** — collects the payoff, closes the loan, and prints a gold release receipt.
+- **Extra loan (top-up)** — increases principal as its own tranche, so it charges its own minimum month from the top-up date. The principal outstanding on the top-up date plus the new amount must stay inside the shop's LTV band, unless an admin ticks **Allow above LTV**.
+- **Renew** — closes the ticket on the renewal date and opens a fresh ADG ticket carrying the outstanding principal. The old ticket records `redeemed_date` and a default note `Renewed from <receipt>`; it shows the shop's **current** rate, and the Renew window compares it with the old ticket's rate. The principal it carries over is a `transfer`, so it is never counted as money collected. A renewal that grows the loan is checked against LTV like a top-up, with the same admin override.
+- **Redeem / full redeem** — collects the payoff for the chosen close date (the window refetches the payoff whenever the date changes), closes the loan, and prints a gold release receipt.
 - **Discounts and payment modes** — a discount is applied to interest first; collections record cash/UPI/card/bank modes.
 - **Forfeit** — marks the loan forfeited without any stock posting.
-- **Auction** — send an auction notice, then record the auction on or after the notice date. The buyer is either an outside buyer or the shop. **Neither path posts to stock.**
+- **Auction** — send an auction notice, then record the auction on or after the notice date. The buyer is either an outside buyer or the shop. **Neither path posts to stock.** Interest stops accruing on the auction date, and a shortfall can be written off or **collected later** from the forfeited loan ("Collect shortfall"); the shortfall never grows after the auction.
+- **Undo last payment** — an admin can remove the latest payment on an active or redeemed loan from the Dues drawer. Undoing a redemption reopens the loan; structural payments (transfer, renewal, auction) and renewed loans are blocked.
 - **Reminders** — an overdue list with a WhatsApp reminder opener using the configured message template.
 
 ### Dues integration
 
-Each pledge keeps a single `due` row in `customer_dues` holding principal + interest − discounts, and every collection writes a `payment` row, so the customer balance is always `due − payments`. Renewals and closures keep both tickets visible in the dues list.
+Each pledge keeps a single `due` row in `customer_dues` holding principal + interest − discounts, and every collection writes a `payment` row, so the customer balance is always `due − payments`. Renewals and closures keep both tickets visible in the dues list. The Adagu loan list shows each active loan's live outstanding payoff (principal, top-ups and interest to date), and the customer-wise report counts a renewed chain once.
 
 ### POS settings (Settings → Adagu Settings)
 

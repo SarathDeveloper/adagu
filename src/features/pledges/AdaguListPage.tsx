@@ -1,38 +1,76 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Calendar, Eye, Pencil, Plus, Printer, Search } from 'lucide-react'
 import { localTodayIso } from '@shared/localDate'
-import type { Pledge } from '@shared/types'
+import type { Pledge, PledgeStatus } from '@shared/types'
 import { DataTable, TablePager } from '../../components/DataTable'
 import { DateInput } from '../../components/DateInput'
+import { EmptyState } from '../../components/EmptyState'
 import { FilterBar } from '../../components/FilterBar'
 import { LoadingState } from '../../components/LoadingState'
-import { StatusBadge, type StatusKind } from '../../components/StatusBadge'
-import { formatCurrency, formatDisplayDate } from '../../lib/format'
+import { formatCurrency, formatDisplayDate, formatWeight } from '../../lib/format'
 import { monthRange } from '../../lib/dateRange'
 import { api } from '../../lib/api'
 import { PledgePreviewModal } from './PledgePreviewModal'
 
 const PAGE_SIZE_OPTIONS = [5, 10, 25]
 const DEFAULT_PAGE_SIZE = 10
+const DAY_MS = 24 * 60 * 60 * 1000
 
 type PledgeStatusChip = 'all' | 'draft' | 'active' | 'redeemed' | 'forfeited' | 'renewed'
 type Period = 'today' | 'month' | 'all'
+type DueTone = 'ok' | 'soon' | 'overdue'
 
-function statusOf(pledge: Pledge): { kind: StatusKind; label: string } {
-  if (pledge.status === 'redeemed') return { kind: 'paid', label: 'Redeemed' }
-  if (pledge.status === 'renewed') return { kind: 'paid', label: 'Renewed' }
-  if (pledge.status === 'forfeited') return { kind: 'draft', label: 'Forfeited' }
-  if (pledge.status === 'draft') return { kind: 'draft', label: 'Draft' }
-  return { kind: 'due', label: 'Active' }
+function statusOf(pledge: Pledge): { tone: PledgeStatus; label: string } {
+  if (pledge.status === 'redeemed') return { tone: 'redeemed', label: 'Redeemed' }
+  if (pledge.status === 'renewed') return { tone: 'renewed', label: 'Renewed' }
+  if (pledge.status === 'forfeited') return { tone: 'forfeited', label: 'Forfeited' }
+  if (pledge.status === 'draft') return { tone: 'draft', label: 'Draft' }
+  return { tone: 'active', label: 'Active' }
 }
 
 function itemCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'item' : 'items'}`
 }
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '—'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase()
+}
+
+function parseIsoDayMs(iso: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim().slice(0, 10))
+  if (!match) return null
+  return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+}
+
+function dueInfo(pledge: Pledge, todayIso: string): { label: string; tone: DueTone } | null {
+  if (pledge.status !== 'active' || !pledge.repaymentDueDate) return null
+  const dueMs = parseIsoDayMs(pledge.repaymentDueDate)
+  const todayMs = parseIsoDayMs(todayIso)
+  if (dueMs === null || todayMs === null) return null
+  const diffDays = Math.round((dueMs - todayMs) / DAY_MS)
+  if (diffDays < 0) {
+    const days = Math.abs(diffDays)
+    return { label: `Overdue ${days} ${days === 1 ? 'day' : 'days'}`, tone: 'overdue' }
+  }
+  if (diffDays === 0) return { label: 'Due today', tone: 'soon' }
+  if (diffDays <= 7) {
+    return { label: `in ${diffDays} ${diffDays === 1 ? 'day' : 'days'}`, tone: 'soon' }
+  }
+  return { label: `in ${diffDays} days`, tone: 'ok' }
+}
+
+function totalNetWeightOf(pledge: Pledge): number {
+  if (typeof pledge.totalNetWeight === 'number') return pledge.totalNetWeight
+  return (pledge.items ?? []).reduce((sum, item) => sum + (item.netWeight ?? 0), 0)
+}
+
 export function AdaguListPage() {
   const today = localTodayIso()
+  const navigate = useNavigate()
 
   const [pledges, setPledges] = useState<Pledge[]>([])
   const [totalRows, setTotalRows] = useState(0)
@@ -109,7 +147,7 @@ export function AdaguListPage() {
   }
 
   return (
-    <div className="app-page billing-page app-page-fill">
+    <div className="app-page billing-page adagu-list app-page-fill">
       <header className="page-header app-page-header billing-page-header">
         <div>
           <h1>Adagu</h1>
@@ -206,92 +244,171 @@ export function AdaguListPage() {
             )
           }
         >
-          <table>
-            <thead>
-              <tr>
-                <th>Receipt No.</th>
-                <th>
-                  <button
-                    type="button"
-                    className="billing-sort"
-                    onClick={() => setDateSort((value) => (value === 'desc' ? 'asc' : 'desc'))}
-                  >
-                    Date
-                    <span aria-hidden>{dateSort === 'desc' ? ' ↓' : ' ↑'}</span>
-                  </button>
-                </th>
-                <th>Customer</th>
-                <th>Items</th>
-                <th className="num">Loan Amount</th>
-                <th className="num">Balance</th>
-                <th>Status</th>
-                <th className="num">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pledges.length === 0 ? (
+          {pledges.length === 0 ? (
+            <EmptyState
+              title="No Adagu receipts found"
+              description="Create your first Adagu receipt to record a pledge and loan."
+              action={
+                <Link to="/adagu/new" className="btn">
+                  <Plus size={16} strokeWidth={1.75} aria-hidden />
+                  New Adagu
+                </Link>
+              }
+            />
+          ) : (
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={8} className="empty-cell">
-                    No Adagu receipts found. Create your first one to get started.
-                  </td>
+                  <th>
+                    <button
+                      type="button"
+                      className="billing-sort"
+                      onClick={() => setDateSort((value) => (value === 'desc' ? 'asc' : 'desc'))}
+                    >
+                      Receipt / Date
+                      <span aria-hidden>{dateSort === 'desc' ? ' ↓' : ' ↑'}</span>
+                    </button>
+                  </th>
+                  <th>Customer</th>
+                  <th className="adagu-col-gold">Pledged gold</th>
+                  <th className="num">Loan</th>
+                  <th className="num">Balance</th>
+                  <th className="adagu-col-due">Due date</th>
+                  <th>Status</th>
+                  <th className="num">Actions</th>
                 </tr>
-              ) : null}
-              {pledges.map((pledge) => {
-                const status = statusOf(pledge)
-                const viewPath = `/adagu/${pledge.id}`
-                const editable = pledge.status === 'active' || pledge.status === 'draft'
-                return (
-                  <tr key={pledge.id}>
-                    <td>
-                      <Link to={viewPath} className="billing-bill-no">
-                        {pledge.receiptNo}
-                      </Link>
-                    </td>
-                    <td>{formatDisplayDate(pledge.pledgeDate)}</td>
-                    <td>
-                      <span className="billing-customer-name">{pledge.customerName}</span>
-                      {pledge.customerPhone ? (
-                        <span className="cell-hint">{pledge.customerPhone}</span>
-                      ) : null}
-                    </td>
-                    <td>{itemCountLabel(pledge.itemCount ?? pledge.items?.length ?? 0)}</td>
-                    <td className="num">{formatCurrency(pledge.loanAmount)}</td>
-                    <td className="num">
-                      {pledge.status === 'active' ? formatCurrency(pledge.loanAmount) : '-'}
-                    </td>
-                    <td>
-                      <StatusBadge kind={status.kind} label={status.label} />
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <Link
-                          to={viewPath}
-                          className="btn ghost billing-icon-btn"
-                          aria-label={`Open ${pledge.receiptNo}`}
-                        >
-                          {editable ? (
-                            <Pencil size={16} strokeWidth={1.75} />
+              </thead>
+              <tbody>
+                {pledges.map((pledge) => {
+                  const status = statusOf(pledge)
+                  const viewPath = `/adagu/${pledge.id}`
+                  const editable = pledge.status === 'active' || pledge.status === 'draft'
+                  const due = dueInfo(pledge, today)
+                  const isOverdue = due?.tone === 'overdue'
+                  const itemCount = pledge.itemCount ?? pledge.items?.length ?? 0
+                  const netWeight = totalNetWeightOf(pledge)
+
+                  return (
+                    <tr
+                      key={pledge.id}
+                      className={`adagu-list-row${isOverdue ? ' adagu-list-row--overdue' : ''}`}
+                      tabIndex={0}
+                      onClick={() => navigate(viewPath)}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          navigate(viewPath)
+                        }
+                      }}
+                    >
+                      <td>
+                        <div className="adagu-cell-stack">
+                          <Link
+                            to={viewPath}
+                            className="billing-bill-no"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {pledge.receiptNo}
+                          </Link>
+                          <span className="cell-hint">{formatDisplayDate(pledge.pledgeDate)}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="adagu-customer-cell">
+                          <span className="adagu-customer-avatar" aria-hidden>
+                            {initialsOf(pledge.customerName)}
+                          </span>
+                          <div className="adagu-cell-stack">
+                            <span className="billing-customer-name">{pledge.customerName}</span>
+                            <span className="cell-hint">{pledge.customerPhone || '—'}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="adagu-col-gold adagu-tabular">
+                        <div className="adagu-cell-stack">
+                          <span className="adagu-cell-primary">
+                            {netWeight > 0 ? formatWeight(netWeight, 3) : '—'}
+                          </span>
+                          <span className="cell-hint">{itemCountLabel(itemCount)}</span>
+                        </div>
+                      </td>
+                      <td className="num adagu-tabular">
+                        <div className="adagu-cell-stack adagu-cell-stack--end">
+                          <span className="adagu-cell-primary">
+                            {formatCurrency(pledge.loanAmount)}
+                          </span>
+                          <span className="cell-hint">{pledge.interestPct}% / month</span>
+                        </div>
+                      </td>
+                      <td className="num adagu-tabular">
+                        <div className="adagu-cell-stack adagu-cell-stack--end">
+                          {pledge.status === 'active' ? (
+                            <span className="adagu-cell-primary adagu-balance-active">
+                              {formatCurrency(pledge.outstanding ?? pledge.loanAmount)}
+                            </span>
+                          ) : pledge.redeemedDate ? (
+                            <span className="cell-hint">
+                              Closed {formatDisplayDate(pledge.redeemedDate)}
+                            </span>
                           ) : (
-                            <Eye size={16} strokeWidth={1.75} />
+                            <span className="muted">-</span>
                           )}
-                        </Link>
-                        <button
-                          type="button"
-                          className="btn ghost billing-icon-btn"
-                          aria-label={`Print ${pledge.receiptNo}`}
-                          onClick={() =>
-                            setPreviewPledge({ id: pledge.id, receiptNo: pledge.receiptNo })
-                          }
-                        >
-                          <Printer size={16} strokeWidth={1.75} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                        </div>
+                      </td>
+                      <td className="adagu-col-due">
+                        {pledge.status === 'active' && pledge.repaymentDueDate ? (
+                          <div className="adagu-cell-stack">
+                            <span className="adagu-cell-primary">
+                              {formatDisplayDate(pledge.repaymentDueDate)}
+                            </span>
+                            {due ? (
+                              <span className={`cell-hint adagu-due-hint adagu-due-hint--${due.tone}`}>
+                                {due.label}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="muted">-</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`adagu-status adagu-status--${status.tone}`}>
+                          <span className="adagu-status-dot" aria-hidden />
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="num" onClick={(event) => event.stopPropagation()}>
+                        <div className="row-actions">
+                          <Link
+                            to={viewPath}
+                            className="btn ghost billing-icon-btn"
+                            aria-label={`Open ${pledge.receiptNo}`}
+                          >
+                            {editable ? (
+                              <Pencil size={16} strokeWidth={1.75} />
+                            ) : (
+                              <Eye size={16} strokeWidth={1.75} />
+                            )}
+                          </Link>
+                          <button
+                            type="button"
+                            className="btn ghost billing-icon-btn"
+                            aria-label={`Print ${pledge.receiptNo}`}
+                            onClick={() =>
+                              setPreviewPledge({ id: pledge.id, receiptNo: pledge.receiptNo })
+                            }
+                          >
+                            <Printer size={16} strokeWidth={1.75} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </DataTable>
       )}
 

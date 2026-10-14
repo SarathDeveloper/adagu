@@ -11,11 +11,13 @@ import { daysBetween } from '@shared/billing/pledgeMath'
 import { HttpError } from '../lib/http'
 import { syncDueEntryForPledge } from '../dues/pledgeSync'
 import {
+  capLedgerDate,
   loadPledgeCore,
   loadPledgePayments,
   loadPledgeTranches,
   mapPledgePayment,
   pledgeAsOfDate,
+  pledgeLedgerCap,
   replayForPledge,
   toLedgerPayments,
   type PledgeLedgerCore,
@@ -34,14 +36,18 @@ export type RecordPledgePaymentInput = {
   note?: string
   /** Close the loan automatically once the principal reaches zero. */
   closeWhenSettled?: boolean
+  /** Allow recording on a forfeited (auctioned) pledge, e.g. auction shortfall. */
+  allowForfeited?: boolean
 }
 
 export function requireActivePledge(
   db: Database.Database,
   pledgeId: number,
+  allowForfeited = false,
 ): PledgeLedgerCore {
   const pledge = loadPledgeCore(db, pledgeId)
   if (!pledge) throw new HttpError(404, 'Pledge not found')
+  if (pledge.status === 'forfeited' && allowForfeited) return pledge
   if (pledge.status !== 'active') {
     throw new HttpError(400, 'Only active Adagu pledges can receive payments')
   }
@@ -85,8 +91,13 @@ export function computePledgePayoff(
 }
 
 function syncPledgeCollected(db: Database.Database, pledgeId: number): number {
+  // A renewal moves principal to the new ticket as a `transfer` row. That is
+  // bookkeeping, not money collected, so it stays out of the running total.
   const row = db
-    .prepare('SELECT COALESCE(SUM(amount), 0) AS n FROM pledge_payments WHERE pledge_id = ?')
+    .prepare(
+      `SELECT COALESCE(SUM(amount), 0) AS n FROM pledge_payments
+       WHERE pledge_id = ? AND mode != 'transfer'`,
+    )
     .get(pledgeId) as { n: number }
   const collected = roundMoney(row.n)
   db.prepare('UPDATE pledges SET amount_collected = ? WHERE id = ?').run(collected, pledgeId)
@@ -102,7 +113,7 @@ export function recordPledgePayment(
   db: Database.Database,
   input: RecordPledgePaymentInput,
 ): PledgePayment {
-  const pledge = requireActivePledge(db, input.pledgeId)
+  const pledge = requireActivePledge(db, input.pledgeId, input.allowForfeited)
 
   if (input.date < pledge.pledge_date) {
     throw new HttpError(400, 'Payment date cannot be before the pledge date')
@@ -115,14 +126,23 @@ export function recordPledgePayment(
     throw new HttpError(400, 'Payment date cannot be before the last payment')
   }
 
+  // A forfeited loan freezes at its auction date: interest must not grow while
+  // a shortfall sits uncollected, so the replay dates are clamped there.
+  const cap = pledgeLedgerCap(pledge)
+  const replayDate = capLedgerDate(input.date, cap)
+  const ledgerPayments = toLedgerPayments(existing).map((payment) => ({
+    ...payment,
+    date: capLedgerDate(payment.date, cap),
+  }))
+
   const amount = roundMoney(Math.max(0, input.amount))
   const discount = roundMoney(Math.max(0, input.discount ?? 0))
 
   const before = replayPledge({
     base,
     topups,
-    payments: toLedgerPayments(existing),
-    asOfDate: input.date,
+    payments: ledgerPayments,
+    asOfDate: replayDate,
   })
   if (amount + discount > before.payoff + EPSILON) {
     throw new HttpError(
@@ -134,8 +154,8 @@ export function recordPledgePayment(
   const after = replayPledge({
     base,
     topups,
-    payments: [...toLedgerPayments(existing), { date: input.date, amount, discount }],
-    asOfDate: input.date,
+    payments: [...ledgerPayments, { date: replayDate, amount, discount }],
+    asOfDate: replayDate,
   })
   const allocation = after.allocations[after.allocations.length - 1]
   const note = input.note ?? ''
@@ -167,7 +187,9 @@ export function recordPledgePayment(
 
   const collected = syncPledgeCollected(db, pledge.id)
 
-  const closeWhenSettled = input.closeWhenSettled ?? true
+  // A forfeited loan keeps its status: collecting the shortfall settles the
+  // books but must not reopen or redeem the loan.
+  const closeWhenSettled = (input.closeWhenSettled ?? true) && pledge.status === 'active'
   if (closeWhenSettled && after.principalOutstanding <= EPSILON && after.overpayment <= EPSILON) {
     db.prepare(
       `UPDATE pledges SET status = 'redeemed', redeemed_date = ?, amount_collected = ? WHERE id = ?`,
@@ -199,11 +221,22 @@ export function deleteLatestPledgePayment(
   pledgePaymentId: number,
 ): number {
   const row = db
-    .prepare('SELECT id, pledge_id, payment_date FROM pledge_payments WHERE id = ?')
+    .prepare('SELECT id, pledge_id, payment_date, kind FROM pledge_payments WHERE id = ?')
     .get(pledgePaymentId) as
-    | { id: number; pledge_id: number; payment_date: string }
+    | { id: number; pledge_id: number; payment_date: string; kind: string }
     | undefined
   if (!row) throw new HttpError(404, 'Payment not found')
+
+  const pledge = loadPledgeCore(db, row.pledge_id)
+  if (!pledge) throw new HttpError(404, 'Pledge not found')
+  // Renewals and auctions are structural: undoing them would leave the linked
+  // tickets and the auction record inconsistent.
+  if (pledge.status !== 'active' && pledge.status !== 'redeemed') {
+    throw new HttpError(400, 'Only an active or redeemed loan can undo a payment')
+  }
+  if (row.kind === 'transfer' || row.kind === 'renewal' || row.kind === 'auction') {
+    throw new HttpError(400, 'Renewal, transfer and auction payments cannot be undone')
+  }
 
   const latest = db
     .prepare(

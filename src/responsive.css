@@ -471,12 +471,23 @@
 
   /* --- Dashboard -------------------------------------------------------- */
 
-  .dashboard-quick-actions {
+  .main-dash-topbar,
+  .main-dash-header,
+  .main-dash-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .main-dash-search {
+    max-width: none;
+  }
+
+  .main-dash-kpis {
     grid-template-columns: 1fr;
   }
 
-  .dashboard-profile-name {
-    display: none;
+  .dashboard-quick-actions {
+    grid-template-columns: 1fr;
   }
 
   /* --- Products --------------------------------------------------------- */
@@ -488,6 +499,11 @@
   .products-page table th:nth-child(3),
   .products-page table td:nth-child(3) {
     min-width: 8rem;
+  }
+
+  .adagu-list .adagu-col-gold,
+  .adagu-list .adagu-col-due {
+    display: none;
   }
 
   /* --- Rates ------------------------------------------------------------ */

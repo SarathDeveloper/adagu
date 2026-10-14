@@ -11,6 +11,7 @@ import { getUploadsDir } from './lib/paths'
 import authRoutes from './routes/auth.routes'
 import backupRoutes from './routes/backup.routes'
 import customersRoutes from './routes/customers.routes'
+import dashboardRoutes from './routes/dashboard.routes'
 import diagnosticsRoutes from './routes/diagnostics.routes'
 import duesRoutes from './routes/dues.routes'
 import metalRatesRoutes from './routes/metalRates.routes'
@@ -44,6 +45,7 @@ export function createApp(): express.Express {
   app.use('/api/diagnostics', diagnosticsRoutes)
   app.use('/api/users', requireAuth, requireRole('admin'), usersRoutes)
   app.use('/api/backup', requireAuth, requireFeature('settings'), backupRoutes)
+  app.use('/api/dashboard', requireAuth, requireFeature('dashboard'), dashboardRoutes)
   app.use('/api/customers', requireAuth, requireFeature('customers'), customersRoutes)
   app.use('/api/dues', requireAuth, requireFeature('dues'), duesRoutes)
   app.use('/api/pledges', requireAuth, requireFeature('adagu'), pledgesRoutes)

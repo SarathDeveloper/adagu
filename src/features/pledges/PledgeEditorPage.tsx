@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -29,9 +29,8 @@ import {
   maxRepaymentDueDate,
   monthlyPledgeInterestAmount,
   netPaidAmount,
-  pledgeAmountDueWithTopups,
-  totalPayableAfterOneYear,
 } from "@shared/billing/pledgeMath";
+import { payableAfterOneYear, replayPledge } from "@shared/billing/pledgeLedger";
 import {
   isAboveLtv,
   itemValue,
@@ -53,6 +52,7 @@ import { DateInput } from "../../components/DateInput";
 import { LoadingState } from "../../components/LoadingState";
 import { Modal } from "../../components/Modal";
 import { useToast } from "../../components/toastContext";
+import { useAuth } from "../auth/authContext";
 import { api } from "../../lib/api";
 import { formatCurrency, formatDisplayDate, formatWeight } from "../../lib/format";
 import {
@@ -111,6 +111,7 @@ export function PledgeEditorPage() {
   const navigate = useNavigate();
   const isNew = !id;
   const { showToast } = useToast();
+  const { isAdmin } = useAuth();
 
   const [pledge, setPledge] = useState<Pledge | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -153,6 +154,9 @@ export function PledgeEditorPage() {
   const [redeemDate, setRedeemDate] = useState(todayIso());
   const [amountCollected, setAmountCollected] = useState<NumericField>(0);
   const [redeemDiscount, setRedeemDiscount] = useState<NumericField>(0);
+  // Mirrors the discount input so the payoff fetch can price the close without
+  // re-running whenever the discount changes.
+  const redeemDiscountRef = useRef<NumericField>(0);
   const [redeemMode, setRedeemMode] = useState<PledgePaymentMode>("cash");
   const [payoff, setPayoff] = useState<PledgePayoff | null>(null);
   const [redeeming, setRedeeming] = useState(false);
@@ -329,7 +333,13 @@ export function PledgeEditorPage() {
     void (async () => {
       try {
         const data = await api.getPledgePayoff(Number(id), redeemDate || todayIso());
-        if (active) setPayoff(data);
+        if (!active) return;
+        setPayoff(data);
+        // Keep the amount in step with the payoff for the chosen date, so a
+        // back-dated or forward-dated close is not rejected by the server.
+        setAmountCollected(
+          Math.max(0, data.payoff - numericFieldToNumber(redeemDiscountRef.current)),
+        );
       } catch {
         if (active) setPayoff(null);
       }
@@ -339,30 +349,42 @@ export function PledgeEditorPage() {
     };
   }, [redeemOpen, isNew, id, redeemDate]);
 
+  // Mirrors the server's period engine so the redeem window and the running
+  // totals never disagree with the payoff endpoint.
   const duePreview = useMemo(() => {
     const principal = numericFieldToNumber(loanAmount);
     const rate = numericFieldToNumber(interestPct);
-    const collected = pledge?.amountCollected ?? 0;
+    const asOf = redeemDate || todayIso();
     const topups = (pledge?.topups ?? []).map((topup) => ({
       amount: topup.amount,
-      topupDate: topup.topupDate,
-      interestPct: topup.interestPct,
+      rate: topup.interestPct,
+      date: topup.topupDate,
     }));
-    return pledgeAmountDueWithTopups(
-      principal,
+    const payments = (pledge?.payments ?? []).map((payment) => ({
+      date: payment.paymentDate,
+      amount: payment.amount,
+      discount: payment.discount,
+    }));
+    const result = replayPledge({
+      base: { amount: principal, rate, date: pledgeDate },
       topups,
-      rate,
-      pledgeDate,
-      redeemDate || todayIso(),
-      collected,
-    );
+      payments,
+      asOfDate: asOf,
+    });
+    return {
+      interest: result.interestDue,
+      totalDue: result.grossDue,
+      remaining: result.payoff,
+      principal: result.principalOutstanding,
+      monthlyInterest: result.monthlyInterest,
+    };
   }, [
     loanAmount,
     interestPct,
     pledgeDate,
     redeemDate,
-    pledge?.amountCollected,
     pledge?.topups,
+    pledge?.payments,
   ]);
 
   const itemValuations = useMemo(
@@ -403,7 +425,7 @@ export function PledgeEditorPage() {
     const rate = numericFieldToNumber(interestPct);
     const billDate = pledgeDate || todayIso();
     const monthlyInterest = monthlyPledgeInterestAmount(principal, rate);
-    const totalPayable = totalPayableAfterOneYear(principal, rate, billDate);
+    const totalPayable = payableAfterOneYear(principal, rate, billDate);
     return { monthlyInterest, totalPayable };
   }, [loanAmount, interestPct, pledgeDate]);
 
@@ -483,15 +505,34 @@ export function PledgeEditorPage() {
 
     const existing = selectedCustomer;
     if (existing) {
+      const nextPhone = customerPhone.replace(/\D/g, "").slice(0, 10);
+      const nextAddress = customerAddress.trim();
+      const nextGuardian = guardianName.trim();
+      const nextAadhaar = aadhaar.replace(/\D/g, "").slice(0, 12);
+      const nextPan = pan.trim().toUpperCase();
+      const borrowerChanged =
+        existing.name !== name ||
+        (existing.phone ?? "") !== nextPhone ||
+        (existing.address ?? "") !== nextAddress ||
+        (existing.guardianName ?? "") !== nextGuardian ||
+        (existing.aadhaar ?? "") !== nextAadhaar ||
+        (existing.pan ?? "") !== nextPan;
+      // The pledge editor only touches borrower fields. Skip the write when
+      // nothing changed so customer notes and other profile data stay put.
+      if (!borrowerChanged) {
+        setCustomerId(existing.id);
+        return existing.id;
+      }
       const updated = await api.updateCustomer(existing.id, {
         name,
-        phone: customerPhone.replace(/\D/g, "").slice(0, 10),
-        address: customerAddress.trim(),
-        guardianName: guardianName.trim(),
-        notes: "",
+        phone: nextPhone,
+        address: nextAddress,
+        guardianName: nextGuardian,
+        // Preserve the customer's own notes; the editor never edits them.
+        notes: existing.notes ?? "",
         gstin: existing.gstin ?? "",
-        aadhaar: aadhaar.replace(/\D/g, "").slice(0, 12),
-        pan: pan.trim().toUpperCase(),
+        aadhaar: nextAadhaar,
+        pan: nextPan,
         // Preserve whatever ID proof type the customer already has on file.
         idProofType: existing.idProofType ?? "",
       });
@@ -781,6 +822,7 @@ export function PledgeEditorPage() {
     mode: PledgePaymentMode;
     newLoanAmount: number;
     note: string;
+    allowAboveLtv: boolean;
   }) {
     try {
       setRedeeming(true);
@@ -793,6 +835,7 @@ export function PledgeEditorPage() {
         mode: input.mode,
         newLoanAmount: input.newLoanAmount,
         note: input.note,
+        allowAboveLtv: input.allowAboveLtv,
       });
       setRenewLoanOpen(false);
       showToast(`Loan renewed as ${created.receiptNo}`, "success");
@@ -1009,6 +1052,7 @@ export function PledgeEditorPage() {
                     duePreview.remaining || numericFieldToNumber(loanAmount),
                   );
                   setRedeemDiscount(0);
+                  redeemDiscountRef.current = 0;
                   setRedeemMode("cash");
                   setRedeemDate(todayIso());
                   setRedeemOpen(true);
@@ -1690,7 +1734,9 @@ export function PledgeEditorPage() {
                   const discount = numericFieldToNumber(
                     parseNumericField(event.target.value),
                   );
-                  setRedeemDiscount(parseNumericField(event.target.value));
+                  const field = parseNumericField(event.target.value);
+                  setRedeemDiscount(field);
+                  redeemDiscountRef.current = field;
                   const total = payoff?.payoff ?? duePreview.remaining;
                   setAmountCollected(Math.max(0, total - discount));
                 }}
@@ -1724,6 +1770,7 @@ export function PledgeEditorPage() {
             style={{ marginTop: "0.5rem" }}
             onClick={() => {
               setRedeemDiscount(0);
+              redeemDiscountRef.current = 0;
               setAmountCollected(payoff?.payoff ?? duePreview.remaining);
             }}
           >
@@ -1741,7 +1788,10 @@ export function PledgeEditorPage() {
               payoff?.principalOutstanding ?? numericFieldToNumber(loanAmount),
             interestPaidUpto: payoff?.interestPaidUpto ?? pledgeDate,
             remaining: payoff?.payoff ?? duePreview.remaining,
+            interestPct: numericFieldToNumber(interestPct),
+            assessedValue: effectiveAssessedValue,
           }}
+          isAdmin={isAdmin}
           busy={busy}
           onClose={() => setRenewLoanOpen(false)}
           onSubmit={(input) => void renewLoan(input)}

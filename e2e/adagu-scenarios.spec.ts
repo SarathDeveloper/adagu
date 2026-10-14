@@ -8,8 +8,9 @@
  * Interest uses the period engine in shared/billing/pledgeLedger.ts: the first
  * 30 days cost one month (a same-day charge still costs the minimum month),
  * later part-months of 1-15 days cost half a month and 16-29 days cost a full
- * month. The editor's "Total Payable (with interest)" preview still uses the
- * plain days/30 helper in shared/billing/pledgeMath.ts.
+ * month. The editor's "Total Payable (with interest)" preview and the printed
+ * receipt use the same engine through `payableAfterOneYear`, so they match the
+ * payoff the server computes.
  *
  * Phases covered:
  *   P1  pledge_payments ledger: collect interest, extra loan, partial and full
@@ -156,13 +157,14 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
         .nth(2),
     ).toHaveValue('24')
 
-    // 100000 × 2% = 2,000 a month; the one-year preview is the days/30 helper.
+    // 100000 × 2% = 2,000 a month; the one-year preview is the period engine
+    // (12 full months + a half month for the 5 extra days).
     await expect(calculatedValue(window, 'Net Weight')).toHaveText('24.000 gms')
     await expect(calculatedValue(window, 'Interest Rate')).toHaveText('2% per month')
     await expect(calculatedValue(window, 'Monthly Interest')).toHaveText(inr(2_000))
     await expect(calculatedValue(window, 'Loan Amount')).toHaveText(inr(100_000))
     await expect(calculatedValue(window, 'Total Payable (with interest)')).toHaveText(
-      inr(124_333.33),
+      inr(125_000),
     )
 
     await window.getByRole('button', { name: 'Generate', exact: true }).click()

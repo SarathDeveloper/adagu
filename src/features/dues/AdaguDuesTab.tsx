@@ -5,6 +5,7 @@ import type {
   DuesLedger,
   PledgeAuctionInput,
   PledgePaymentMode,
+  PledgePayoff,
   PledgeReminderEntry,
 } from '@shared/types'
 import { DateInput } from '../../components/DateInput'
@@ -14,6 +15,7 @@ import { FilterBar } from '../../components/FilterBar'
 import { LoadingState } from '../../components/LoadingState'
 import { Modal } from '../../components/Modal'
 import { useToast } from '../../components/toastContext'
+import { useAuth } from '../auth/authContext'
 import { formatCurrency, formatDisplayDate, paginate, TABLE_PAGE_SIZE } from '../../lib/format'
 import { api } from '../../lib/api'
 import { AdaguDueDetailDrawer } from './AdaguDueDetailDrawer'
@@ -22,6 +24,7 @@ import { AuctionModal } from './AuctionModal'
 import { InterestCollectionModal } from './InterestCollectionModal'
 import { PLEDGE_PAYMENT_MODES } from './pledgePaymentModes'
 import { RenewModal } from './RenewModal'
+import { ShortfallModal } from './ShortfallModal'
 import { TopupModal } from './TopupModal'
 import { PledgePreviewModal } from '../pledges/PledgePreviewModal'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
@@ -43,6 +46,7 @@ export function AdaguDuesTab({
   onReload: () => Promise<DuesLedger>
 }) {
   const { showToast } = useToast()
+  const { isAdmin } = useAuth()
   const [filter, setFilter] = useState<AdaguFilter>('all')
   const [page, setPage] = useState(1)
   const [busy, setBusy] = useState(false)
@@ -53,6 +57,7 @@ export function AdaguDuesTab({
   const [interestTarget, setInterestTarget] = useState<AdaguDueSummary | null>(null)
   const [topupTarget, setTopupTarget] = useState<AdaguDueSummary | null>(null)
   const [renewTarget, setRenewTarget] = useState<AdaguDueSummary | null>(null)
+  const [shortfallTarget, setShortfallTarget] = useState<AdaguDueSummary | null>(null)
   const [renewedTarget, setRenewedTarget] = useState<number | null>(null)
   const [redeemTarget, setRedeemTarget] = useState<AdaguDueSummary | null>(null)
   const [auctionTarget, setAuctionTarget] = useState<AdaguDueSummary | null>(null)
@@ -62,9 +67,13 @@ export function AdaguDuesTab({
   const [redeemAmount, setRedeemAmount] = useState(0)
   const [redeemDiscount, setRedeemDiscount] = useState(0)
   const [redeemMode, setRedeemMode] = useState<PledgePaymentMode>('cash')
+  const [redeemPayoff, setRedeemPayoff] = useState<{ key: string; payoff: PledgePayoff } | null>(null)
   const [reminders, setReminders] = useState<PledgeReminderEntry[]>([])
   const [remindersLoading, setRemindersLoading] = useState(false)
   const remindersLoadedRef = useRef(false)
+  // Mirrors the discount input so the payoff effect can read it without
+  // re-fetching whenever the discount changes.
+  const redeemDiscountRef = useRef(0)
 
   async function loadReminders(background = false) {
     try {
@@ -85,6 +94,31 @@ export function AdaguDuesTab({
     if (filter === 'reminders') void loadReminders(remindersLoadedRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter])
+
+  // Interest moves in whole and half months, so the payoff depends on the
+  // chosen date. Ask the server for it instead of trusting the list snapshot.
+  // The keyed state means a payoff from a previous date is never shown while
+  // the new one loads, with no synchronous setState in the effect body.
+  useEffect(() => {
+    if (!redeemTarget) return
+    const key = `${redeemTarget.pledgeId}|${redeemDate}`
+    let active = true
+    void api
+      .getPledgePayoff(redeemTarget.pledgeId, redeemDate)
+      .then((payoff) => {
+        if (!active) return
+        setRedeemPayoff({ key, payoff })
+        setRedeemAmount(Math.max(0, payoff.payoff - redeemDiscountRef.current))
+      })
+      .catch((err) => {
+        if (!active) return
+        onError(err instanceof Error ? err.message : 'Failed to load payoff')
+      })
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [redeemTarget, redeemDate])
 
   async function sendWhatsApp(row: PledgeReminderEntry) {
     if (!row.whatsappUrl) {
@@ -131,6 +165,13 @@ export function AdaguDuesTab({
 
   const paged = useMemo(() => paginate(rows, page, TABLE_PAGE_SIZE), [rows, page])
 
+  // The server is authoritative; the list snapshot is only a placeholder until
+  // the payoff for the chosen date arrives.
+  const redeemRequestKey = redeemTarget ? `${redeemTarget.pledgeId}|${redeemDate}` : ''
+  const activeRedeemPayoff =
+    redeemPayoff && redeemPayoff.key === redeemRequestKey ? redeemPayoff.payoff : null
+  const redeemPayoffValue = activeRedeemPayoff?.payoff ?? redeemTarget?.remaining ?? 0
+
   async function reloadAndSyncView() {
     const data = await onReload()
     setViewTarget((current) => {
@@ -149,6 +190,7 @@ export function AdaguDuesTab({
     setRedeemDate(localTodayIso())
     setRedeemAmount(summary.remaining)
     setRedeemDiscount(0)
+    redeemDiscountRef.current = 0
     setRedeemMode('cash')
   }
 
@@ -181,7 +223,12 @@ export function AdaguDuesTab({
     }
   }
 
-  async function addTopup(input: { amount: number; topupDate: string; note: string }) {
+  async function addTopup(input: {
+    amount: number
+    topupDate: string
+    note: string
+    allowAboveLtv: boolean
+  }) {
     if (!topupTarget) return
     try {
       setBusy(true)
@@ -191,6 +238,7 @@ export function AdaguDuesTab({
         topupDate: input.topupDate,
         amount: input.amount,
         note: input.note,
+        allowAboveLtv: input.allowAboveLtv,
       })
       setTopupTarget(null)
       showToast('Extra loan added', 'success')
@@ -207,6 +255,7 @@ export function AdaguDuesTab({
     mode: PledgePaymentMode
     newLoanAmount: number
     note: string
+    allowAboveLtv: boolean
   }) {
     if (!renewTarget) return
     try {
@@ -218,6 +267,7 @@ export function AdaguDuesTab({
         mode: input.mode,
         newLoanAmount: input.newLoanAmount,
         note: input.note,
+        allowAboveLtv: input.allowAboveLtv,
       })
       setRenewTarget(null)
       setViewTarget(null)
@@ -231,8 +281,48 @@ export function AdaguDuesTab({
     }
   }
 
-  async function collectPartial() {
-    if (!redeemTarget || redeemAmount <= 0) return
+  async function undoLatestPayment() {
+    if (!viewTarget) return
+    try {
+      setBusy(true)
+      onError(null)
+      await api.undoLatestPledgePayment(viewTarget.pledgeId)
+      showToast('Last payment undone', 'success')
+      await reloadAndSyncView()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to undo the payment')
+      throw err
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function collectShortfall(input: {
+    amount: number
+    collectedDate: string
+    mode: PledgePaymentMode
+  }) {
+    if (!shortfallTarget) return
+    try {
+      setBusy(true)
+      onError(null)
+      await api.collectPledgeShortfall({
+        id: shortfallTarget.pledgeId,
+        collectedDate: input.collectedDate,
+        amount: input.amount,
+        mode: input.mode,
+      })
+      setShortfallTarget(null)
+      showToast('Auction shortfall collected', 'success')
+      await reloadAndSyncView()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to collect the shortfall')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function collectPartial() {    if (!redeemTarget || redeemAmount <= 0) return
     try {
       setRedeemAction('partial')
       setBusy(true)
@@ -267,7 +357,7 @@ export function AdaguDuesTab({
       const updated = await api.redeemPledge({
         id: redeemTarget.pledgeId,
         redeemedDate: redeemDate,
-        amountCollected: redeemAmount || redeemTarget.remaining - redeemDiscount,
+        amountCollected: redeemAmount,
         discount: redeemDiscount,
         mode: redeemMode,
       })
@@ -458,6 +548,8 @@ export function AdaguDuesTab({
           onPrintNotice={() => setNoticePrintTarget(viewTarget.pledgeId)}
           onViewBill={() => setBillTarget(viewTarget.pledgeId)}
           onReleaseReceipt={() => setReleaseTarget(viewTarget.pledgeId)}
+          onCollectShortfall={() => setShortfallTarget(viewTarget)}
+          onUndoPayment={undoLatestPayment}
         />
       ) : null}
 
@@ -486,15 +578,26 @@ export function AdaguDuesTab({
       {topupTarget ? (
         <TopupModal
           summary={topupTarget}
+          isAdmin={isAdmin}
           busy={busy}
           onClose={() => setTopupTarget(null)}
           onSubmit={(input) => void addTopup(input)}
         />
       ) : null}
 
+      {shortfallTarget ? (
+        <ShortfallModal
+          summary={shortfallTarget}
+          busy={busy}
+          onClose={() => setShortfallTarget(null)}
+          onSubmit={(input) => void collectShortfall(input)}
+        />
+      ) : null}
+
       {renewTarget ? (
         <RenewModal
           summary={renewTarget}
+          isAdmin={isAdmin}
           busy={busy}
           onClose={() => setRenewTarget(null)}
           onSubmit={(input) => void renewLoan(input)}
@@ -519,10 +622,20 @@ export function AdaguDuesTab({
               <button type="button" className="btn secondary" onClick={() => setRedeemTarget(null)} disabled={busy}>
                 Cancel
               </button>
-              <button type="button" className="btn secondary" disabled={busy} onClick={() => void collectPartial()}>
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={busy || !activeRedeemPayoff}
+                onClick={() => void collectPartial()}
+              >
                 {redeemAction === 'partial' ? 'Recording…' : 'Record collection'}
               </button>
-              <button type="button" className="btn" disabled={busy} onClick={() => void redeemFull()}>
+              <button
+                type="button"
+                className="btn"
+                disabled={busy || !activeRedeemPayoff}
+                onClick={() => void redeemFull()}
+              >
                 {redeemAction === 'full' ? 'Closing…' : 'Full redeem'}
               </button>
             </div>
@@ -531,20 +644,24 @@ export function AdaguDuesTab({
           <dl className="dues-detail-totals">
             <div>
               <dt>Principal outstanding</dt>
-              <dd className="num">{formatCurrency(redeemTarget.principalOutstanding)}</dd>
+              <dd className="num">
+                {formatCurrency(activeRedeemPayoff?.principalOutstanding ?? redeemTarget.principalOutstanding)}
+              </dd>
             </div>
             <div>
               <dt>Interest due</dt>
-              <dd className="num">{formatCurrency(redeemTarget.interestDue)}</dd>
+              <dd className="num">{formatCurrency(activeRedeemPayoff?.interestDue ?? redeemTarget.interestDue)}</dd>
             </div>
             <div>
               <dt>Interest paid up to</dt>
-              <dd>{formatDisplayDate(redeemTarget.interestPaidUpto)}</dd>
+              <dd>
+                {formatDisplayDate(activeRedeemPayoff?.interestPaidUpto ?? redeemTarget.interestPaidUpto)}
+              </dd>
             </div>
             <div>
               <dt>Payoff</dt>
               <dd className="num">
-                <strong>{formatCurrency(redeemTarget.remaining)}</strong>
+                <strong>{formatCurrency(redeemPayoffValue)}</strong>
               </dd>
             </div>
           </dl>
@@ -574,8 +691,9 @@ export function AdaguDuesTab({
                 value={redeemDiscount || ''}
                 onChange={(event) => {
                   const discount = Math.max(0, Number(event.target.value) || 0)
+                  redeemDiscountRef.current = discount
                   setRedeemDiscount(discount)
-                  setRedeemAmount(Math.max(0, redeemTarget.remaining - discount))
+                  setRedeemAmount(Math.max(0, redeemPayoffValue - discount))
                 }}
               />
             </label>
@@ -603,8 +721,9 @@ export function AdaguDuesTab({
             className="btn ghost"
             style={{ marginTop: '0.5rem' }}
             onClick={() => {
+              redeemDiscountRef.current = 0
               setRedeemDiscount(0)
-              setRedeemAmount(redeemTarget.remaining)
+              setRedeemAmount(redeemPayoffValue)
             }}
           >
             Fill payoff

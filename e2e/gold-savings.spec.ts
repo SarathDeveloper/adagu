@@ -4,9 +4,14 @@
  */
 import type { Page } from '@playwright/test'
 import { getDatabase } from '../server/db'
+import { GOLD_SAVINGS_VISIBLE } from '../src/features/goldSavings/visibility'
 import { expect, test } from './fixtures/web-app'
 import { expectPrintPreviewModal, openGoldSavingsTab, sidebarLink } from './helpers/nav'
 import { seedGoldSavingsDemo, seedShopName } from './helpers/seed'
+
+test.beforeEach(() => {
+  test.skip(!GOLD_SAVINGS_VISIBLE, 'Gold Savings is hidden')
+})
 
 async function pickCustomer(window: Page, name: string) {
   await window.getByPlaceholder('Search customer by name, phone or ID…').fill(name)

@@ -1,4 +1,5 @@
 import type { PaperSize, ShopSettings } from '@shared/types'
+import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 
 function paperLabel(size: PaperSize): string {
   if (size === 'a4') return 'A4'
@@ -21,7 +22,9 @@ export function PrintersSettings({
         <div>
           <h2 className="settings-section-title">Printers</h2>
           <p className="muted settings-card-subtitle">
-            Adagu receipts and Gold Savings vouchers print from the browser. Choose the paper size and copy count.
+            {GOLD_SAVINGS_VISIBLE
+              ? 'Adagu receipts and Gold Savings vouchers print from the browser. Choose the paper size and copy count.'
+              : 'Adagu receipts print from the browser. Choose the paper size and copy count.'}
           </p>
         </div>
       </div>

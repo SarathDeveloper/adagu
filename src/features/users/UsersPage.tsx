@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import { FEATURE_KEYS, type FeatureKey, type User, type UserRole } from '@shared/types'
+import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { TablePager } from '../../components/DataTable'
 import { Modal } from '../../components/Modal'
@@ -36,8 +37,15 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   gold_savings: 'Gold Savings',
 }
 
+const VISIBLE_FEATURE_KEYS = FEATURE_KEYS.filter(
+  (key) => GOLD_SAVINGS_VISIBLE || key !== 'gold_savings',
+)
+
 function featureListLabel(features: FeatureKey[]): string {
-  const labels = features.map((key) => FEATURE_LABELS[key]).filter(Boolean)
+  const labels = features
+    .filter((key) => VISIBLE_FEATURE_KEYS.includes(key))
+    .map((key) => FEATURE_LABELS[key])
+    .filter(Boolean)
   return labels.length > 0 ? labels.join(', ') : 'None'
 }
 
@@ -64,7 +72,7 @@ function FeatureChips({
 }) {
   return (
     <div className="users-feature-chips">
-      {FEATURE_KEYS.map((key) => {
+      {VISIBLE_FEATURE_KEYS.map((key) => {
         const checked = selected.includes(key)
         return (
           <button

@@ -1,7 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../../lib/api'
+import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 
 export const DEFAULT_APP_SUBTITLE = 'Adagu & Gold Savings'
+const HIDDEN_GOLD_SAVINGS_SUBTITLE = 'Adagu'
+
+function displayAppSubtitle(subtitle: string): string {
+  if (!GOLD_SAVINGS_VISIBLE && subtitle === DEFAULT_APP_SUBTITLE) return HIDDEN_GOLD_SAVINGS_SUBTITLE
+  return subtitle
+}
 export const DEFAULT_WINDOW_TITLE = 'AdaguTrackerPro'
 
 interface ShopBranding {
@@ -72,7 +79,14 @@ export function ShopBrandingProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const value = useMemo(
-    () => ({ shopName, appSubtitle, logoImagePath, ready, needsSetup, refresh }),
+    () => ({
+      shopName,
+      appSubtitle: displayAppSubtitle(appSubtitle),
+      logoImagePath,
+      ready,
+      needsSetup,
+      refresh,
+    }),
     [shopName, appSubtitle, logoImagePath, ready, needsSetup, refresh],
   )
 
