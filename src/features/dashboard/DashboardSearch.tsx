@@ -96,7 +96,7 @@ export function DashboardSearch() {
                   type="button"
                   role="option"
                   className="main-dash-search-item"
-                  onClick={() => go(`/customers?q=${encodeURIComponent(customer.name)}`)}
+                  onClick={() => go(`/customers/${customer.id}`)}
                 >
                   <span>{customer.name}</span>
                   {customer.phone ? <span className="main-dash-search-meta">{customer.phone}</span> : null}

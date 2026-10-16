@@ -186,7 +186,6 @@ export const FEATURE_KEY_VALUES = [
   'customers',
   'dues',
   'reports',
-  'rates',
   'settings',
 ] as const
 

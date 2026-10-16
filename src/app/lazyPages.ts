@@ -28,6 +28,11 @@ export const CustomersPage = lazy(() =>
     default: module.CustomersPage,
   })),
 )
+export const CustomerDetailPage = lazy(() =>
+  import('../features/customers/CustomerDetailPage').then((module) => ({
+    default: module.CustomerDetailPage,
+  })),
+)
 export const DuesPage = lazy(() =>
   import('../features/dues/DuesPage').then((module) => ({ default: module.DuesPage })),
 )
@@ -35,9 +40,6 @@ export const ReportViewPage = lazy(() =>
   import('../features/reports/ReportViewPage').then((module) => ({
     default: module.ReportViewPage,
   })),
-)
-export const MetalRatesPage = lazy(() =>
-  import('../features/rates/MetalRatesPage').then((module) => ({ default: module.MetalRatesPage })),
 )
 export const GoldSavingsDashboardPage = lazy(() =>
   import('../features/goldSavings/GoldSavingsDashboardPage').then((module) => ({

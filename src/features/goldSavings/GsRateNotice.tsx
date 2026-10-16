@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import type { GoldSavingRate } from '@shared/types'
 import { api } from '../../lib/api'
 import { formatCurrency, formatDisplayDate } from '../../lib/format'
@@ -7,7 +6,7 @@ import { formatCurrency, formatDisplayDate } from '../../lib/format'
 /**
  * Shows the gold rate that applies to a date and enforces rate safety: when the
  * rate on file is not dated the same day, an administrator must tick a
- * confirmation and staff are blocked with a link to the rates page.
+ * confirmation and staff are blocked until a rate exists for that date.
  */
 export function GsRateNotice({
   date,
@@ -84,8 +83,7 @@ export function GsRateNotice({
         </label>
       ) : (
         <div className="error-banner">
-          No gold rate is saved for {formatDisplayDate(date)}. Ask an administrator to set it on the{' '}
-          <Link to="/rates">rates page</Link>.
+          No gold rate is saved for {formatDisplayDate(date)}. Ask an administrator to set a gold rate.
         </div>
       )}
     </div>

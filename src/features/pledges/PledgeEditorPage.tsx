@@ -413,7 +413,6 @@ export function PledgeEditorPage() {
     ? numericFieldToNumber(assessedValue)
     : computedAssessedValue;
 
-  const hasRates = metalRates != null && (metalRates.gold24k > 0 || metalRates.silverFine > 0);
   const aboveLtv = isAboveLtv(
     numericFieldToNumber(loanAmount),
     effectiveAssessedValue,
@@ -1535,31 +1534,22 @@ export function PledgeEditorPage() {
                   />
                 </div>
               </div>
-              {!hasRates || aboveLtv ? (
+              {aboveLtv ? (
                 <div className="adagu-field" style={{ gridColumn: "1 / -1" }}>
-                  {!hasRates ? (
-                    <div className="adagu-banner adagu-banner--warning">
-                      No metal rates for today.{" "}
-                      <Link to="/rates">Update Rates</Link> to assess value
-                      automatically.
-                    </div>
-                  ) : null}
-                  {aboveLtv ? (
-                    <div className="adagu-banner adagu-banner--warning">
-                      Loan is above the {ltvPct}% LTV limit.
-                      <label className="adagu-banner-check">
-                        <input
-                          type="checkbox"
-                          checked={allowAboveLtv}
-                          disabled={!canEdit || busy}
-                          onChange={(event) =>
-                            setAllowAboveLtv(event.target.checked)
-                          }
-                        />
-                        Admin override (allow above LTV)
-                      </label>
-                    </div>
-                  ) : null}
+                  <div className="adagu-banner adagu-banner--warning">
+                    Loan is above the {ltvPct}% LTV limit.
+                    <label className="adagu-banner-check">
+                      <input
+                        type="checkbox"
+                        checked={allowAboveLtv}
+                        disabled={!canEdit || busy}
+                        onChange={(event) =>
+                          setAllowAboveLtv(event.target.checked)
+                        }
+                      />
+                      Admin override (allow above LTV)
+                    </label>
+                  </div>
                 </div>
               ) : null}
               <div className="adagu-field" style={{ gridColumn: "1 / -1" }}>

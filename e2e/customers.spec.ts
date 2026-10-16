@@ -32,22 +32,28 @@ test('customer profile shows Adagu loan and due history', async ({ window }) => 
   await sidebarLink(window, 'Customers').click()
   await expect(window.getByRole('heading', { name: 'Customers' })).toBeVisible()
   const customerRow = window.getByRole('row').filter({ hasText: 'E2E Customer' })
-  await customerRow.getByRole('button', { name: 'E2E Customer' }).click()
+  await customerRow.getByRole('link', { name: 'E2E Customer' }).click()
 
-  const drawer = window.getByRole('dialog', { name: 'E2E Customer' })
-  await expect(drawer.getByRole('heading', { name: 'Customer Profile' })).toBeVisible()
-  await expect(drawer.getByText('Total Paid')).toBeVisible()
-  await expect(drawer.getByText('Outstanding')).toBeVisible()
-  await expect(drawer.getByText('Active Adagu loans')).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Adagu loans' })).toBeVisible()
+  await expect(window).toHaveURL(/\/customers\/\d+$/)
+  await expect(window.getByRole('heading', { name: 'E2E Customer' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Customer Profile' })).toBeVisible()
+  await expect(window.getByText('Total Paid')).toBeVisible()
+  await expect(window.getByText('Outstanding')).toBeVisible()
+  await expect(window.getByText('Active Adagu loans')).toBeVisible()
+
+  await window.getByRole('tab', { name: 'Adagu' }).click()
+  await expect(window.getByRole('heading', { name: 'Active Adagu loans' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Active Adagu loans' }).locator('..').getByText(/ADG/)).toBeVisible()
+
   if (GOLD_SAVINGS_VISIBLE) {
-    await expect(drawer.getByRole('heading', { name: 'Gold Savings accounts' })).toBeVisible()
+    await expect(window.getByRole('tab', { name: 'Gold Savings' })).toBeVisible()
   } else {
-    await expect(drawer.getByRole('heading', { name: 'Gold Savings accounts' })).toHaveCount(0)
+    await expect(window.getByRole('tab', { name: 'Gold Savings' })).toHaveCount(0)
   }
-  await expect(drawer.getByRole('heading', { name: 'Payment History' })).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Due History' })).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Adagu loans' }).locator('..').getByText(/ADG/)).toBeVisible()
-  await expect(drawer.getByRole('heading', { name: 'Due History' }).locator('..').getByText(/ADG/)).toBeVisible()
-  await expect(drawer.getByText('No payments recorded.')).toBeVisible()
+
+  await window.getByRole('tab', { name: 'History' }).click()
+  await expect(window.getByRole('heading', { name: 'Payment History' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Due History' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Due History' }).locator('..').getByText(/ADG/)).toBeVisible()
+  await expect(window.getByText('No payments recorded.')).toBeVisible()
 })

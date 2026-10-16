@@ -18,6 +18,7 @@ import {
   ChangePasswordPage,
   ShopSetupPage,
   CollectionsPage,
+  CustomerDetailPage,
   CustomersPage,
   DashboardPage,
   DuesPage,
@@ -25,7 +26,6 @@ import {
   GoldSavingsDashboardPage,
   GoldSavingsReportsPage,
   MaturityPage,
-  MetalRatesPage,
   OverdueAgingPage,
   PledgeEditorPage,
   ReportViewPage,
@@ -89,6 +89,7 @@ export const router = createBrowserRouter([
             ],
           },
           { path: 'customers', element: <CustomersPage /> },
+          { path: 'customers/:id', element: <CustomerDetailPage /> },
           { path: 'dues', element: <DuesPage /> },
           {
             path: 'reports',
@@ -98,7 +99,7 @@ export const router = createBrowserRouter([
               { path: ':reportId', element: <ReportViewPage /> },
             ],
           },
-          { path: 'rates', element: <MetalRatesPage /> },
+          { path: 'rates', element: <Navigate to="/dashboard" replace /> },
           {
             path: 'gold-savings',
             element: GOLD_SAVINGS_VISIBLE ? (

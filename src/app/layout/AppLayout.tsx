@@ -2,7 +2,6 @@ import { useEffect, useState, Suspense } from 'react'
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom'
 import {
   BarChart3,
-  ChartNoAxesCombined,
   Gem,
   Handshake,
   House,
@@ -40,7 +39,6 @@ const links: {
   { to: '/dues', label: 'Dues', icon: Wallet, feature: 'dues' },
   { to: '/customers', label: 'Customers', icon: Users, feature: 'customers' },
   { to: '/reports', label: 'Reports', icon: BarChart3, feature: 'reports' },
-  { to: '/rates', label: 'Gold & Silver Rates', icon: ChartNoAxesCombined, feature: 'rates' },
   { to: '/users', label: 'Users', icon: UserCog, feature: 'users', adminOnly: true },
   { to: '/settings', label: 'Settings', icon: Settings, feature: 'settings' },
 ]
@@ -59,7 +57,6 @@ function featureForPath(pathname: string): FeatureKey | 'users' | null {
   if (pathname.startsWith('/customers')) return 'customers'
   if (pathname.startsWith('/dues')) return 'dues'
   if (pathname.startsWith('/reports')) return 'reports'
-  if (pathname.startsWith('/rates')) return 'rates'
   if (pathname.startsWith('/settings')) return 'settings'
   return null
 }

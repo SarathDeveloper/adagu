@@ -506,24 +506,6 @@
     display: none;
   }
 
-  /* --- Rates ------------------------------------------------------------ */
-
-  .rates-summary-ticker {
-    white-space: normal;
-    flex-wrap: wrap;
-    justify-content: center;
-    row-gap: 0.25rem;
-  }
-
-  .rates-trend-head {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .rates-silver-grid {
-    grid-template-columns: 1fr;
-  }
-
   /* --- Gold savings ----------------------------------------------------- */
 
   .inventory-shell .dashboard-lower-grid,

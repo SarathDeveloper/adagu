@@ -12,7 +12,6 @@ const ROUTES: { path: string; name: string }[] = [
   { path: '/customers', name: 'customers' },
   { path: '/dues', name: 'dues' },
   { path: '/reports/active-pledges', name: 'reports' },
-  { path: '/rates', name: 'rates' },
   { path: '/gold-savings/dashboard', name: 'gold savings' },
   { path: '/settings', name: 'settings' },
   { path: '/users', name: 'users' },

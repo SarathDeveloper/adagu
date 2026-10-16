@@ -281,7 +281,6 @@ export type FeatureKey =
   | 'customers'
   | 'dues'
   | 'reports'
-  | 'rates'
   | 'settings'
   | 'gold_savings'
 
@@ -292,7 +291,6 @@ export const FEATURE_KEYS: FeatureKey[] = [
   'customers',
   'dues',
   'reports',
-  'rates',
   'settings',
 ]
 

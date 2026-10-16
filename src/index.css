@@ -1061,6 +1061,25 @@ label {
   text-align: left;
   white-space: normal;
 }
+.customers-list-row {
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.customers-list-row:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+  background: var(--surface-muted);
+}
+.customer-detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+}
+.app-page-fill > .customer-detail-stack {
+  flex: 1 1 auto;
+  overflow: auto;
+}
 /* One-line cell text that must not stretch a table column; pair with a title tooltip. */
 .cell-truncate {
   display: block;
@@ -9776,281 +9795,6 @@ label {
     flex: 1 1 100%;
     order: 3;
   }
-}
-
-.rates-page {
-  gap: var(--billing-gap);
-}
-.rates-summary-ticker {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.35rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  font-size: var(--billing-font-body);
-  white-space: nowrap;
-}
-.rates-summary-side {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4rem;
-}
-.rates-summary-divider {
-  width: 1px;
-  height: 1rem;
-  background: var(--border);
-}
-.rates-summary-label {
-  font-size: var(--billing-font-label);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-.rates-summary-amount {
-  font-weight: 700;
-  color: var(--text);
-}
-.rates-summary-change {
-  font-size: var(--billing-font-label);
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.rates-summary-change.up {
-  color: var(--success);
-}
-.rates-summary-change.down {
-  color: var(--danger);
-}
-.rates-toolbar {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--billing-gap);
-}
-.rates-date-field {
-  display: inline-flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: var(--billing-font-label);
-  font-weight: 600;
-  color: var(--text-secondary);
-  flex-shrink: 0;
-}
-.rates-date-field > span {
-  white-space: nowrap;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.rates-date-field svg {
-  flex-shrink: 0;
-}
-.rates-date-field .date-display-input {
-  min-width: 9.5rem;
-  flex-shrink: 0;
-}
-.rates-metal-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--billing-gap);
-}
-.rates-metal-label {
-  margin: 0;
-  font-size: var(--billing-font-label);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-.rates-gold-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--billing-gap);
-}
-.rates-silver-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 16rem));
-  gap: var(--billing-gap);
-  justify-content: start;
-}
-.rate-purity-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: var(--billing-card-pad);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-}
-.rate-purity-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-.rate-purity-card-head h3 {
-  margin: 0;
-  font-size: var(--billing-font-section);
-  font-weight: 700;
-  color: var(--text);
-}
-.rate-purity-card-head p {
-  margin: 0.1rem 0 0;
-  font-size: var(--billing-font-label);
-  color: var(--text-muted);
-}
-.rate-purity-edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--billing-icon-box);
-  height: var(--billing-icon-box);
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  padding: 0;
-}
-.rate-purity-edit:hover {
-  color: var(--brand);
-}
-.rate-purity-amount {
-  margin: 0;
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--brand);
-  letter-spacing: -0.02em;
-}
-.rate-purity-input {
-  max-width: 9rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.rate-purity-updated {
-  margin: 0;
-  font-size: var(--billing-font-label);
-  color: var(--text-muted);
-}
-.rates-trend-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  overflow: visible;
-}
-.rates-trend-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--billing-gap);
-}
-.rates-trend-title {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-.rates-trend-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--billing-icon-box);
-  height: var(--billing-icon-box);
-  border-radius: var(--billing-radius-control);
-  background: var(--accent-soft);
-  color: var(--accent-hover);
-  flex-shrink: 0;
-}
-.rates-section-title {
-  margin: 0;
-  font-size: var(--billing-font-section);
-  font-weight: 700;
-}
-.rates-trend-subtitle {
-  margin: 0.15rem 0 0;
-  font-size: var(--billing-font-label);
-}
-.rates-trend-period .input {
-  min-width: 8.5rem;
-}
-.rates-trend-empty {
-  margin: 0;
-  padding: 2rem 0;
-  text-align: center;
-}
-.rates-trend-svg {
-  width: 100%;
-  height: auto;
-  overflow: visible;
-}
-.rates-trend-grid {
-  stroke: var(--border);
-  stroke-dasharray: 3 4;
-  stroke-width: 1;
-}
-.rates-trend-cursor {
-  stroke: var(--border-strong);
-  stroke-width: 1;
-}
-.rates-trend-axis {
-  fill: var(--text-muted);
-  font-size: 11px;
-}
-.rates-trend-line {
-  fill: none;
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.rates-trend-line-gold {
-  stroke: var(--accent);
-}
-.rates-trend-line-silver {
-  stroke: #8a9bb5;
-}
-.rates-trend-dot-gold {
-  fill: var(--accent);
-  stroke: var(--surface);
-  stroke-width: 1.5;
-}
-.rates-trend-dot-silver {
-  fill: var(--surface);
-  stroke: #7b8eaa;
-  stroke-width: 1.75;
-}
-@media (max-width: 1100px) {
-  .rates-gold-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 640px) {
-  .rates-gold-grid,
-  .rates-silver-grid {
-    grid-template-columns: 1fr;
-  }
-  .rates-page .page-header {
-    flex-direction: column;
-  }
-  .rates-page .page-header-actions {
-    margin-left: 0;
-  }
-}
-
-.rates-history-head {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border);
-}
-.rates-page .data-table th,
-.rates-page .data-table td {
-  padding: 0.45rem 0.85rem;
-  font-size: var(--billing-font-body);
-}
-.rates-page .data-table th {
-  font-size: var(--billing-font-label);
 }
 
 .gs-enroll-bars {

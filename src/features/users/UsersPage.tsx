@@ -32,7 +32,6 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   customers: 'Customers',
   dues: 'Dues',
   reports: 'Reports',
-  rates: 'Gold & Silver Rates',
   settings: 'Settings',
   gold_savings: 'Gold Savings',
 }

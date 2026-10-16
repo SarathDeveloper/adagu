@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { deriveGoldRates, deriveSilverRates } from '@shared/billing/metalRateDerivation'
 import { metalRatesInputSchema } from '@shared/schemas'
 import type { MetalRates, MetalRatesInput } from '@shared/types'
-import { requireFeature } from '../auth/middleware'
+import { requireRole } from '../auth/middleware'
 import { getDatabase } from '../db'
 import { asyncHandler, parseBody } from '../lib/http'
 
@@ -129,7 +129,7 @@ router.get(
 
 router.post(
   '/',
-  requireFeature('rates'),
+  requireRole('admin'),
   asyncHandler((req, res) => {
     const input = completeRates(parseBody(metalRatesInputSchema, req.body) as MetalRatesInput)
     const db = getDatabase()
