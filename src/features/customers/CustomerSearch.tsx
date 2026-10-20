@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, Search, X } from 'lucide-react'
 import type { Customer } from '@shared/types'
@@ -39,10 +39,12 @@ export function CustomerSearch({
 }: CustomerSearchProps) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [highlight, setHighlight] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalPrefill, setModalPrefill] = useState<ReturnType<typeof prefillFromSearch> | undefined>()
   const rootRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const listId = useId()
   const panelStyle = useAnchoredPanel(rootRef, open)
   const prevCustomerIdRef = useRef(customerId)
 
@@ -67,6 +69,16 @@ export function CustomerSearch({
   }, [customers, query])
 
   const showNoMatch = query.trim().length > 0 && filtered.length === 0
+  const optionCount = filtered.length > 0 ? filtered.length : showNoMatch ? 1 : 0
+
+  useEffect(() => {
+    setHighlight(0)
+  }, [query])
+
+  useEffect(() => {
+    if (!open) return
+    panelRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [open, highlight, filtered])
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
@@ -90,6 +102,36 @@ export function CustomerSearch({
     setOpen(false)
   }
 
+  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open) return
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      event.stopPropagation()
+      if (optionCount === 0) return
+      setHighlight((current) => {
+        const next = event.key === 'ArrowDown' ? current + 1 : current - 1
+        return (next + optionCount) % optionCount
+      })
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      event.stopPropagation()
+      if (filtered.length === 0) {
+        if (showNoMatch) openAddModal()
+        return
+      }
+      const customer = filtered[Math.min(highlight, filtered.length - 1)]
+      if (customer) pick(customer)
+      return
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      setOpen(false)
+    }
+  }
+
   return (
     <div className="billing-customer-search" ref={rootRef}>
       {hideLabel ? null : <label className="billing-card-label">{label}</label>}
@@ -111,6 +153,11 @@ export function CustomerSearch({
             if (selected && !keepSearchEmpty) setQuery(selected.name)
             setOpen(true)
           }}
+          onKeyDown={onSearchKeyDown}
+          aria-activedescendant={open && optionCount > 0 ? `${listId}-option-${highlight}` : undefined}
+          aria-expanded={open}
+          aria-controls={listId}
+          role="combobox"
         />
         {customerId > 0 && !disabled && !keepSearchEmpty ? (
           <button
@@ -144,13 +191,22 @@ export function CustomerSearch({
       ) : null}
       {open && !disabled
         ? createPortal(
-            <div ref={panelRef} className="billing-customer-dropdown" role="listbox" style={panelStyle}>
-              {filtered.map((customer) => (
+            <div
+              ref={panelRef}
+              id={listId}
+              className="billing-customer-dropdown"
+              role="listbox"
+              style={panelStyle}
+            >
+              {filtered.map((customer, index) => (
                 <button
                   key={customer.id}
+                  id={`${listId}-option-${index}`}
                   type="button"
-                  className="billing-customer-option"
+                  className={`billing-customer-option${index === highlight ? ' is-active' : ''}`}
                   role="option"
+                  aria-selected={index === highlight}
+                  onMouseEnter={() => setHighlight(index)}
                   onClick={() => pick(customer)}
                 >
                   <span className="billing-customer-option-name">{customer.name}</span>
@@ -161,8 +217,11 @@ export function CustomerSearch({
               ))}
               {showNoMatch ? (
                 <button
+                  id={`${listId}-option-0`}
                   type="button"
-                  className="billing-customer-option billing-customer-no-match"
+                  className={`billing-customer-option billing-customer-no-match${highlight === 0 ? ' is-active' : ''}`}
+                  role="option"
+                  aria-selected={highlight === 0}
                   onClick={openAddModal}
                 >
                   No customer found — Add new

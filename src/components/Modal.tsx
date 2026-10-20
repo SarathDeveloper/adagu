@@ -17,6 +17,8 @@ interface ModalProps {
    * header/body/footer inside the modal (print preview, product/inward editors).
    */
   noBodyWrapper?: boolean
+  /** Enter moves between fields in this dialog. Ctrl+S clicks `[data-entry-save]`. */
+  entry?: boolean
 }
 
 const OVERLAY_SELECTOR = '.modal-backdrop, .drawer-backdrop'
@@ -37,6 +39,7 @@ export function Modal({
   busy,
   dismissible = true,
   noBodyWrapper,
+  entry,
 }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null)
   const canClose = dismissible && !busy
@@ -66,6 +69,7 @@ export function Modal({
     >
       <div
         className={`modal${className ? ` ${className}` : ''}`}
+        data-entry={entry ? '' : undefined}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"

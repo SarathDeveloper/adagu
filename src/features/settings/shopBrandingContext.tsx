@@ -11,6 +11,14 @@ function displayAppSubtitle(subtitle: string): string {
 }
 export const DEFAULT_WINDOW_TITLE = 'AdaguTrackerPro'
 
+/** One or two letters for the sidebar mark when the shop has not uploaded a logo. */
+export function shopInitials(shopName: string): string {
+  const parts = shopName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'A'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase()
+}
+
 interface ShopBranding {
   shopName: string
   appSubtitle: string
@@ -49,7 +57,7 @@ export function ShopBrandingProvider({ children }: { children: ReactNode }) {
       setShopName(nextName)
       setAppSubtitle(settings.appSubtitle.trim() || DEFAULT_APP_SUBTITLE)
       setLogoImagePath(settings.logoImagePath.trim())
-      setNeedsSetup(!nextName)
+      setNeedsSetup(!nextName && !settings.setupSkipped)
       setReady(true)
       applyWindowTitle(nextName)
       return true

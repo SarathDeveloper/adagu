@@ -35,6 +35,9 @@ test('shop details form saves shop name and tagline', async ({ window }) => {
 test('shop logo uploads and persists after save', async ({ window }) => {
   await sidebarLink(window, 'Settings').click()
   await expect(window.getByRole('heading', { name: 'Shop Identity' })).toBeVisible()
+  await expect(window.locator('.brand-icon img')).toHaveCount(0)
+  await expect(window.locator('.brand-icon svg')).toHaveCount(0)
+  await expect(window.locator('.brand-icon')).toHaveText('ES')
 
   await window.getByRole('textbox', { name: /Shop Name/ }).fill('Logo Shop')
   await window.getByRole('textbox', { name: /Phone 1/ }).fill('9000000000')
@@ -52,6 +55,7 @@ test('shop logo uploads and persists after save', async ({ window }) => {
     'src',
     /\/uploads\/.+\.png/,
   )
+  await expect(window.locator('.brand-icon img')).toHaveAttribute('src', /\/uploads\/.+\.png/)
 
   await sidebarLink(window, 'Dashboard').click()
   await sidebarLink(window, 'Settings').click()
@@ -63,6 +67,17 @@ test('shop logo uploads and persists after save', async ({ window }) => {
       .filter({ hasText: 'Business Logo' })
       .locator('.settings-image-preview img'),
   ).toHaveAttribute('src', /\/uploads\/.+\.png/)
+  await expect(window.locator('.brand-icon img')).toHaveAttribute('src', /\/uploads\/.+\.png/)
+
+  await window
+    .locator('.settings-identity-field')
+    .filter({ hasText: 'Business Logo' })
+    .getByRole('button', { name: 'Remove logo' })
+    .click()
+  await expect(window.getByText('Logo removed')).toBeVisible()
+  await expect(window.locator('.brand-icon img')).toHaveCount(0)
+  await expect(window.locator('.brand-icon svg')).toHaveCount(0)
+  await expect(window.locator('.brand-icon')).toHaveText('LS')
 })
 
 test('adagu settings preview opens from Test Print', async ({ window }) => {

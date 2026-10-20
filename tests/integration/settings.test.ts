@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_BILL_TEMPLATE, templateSettingKey } from '@shared/billTemplate'
 import type { ShopSettings } from '@shared/types'
 import { getDatabase } from '../../server/db'
-import { loadShopSettings } from '../../server/lib/settingsStore'
+import { loadShopSettings, markShopSetupSkipped } from '../../server/lib/settingsStore'
 import { IPC_CHANNELS, ipc, useIntegrationEnv } from './helpers/testEnv'
 import { invokeIpcForTests } from './helpers/testEnv'
 
@@ -62,6 +62,7 @@ describe('settings IPC', () => {
     expect(settings.promoLine).toBe('')
     expect(settings.logoImagePath).toBe('')
     expect(settings.pawnbrokerLicenseNo).toBe('')
+    expect(settings.setupSkipped).toBe(false)
   })
 
   it('persists proprietor and promo lines', async () => {
@@ -217,6 +218,23 @@ describe('settings IPC', () => {
     const reloaded = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
     expect(reloaded.passbookBannerPath).toBe('/uploads/passbook-banner.png')
     expect(reloaded.passbookSideImagePath).toBe('/uploads/passbook-side.png')
+  })
+
+  it('keeps a skipped setup after shop details are saved later', async () => {
+    const db = getDatabase()
+    const skipped = markShopSetupSkipped(db)
+    expect(skipped.setupSkipped).toBe(true)
+    expect(skipped.shopName).toBe('')
+
+    const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {
+      ...skipped,
+      shopName: 'Later Shop',
+    })
+    expect(updated.shopName).toBe('Later Shop')
+    expect(updated.setupSkipped).toBe(true)
+
+    const reloaded = loadShopSettings(getDatabase())
+    expect(reloaded.setupSkipped).toBe(true)
   })
 
   it('returns the customer count from SQLite', async () => {

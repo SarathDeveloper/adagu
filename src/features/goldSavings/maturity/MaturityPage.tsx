@@ -142,7 +142,7 @@ export function MaturityPage() {
             />
             <StatCard label="Total eligible gold" value={formatWeight(eligibleGold, 3)} tone="brand" />
           </div>
-          <section className="card padded">
+          <section className="card padded" data-entry="">
             <h2 className="settings-section-title">Payout</h2>
             <p className="muted">
               The customer is paid for their gold at the rate below. No gold, jewellery or bill is issued. A payout
@@ -200,6 +200,8 @@ export function MaturityPage() {
               <button
                 type="button"
                 className="btn"
+                data-entry-save=""
+                title="Ctrl+S"
                 disabled={rate <= 0 || busy}
                 onClick={() => setConfirm(true)}
               >

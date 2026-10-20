@@ -39,7 +39,7 @@ export function ChangePasswordPage() {
 
   return (
     <div className="auth-screen">
-      <form className="card padded auth-card" onSubmit={(event) => void onSubmit(event)}>
+      <form className="card padded auth-card" data-entry="" onSubmit={(event) => void onSubmit(event)}>
         <h1>Change password</h1>
         <p className="muted">
           {user?.mustChangePassword
@@ -77,7 +77,7 @@ export function ChangePasswordPage() {
           />
         </label>
         {error ? <p className="error-banner">{error}</p> : null}
-        <button type="submit" className="btn" disabled={busy}>
+        <button type="submit" className="btn" data-entry-save="" title="Ctrl+S" disabled={busy}>
           {busy ? 'Saving…' : 'Save password'}
         </button>
       </form>

@@ -32,6 +32,7 @@ export function InterestCollectionModal({
       title={`Collect interest · ${summary.receiptNo}`}
       onClose={onClose}
       busy={busy}
+      entry
       footer={
         <div className="modal-actions">
           <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>
@@ -40,6 +41,8 @@ export function InterestCollectionModal({
           <button
             type="button"
             className="btn"
+            data-entry-save=""
+            title="Ctrl+S"
             disabled={busy || amount <= 0}
             onClick={() => onSubmit({ amount, collectedDate, mode })}
           >

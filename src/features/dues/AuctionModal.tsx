@@ -110,6 +110,7 @@ export function AuctionModal({
       <Modal
         title={`Auction notice · ${summary.receiptNo}`}
         onClose={onClose}
+        entry
         footer={
           <div className="modal-actions">
             <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>
@@ -118,6 +119,8 @@ export function AuctionModal({
             <button
               type="button"
               className="btn"
+              data-entry-save=""
+              title="Ctrl+S"
               disabled={busy}
               onClick={() => onNotice({ noticeDate })}
             >
@@ -161,6 +164,7 @@ export function AuctionModal({
     <Modal
       title={`Record auction · ${summary.receiptNo}`}
       onClose={onClose}
+      entry
       footer={
         <div className="modal-actions">
           <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>
@@ -169,6 +173,8 @@ export function AuctionModal({
           <button
             type="button"
             className="btn"
+            data-entry-save=""
+            title="Ctrl+S"
             disabled={busy}
             onClick={() =>
               onAuction({

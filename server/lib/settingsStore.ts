@@ -51,6 +51,8 @@ const SHOP_KEYS = {
   pawnbrokerLicenseNo: 'pawnbroker_license_no',
 } as const
 
+const SETUP_SKIPPED_KEY = 'shop_setup_skipped'
+
 const DEFAULT_PLEDGE_LTV_PCT = 75
 const DEFAULT_ADAGU_INTEREST_PCT = 2.1
 const DEFAULT_ADAGU_AUCTION_NOTICE_DAYS = 14
@@ -177,10 +179,19 @@ export function loadShopSettings(db: ReturnType<typeof getDatabase>): ShopSettin
       getShopSetting(db, SHOP_KEYS.adaguReminderTemplate, DEFAULT_ADAGU_REMINDER_TEMPLATE),
     ),
     pawnbrokerLicenseNo: getShopSetting(db, SHOP_KEYS.pawnbrokerLicenseNo, '').trim(),
+    setupSkipped: parseBooleanSetting(getShopSetting(db, SETUP_SKIPPED_KEY, '0')),
   }
 }
 
-export function saveShopSettings(db: ReturnType<typeof getDatabase>, input: ShopSettings): ShopSettings {
+export function markShopSetupSkipped(db: ReturnType<typeof getDatabase>): ShopSettings {
+  setShopSetting(db, SETUP_SKIPPED_KEY, '1')
+  return loadShopSettings(db)
+}
+
+export function saveShopSettings(
+  db: ReturnType<typeof getDatabase>,
+  input: Omit<ShopSettings, 'setupSkipped'>,
+): ShopSettings {
   setShopSetting(db, SHOP_KEYS.shopName, input.shopName)
   setShopSetting(db, SHOP_KEYS.tagline, input.tagline)
   setShopSetting(db, SHOP_KEYS.appSubtitle, input.appSubtitle)

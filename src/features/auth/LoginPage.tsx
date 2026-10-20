@@ -41,7 +41,7 @@ export function LoginPage() {
 
   return (
     <div className="auth-screen">
-      <form className="card padded auth-card" onSubmit={(event) => void onSubmit(event)}>
+      <form className="card padded auth-card" data-entry="" onSubmit={(event) => void onSubmit(event)}>
         <div className="auth-brand">
           {logoSrc ? <img src={logoSrc} alt="" className="auth-logo" /> : null}
           <h1>{shopName || 'AdaguTrackerPro'}</h1>
@@ -67,7 +67,7 @@ export function LoginPage() {
           />
         </label>
         {error ? <p className="error-banner">{error}</p> : null}
-        <button type="submit" className="btn" disabled={busy || !username.trim() || !password}>
+        <button type="submit" className="btn" data-entry-save="" title="Ctrl+S" disabled={busy || !username.trim() || !password}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>

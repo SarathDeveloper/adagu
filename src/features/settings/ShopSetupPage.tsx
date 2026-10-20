@@ -64,6 +64,20 @@ export function ShopSetupPage() {
     }
   }
 
+  async function onSkip() {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.skipShopSetup()
+      await refresh()
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not skip shop setup')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (!settings) return
@@ -102,7 +116,7 @@ export function ShopSetupPage() {
 
   return (
     <div className="auth-screen">
-      <form className="card padded auth-card auth-card--setup" onSubmit={(event) => void onSubmit(event)}>
+      <form className="card padded auth-card auth-card--setup" data-entry="" onSubmit={(event) => void onSubmit(event)}>
         <div className="auth-brand">
           <h1>Set up your shop</h1>
           <p className="muted">
@@ -171,15 +185,25 @@ export function ShopSetupPage() {
                   }}
                 />
               </label>
+              {logoSrc ? (
+                <button type="button" className="btn secondary" onClick={() => setLogoImagePath('')}>
+                  Remove logo
+                </button>
+              ) : null}
               <p className="muted">Optional. PNG or JPG, up to 2MB.</p>
             </div>
           </>
         ) : null}
         {error ? <p className="error-banner">{error}</p> : null}
         {!loading && isAdmin ? (
-          <button type="submit" className="btn" disabled={busy || !settings}>
-            {busy ? 'Saving…' : 'Save and continue'}
-          </button>
+          <>
+            <button type="submit" className="btn" data-entry-save="" title="Ctrl+S" disabled={busy || !settings}>
+              {busy ? 'Saving…' : 'Save and continue'}
+            </button>
+            <button type="button" className="btn secondary" disabled={busy || !settings} onClick={() => void onSkip()}>
+              Skip this step
+            </button>
+          </>
         ) : null}
         {!loading ? (
           <button type="button" className="btn secondary" onClick={() => void logout()}>

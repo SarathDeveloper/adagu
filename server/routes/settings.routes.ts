@@ -7,7 +7,7 @@ import { requireFeature } from '../auth/middleware'
 import { getDatabase } from '../db'
 import { asyncHandler, HttpError, parseBody } from '../lib/http'
 import { getUploadsDir } from '../lib/paths'
-import { loadShopSettings, saveShopSettings } from '../lib/settingsStore'
+import { loadShopSettings, markShopSetupSkipped, saveShopSettings } from '../lib/settingsStore'
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
@@ -55,6 +55,14 @@ router.put(
   asyncHandler((req, res) => {
     const input = parseBody(shopSettingsSchema, req.body)
     res.json(saveShopSettings(getDatabase(), input))
+  }),
+)
+
+router.post(
+  '/skip-setup',
+  requireFeature('settings'),
+  asyncHandler((_req, res) => {
+    res.json(markShopSetupSkipped(getDatabase()))
   }),
 )
 

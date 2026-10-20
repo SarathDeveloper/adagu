@@ -75,6 +75,7 @@ export function RenewModal({
       title={`Renew loan · ${summary.receiptNo}`}
       onClose={onClose}
       busy={busy}
+      entry
       footer={
         <div className="modal-actions">
           <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>
@@ -83,6 +84,8 @@ export function RenewModal({
           <button
             type="button"
             className="btn"
+            data-entry-save=""
+            title="Ctrl+S"
             disabled={busy || newLoanAmount < 0 || blocked}
             onClick={() =>
               onSubmit({ renewDate, mode, newLoanAmount, note, allowAboveLtv: isAdmin && allowAboveLtv })

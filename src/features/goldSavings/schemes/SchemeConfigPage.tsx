@@ -300,12 +300,13 @@ function SchemeFormModal({
       title={editing ? `Edit ${editing.code}` : 'New scheme'}
       className="modal-wide"
       onClose={onClose}
+      entry
       footer={
         <div className="modal-actions">
           <button type="button" className="btn secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="btn" disabled={saving} onClick={() => void save()}>
+          <button type="button" className="btn" data-entry-save="" title="Ctrl+S" disabled={saving} onClick={() => void save()}>
             {saving ? 'Saving…' : 'Save scheme'}
           </button>
         </div>

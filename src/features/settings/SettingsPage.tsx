@@ -27,7 +27,7 @@ import { printPreviewPaths } from '../print/printPreviewPaths'
 import { PrintersSettings } from './PrintersSettings'
 import { BackupSettings } from './BackupSettings'
 import { RequiredMark } from './ShopHeaderFields'
-import { useShopBranding } from './shopBrandingContext'
+import { shopInitials, useShopBranding } from './shopBrandingContext'
 import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 
 type SettingsTab = 'invoice' | 'printers' | 'backup' | 'data'
@@ -94,6 +94,7 @@ function DashedImageField({
   hint,
   preview,
   onPick,
+  onClear,
 }: {
   label: string
   optional?: boolean
@@ -101,6 +102,7 @@ function DashedImageField({
   hint: string
   preview: ReactNode
   onPick: (file: File) => void
+  onClear?: () => void
 }) {
   return (
     <div className="settings-identity-field">
@@ -134,6 +136,11 @@ function DashedImageField({
             onChange={(event) => pickFile(event, onPick)}
           />
         </label>
+        {onClear ? (
+          <button type="button" className="settings-remove-file" onClick={onClear}>
+            Remove logo
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -229,7 +236,7 @@ export function SettingsPage() {
     try {
       const saved = await api.updateShopSettings(current)
       updateShop(saved)
-      refreshBranding()
+      await refreshBranding()
       showToast(successMessage, 'success')
       setError(null)
       return true
@@ -271,6 +278,14 @@ export function SettingsPage() {
     }
   }
 
+  async function clearLogo() {
+    const next = shopRef.current ? { ...shopRef.current, logoImagePath: '' } : null
+    if (!next) return
+    updateShop(next)
+    setError(null)
+    await saveShop('none', 'Logo removed')
+  }
+
   const tabs: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
     { id: 'invoice', label: 'Adagu Settings', icon: FileText },
     { id: 'printers', label: 'Printers', icon: Printer },
@@ -289,7 +304,9 @@ export function SettingsPage() {
               {headerLogoSrc ? (
                 <img className="settings-header-chip-logo" src={headerLogoSrc} alt="" />
               ) : (
-                <Store className="settings-header-chip-icon" size={18} strokeWidth={1.75} aria-hidden />
+                <span className="settings-header-chip-initials" aria-hidden>
+                  {shopInitials(shopDisplay.name)}
+                </span>
               )}
               <div className="settings-header-chip-text">
                 <strong>{shopDisplay.name}</strong>
@@ -336,7 +353,7 @@ export function SettingsPage() {
         <div className="settings-stack">
           {tab === 'invoice' && shop && (
             <div className="settings-invoice-stack">
-              <div className="card settings-identity-card">
+              <div className="card settings-identity-card" data-entry="">
                 <div className="settings-identity-head">
                   <div className="settings-identity-title">
                     <span className="settings-identity-badge" aria-hidden>
@@ -353,6 +370,8 @@ export function SettingsPage() {
                   <button
                     type="button"
                     className="btn"
+                    data-entry-save=""
+                    title="Ctrl+S"
                     onClick={() => void saveShop('printHeader', 'Shop details saved')}
                   >
                     <Save size={16} strokeWidth={1.75} aria-hidden />
@@ -471,6 +490,7 @@ export function SettingsPage() {
                         )
                       }
                       onPick={(file) => void pickImage('logoImagePath', file)}
+                      onClear={shop.logoImagePath ? () => void clearLogo() : undefined}
                     />
                     <DashedImageField
                       label="Signature Image"
@@ -594,7 +614,7 @@ export function SettingsPage() {
                 ) : null}
               </div>
 
-              <div className="card padded">
+              <div className="card padded" data-entry="">
                 <div className="settings-card-head">
                   <div>
                     <h2 className="settings-section-title">Adagu Settings</h2>
@@ -606,6 +626,8 @@ export function SettingsPage() {
                     <button
                       type="button"
                       className="btn"
+                      data-entry-save=""
+                      title="Ctrl+S"
                       onClick={() => void saveShop('printHeader', 'Adagu settings saved')}
                     >
                       <Save size={16} strokeWidth={1.75} aria-hidden />

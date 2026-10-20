@@ -332,7 +332,7 @@ export function BackupSettings() {
         </p>
       </div>
 
-      <div className="card padded backup-schedule">
+      <div className="card padded backup-schedule" data-entry="">
         <div className="settings-card-head">
           <div>
             <h2 className="settings-section-title">Automatic backup</h2>
@@ -374,12 +374,12 @@ export function BackupSettings() {
             ? `Next backup ${formatDisplayDateTime(nextBackup)}`
             : 'Due now — will run shortly'}
         </p>
-        <button type="button" className="btn settings-save-btn" disabled={busy} onClick={() => void saveSchedule()}>
+        <button type="button" className="btn settings-save-btn" data-entry-save="" title="Ctrl+S" disabled={busy} onClick={() => void saveSchedule()}>
           Save Changes
         </button>
       </div>
 
-      <div className="card padded backup-offsite">
+      <div className="card padded backup-offsite" data-entry="">
         <div className="settings-card-head">
           <div>
             <h2 className="settings-section-title">Off-machine copy</h2>
@@ -425,7 +425,7 @@ export function BackupSettings() {
                 : 'Leave empty to turn this off'}
         </p>
         <div className="backup-offsite-actions">
-          <button type="button" className="btn settings-save-btn" disabled={busy} onClick={() => void saveSchedule()}>
+          <button type="button" className="btn settings-save-btn" data-entry-save="" title="Ctrl+S" disabled={busy} onClick={() => void saveSchedule()}>
             Save Changes
           </button>
           <button

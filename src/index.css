@@ -184,6 +184,12 @@ button {
   height: 100%;
   object-fit: contain;
 }
+.brand-icon-initials {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
 .brand-text {
   font-size: 1.125rem;
   font-weight: 600;
@@ -5656,7 +5662,8 @@ label {
   cursor: pointer;
 }
 .billing-customer-option:hover,
-.billing-customer-option:focus-visible {
+.billing-customer-option:focus-visible,
+.billing-customer-option.is-active {
   background: var(--brand-soft);
 }
 .billing-customer-option--unavailable,
@@ -6089,6 +6096,20 @@ label {
 .settings-choose-file svg {
   color: var(--brand);
 }
+.settings-remove-file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface);
+  color: var(--danger);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
 @media (max-width: 800px) {
   .settings-identity-head {
     flex-direction: column;
@@ -6134,6 +6155,20 @@ label {
   object-fit: contain;
   border-radius: 0.25rem;
   background: transparent;
+}
+.settings-header-chip-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.25rem;
+  background: rgba(126, 58, 242, 0.12);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
 }
 .settings-header-chip-text {
   min-width: 0;

@@ -273,6 +273,7 @@ export const api = {
   getRecordCounts: () => request<RecordCounts>('/api/settings/counts'),
   updateShopSettings: (input: ShopSettings) =>
     request<ShopSettings>('/api/settings', { method: 'PUT', body: JSON.stringify(input) }),
+  skipShopSetup: () => request<ShopSettings>('/api/settings/skip-setup', { method: 'POST' }),
   uploadShopImage: async (file: File) => {
     const body = new FormData()
     // Uploaded images are shrunk first: they print a few centimetres wide but

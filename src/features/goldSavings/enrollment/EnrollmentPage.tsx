@@ -120,7 +120,7 @@ export function EnrollmentPage() {
         subtitle="Creates the scheme account, installment schedule and optional first receipt"
       />
       {error ? <div className="error-banner">{error}</div> : null}
-      <div className="settings-shop-workspace">
+      <div className="settings-shop-workspace" data-entry="">
         <div className="settings-stack">
           <section className="card padded">
             <h2 className="settings-section-title">Customer information</h2>
@@ -270,7 +270,7 @@ export function EnrollmentPage() {
               </div>
             ) : null}
             <div className="modal-actions">
-              <button type="button" className="btn" disabled={!ready || saving} onClick={() => setConfirmOpen(true)}>
+              <button type="button" className="btn" data-entry-save="" title="Ctrl+S" disabled={!ready || saving} onClick={() => setConfirmOpen(true)}>
                 Create scheme account
               </button>
             </div>

@@ -889,7 +889,7 @@ export function PledgeEditorPage() {
   }
 
   return (
-    <div className="adagu-editor-container sale-bill-editor">
+    <div className="adagu-editor-container sale-bill-editor" data-entry="">
       <header className="adagu-page-header sale-bill-toolbar">
         <div className="adagu-header-left">
           <div className="adagu-header-icon">
@@ -978,6 +978,8 @@ export function PledgeEditorPage() {
                 type="button"
                 className="btn secondary"
                 disabled={busy}
+                data-entry-save=""
+                title="Ctrl+S"
                 onClick={() => void saveDraft()}
               >
                 <Save size={16} strokeWidth={1.75} aria-hidden />
@@ -1632,6 +1634,7 @@ export function PledgeEditorPage() {
       {redeemOpen ? (
         <Modal
           title="Collect / Redeem"
+          entry
           onClose={() => setRedeemOpen(false)}
           footer={
             <div className="modal-actions">

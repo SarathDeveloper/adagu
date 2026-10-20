@@ -108,6 +108,7 @@ export interface ShopSettings {
   adaguRequireKyc: boolean
   adaguReminderTemplate: string
   pawnbrokerLicenseNo: string
+  setupSkipped: boolean
 }
 
 export interface MetalRates {

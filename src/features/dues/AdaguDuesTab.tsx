@@ -616,6 +616,7 @@ export function AdaguDuesTab({
       {redeemTarget ? (
         <Modal
           title={`Close Adagu loan · ${redeemTarget.receiptNo}`}
+          entry
           onClose={() => setRedeemTarget(null)}
           footer={
             <div className="modal-actions">

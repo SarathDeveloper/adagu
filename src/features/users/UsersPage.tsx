@@ -254,7 +254,7 @@ export function UsersPage() {
           </div>
         </div>
 
-        <form className="users-form" onSubmit={(event) => void onCreate(event)}>
+        <form className="users-form" data-entry="" onSubmit={(event) => void onCreate(event)}>
           <div className="users-form-row">
             <label className="users-field">
               <span>
@@ -333,7 +333,7 @@ export function UsersPage() {
             </div>
           ) : null}
 
-          <button type="submit" className="btn users-create-btn">
+          <button type="submit" className="btn users-create-btn" data-entry-save="" title="Ctrl+S">
             <Plus size={16} strokeWidth={2} aria-hidden />
             Create user
           </button>
@@ -503,12 +503,13 @@ export function UsersPage() {
         <Modal
           title={`Permissions for ${editingUser.username}`}
           onClose={() => setEditingId(null)}
+          entry
           footer={
             <div className="modal-actions">
               <button type="button" className="btn secondary" onClick={() => setEditingId(null)}>
                 Cancel
               </button>
-              <button type="button" className="btn" onClick={() => void savePermissions(editingUser.id)}>
+              <button type="button" className="btn" data-entry-save="" title="Ctrl+S" onClick={() => void savePermissions(editingUser.id)}>
                 Save
               </button>
             </div>

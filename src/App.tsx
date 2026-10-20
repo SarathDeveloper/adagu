@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { router } from './app/routes'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { FatalErrorGate } from './components/FatalErrorGate'
+import { FormEntryKeys } from './components/FormEntryKeys'
 import { LoadingState } from './components/LoadingState'
 import { ToastProvider } from './components/Toast'
 import { AuthProvider } from './features/auth/authContext'
@@ -13,6 +14,7 @@ function App() {
     <FatalErrorGate>
       <ErrorBoundary>
         <ToastProvider>
+          <FormEntryKeys />
           <AuthProvider>
             <ShopBrandingProvider>
               <ErrorBoundary>

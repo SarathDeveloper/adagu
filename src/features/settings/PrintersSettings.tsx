@@ -17,7 +17,7 @@ export function PrintersSettings({
   onSave: () => void
 }) {
   return (
-    <div className="card padded">
+    <div className="card padded" data-entry="">
       <div className="settings-card-head">
         <div>
           <h2 className="settings-section-title">Printers</h2>
@@ -39,7 +39,7 @@ export function PrintersSettings({
         />
       </div>
 
-      <button type="button" className="btn settings-save-btn" onClick={onSave}>
+      <button type="button" className="btn settings-save-btn" data-entry-save="" title="Ctrl+S" onClick={onSave}>
         Save Changes
       </button>
     </div>

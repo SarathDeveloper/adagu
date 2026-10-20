@@ -2,7 +2,6 @@ import { useEffect, useState, Suspense } from 'react'
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom'
 import {
   BarChart3,
-  Gem,
   Handshake,
   House,
   LogOut,
@@ -17,7 +16,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import type { FeatureKey } from '@shared/types'
 import { useAuth } from '../../features/auth/authContext'
-import { useShopBranding } from '../../features/settings/shopBrandingContext'
+import { shopInitials, useShopBranding } from '../../features/settings/shopBrandingContext'
 import { BackupHealthBanner } from '../../features/settings/BackupHealthBanner'
 import { localImageSrc } from '../../features/print/mapShopDisplay'
 import { LoadingState } from '../../components/LoadingState'
@@ -105,7 +104,7 @@ export function AppLayout() {
   const brandIcon = logoSrc ? (
     <img src={logoSrc} alt="" />
   ) : (
-    <Gem size={20} strokeWidth={1.75} />
+    <span className="brand-icon-initials">{shopInitials(shopName)}</span>
   )
 
   return (

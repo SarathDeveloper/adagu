@@ -47,6 +47,7 @@ function shop(overrides: Partial<ShopSettings> = {}): ShopSettings {
     adaguRequireKyc: false,
     adaguReminderTemplate: '',
     pawnbrokerLicenseNo: '',
+    setupSkipped: false,
     ...overrides,
   }
 }

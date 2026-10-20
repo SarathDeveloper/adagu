@@ -57,6 +57,7 @@ export function TopupModal({
       title={`Extra loan · ${summary.receiptNo}`}
       onClose={onClose}
       busy={busy}
+      entry
       footer={
         <div className="modal-actions">
           <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>
@@ -65,6 +66,8 @@ export function TopupModal({
           <button
             type="button"
             className="btn"
+            data-entry-save=""
+            title="Ctrl+S"
             disabled={busy || amount <= 0 || blocked}
             onClick={() => onSubmit({ amount, topupDate, note, allowAboveLtv: isAdmin && allowAboveLtv })}
           >

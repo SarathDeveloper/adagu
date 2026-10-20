@@ -115,12 +115,13 @@ export function CustomerFormModal({
     <Modal
       title={editing ? 'Edit customer' : 'Add customer'}
       onClose={onClose}
+      entry
       footer={
         <div className="modal-actions">
           <button type="button" className="btn secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          <button type="button" className="btn" onClick={() => void save()} disabled={saving}>
+          <button type="button" className="btn" data-entry-save="" title="Ctrl+S" onClick={() => void save()} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>

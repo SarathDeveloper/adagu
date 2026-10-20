@@ -144,6 +144,7 @@ export function CollectPaymentModal({
         className="modal-wide"
         title={`Collect ${detail.account.accountNo}`}
         onClose={onClose}
+        entry
         footer={
           <div className="modal-actions">
             <button type="button" className="btn secondary" disabled={saving} onClick={onClose}>
@@ -152,6 +153,8 @@ export function CollectPaymentModal({
             <button
               type="button"
               className="btn"
+              data-entry-save=""
+              title="Ctrl+S"
               disabled={!nextInstallment || saving || rateBlocked}
               onClick={() => setConfirm(true)}
             >
