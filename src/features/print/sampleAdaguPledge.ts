@@ -37,6 +37,8 @@ export const SAMPLE_ADAGU_PLEDGE: Pledge = {
       pieces: 1,
       ratePerGram: 6000,
       itemValue: 48900,
+      releasedAt: null,
+      releasedPaymentId: null,
     },
     {
       id: 2,
@@ -51,6 +53,8 @@ export const SAMPLE_ADAGU_PLEDGE: Pledge = {
       pieces: 1,
       ratePerGram: 6000,
       itemValue: 12300,
+      releasedAt: null,
+      releasedPaymentId: null,
     },
   ],
   topups: [],

@@ -11,6 +11,7 @@ import {
   pledgeInputSchema,
   pledgePhotoKindSchema,
   pledgeRedeemInputSchema,
+  pledgeReleaseItemInputSchema,
   pledgeRenewInputSchema,
   pledgeSanctionInputSchema,
   pledgeShortfallInputSchema,
@@ -24,6 +25,7 @@ import {
   parseAdgSeq,
 } from '@shared/billing/pledgeMath'
 import { itemValue, maxLoanForValue, ratePerGram } from '@shared/billing/pledgeValuation'
+import { assertReleaseAmount, quotePledgeItemRelease } from '@shared/billing/pledgeRelease'
 import { roundMoney } from '@shared/billing/pricing'
 import { localTodayIso } from '@shared/localDate'
 import type {
@@ -38,6 +40,7 @@ import type {
   PledgeItemInput,
   PledgePhotoKind,
   PledgeRedeemInput,
+  PledgeReleaseItemInput,
   PledgeRenewInput,
   PledgeShortfallInput,
   PledgeStatus,
@@ -124,6 +127,8 @@ type PledgeItemRow = {
   pieces: number
   rate_per_gram: number | null
   item_value: number | null
+  released_at: string | null
+  released_payment_id: number | null
 }
 
 type CustomerSnapshot = {
@@ -162,6 +167,8 @@ function mapItem(row: PledgeItemRow): PledgeItem {
     pieces: row.pieces,
     ratePerGram: row.rate_per_gram ?? 0,
     itemValue: row.item_value ?? 0,
+    releasedAt: row.released_at ?? null,
+    releasedPaymentId: row.released_payment_id ?? null,
   }
 }
 
@@ -169,7 +176,8 @@ function loadItems(db: ReturnType<typeof getDatabase>, pledgeId: number): Pledge
   const rows = db
     .prepare(
       `SELECT id, pledge_id, description, identification, metal, purity,
-              gross_weight, stone_weight, net_weight, pieces, rate_per_gram, item_value
+              gross_weight, stone_weight, net_weight, pieces, rate_per_gram, item_value,
+              released_at, released_payment_id
        FROM pledge_items WHERE pledge_id = ? ORDER BY id`,
     )
     .all(pledgeId) as PledgeItemRow[]
@@ -491,8 +499,8 @@ router.get(
     const rows = db
       .prepare(
         `SELECT p.*, c.name AS customer_name, c.phone AS customer_phone,
-                (SELECT COUNT(*) FROM pledge_items WHERE pledge_id = p.id) AS item_count,
-                (SELECT COALESCE(SUM(net_weight), 0) FROM pledge_items WHERE pledge_id = p.id) AS total_net_weight
+                (SELECT COUNT(*) FROM pledge_items WHERE pledge_id = p.id AND released_at IS NULL) AS item_count,
+                (SELECT COALESCE(SUM(net_weight), 0) FROM pledge_items WHERE pledge_id = p.id AND released_at IS NULL) AS total_net_weight
          ${fromSql}
          ORDER BY p.pledge_date ${sort}, p.id ${sort}
          LIMIT ? OFFSET ?`,
@@ -643,6 +651,64 @@ router.post(
         kind: interestOnly ? 'interest' : 'part',
         note: interestOnly ? 'Interest collected' : 'Partial collection',
       })
+      return mapPledge(db, getPledgeRow(db, id))
+    })
+    res.json(tx())
+  }),
+)
+
+router.post(
+  '/:id/items/:itemId/release',
+  asyncHandler((req, res) => {
+    const id = parseIdParam(req.params.id)
+    const itemId = parseIdParam(req.params.itemId)
+    const input = parseBody(pledgeReleaseItemInputSchema, req.body) as PledgeReleaseItemInput
+    const db = getDatabase()
+    const tx = db.transaction(() => {
+      const row = getPledgeRow(db, id)
+      const items = loadItems(db, id)
+      const payoff = computePledgePayoff(db, id, input.date)
+      if (!payoff) throw new HttpError(404, 'Pledge not found')
+      let quote
+      try {
+        quote = quotePledgeItemRelease({
+          active: row.status === 'active',
+          assessedValue: row.assessed_value,
+          principalOutstanding: payoff.principalOutstanding,
+          interestDue: payoff.interestDue,
+          payoff: payoff.payoff,
+          ltvPct: loadShopSettings(db).pledgeLtvPct,
+          itemId,
+          items: items.map((item) => ({
+            id: item.id,
+            itemValue: item.itemValue,
+            netWeight: item.netWeight,
+            released: Boolean(item.releasedAt),
+          })),
+        })
+        assertReleaseAmount(quote, input.amount)
+      } catch (err) {
+        throw new HttpError(400, err instanceof Error ? err.message : 'Cannot release this jewel')
+      }
+      const item = items.find((entry) => entry.id === itemId)
+      const payment = recordPledgePayment(db, {
+        pledgeId: id,
+        date: input.date,
+        amount: roundMoney(input.amount),
+        mode: input.mode ?? 'cash',
+        kind: 'part',
+        note: `Released: ${item?.description?.trim() || 'jewel'}`,
+        closeWhenSettled: false,
+      })
+      db.prepare(
+        `UPDATE pledge_items
+         SET released_at = ?, released_payment_id = ?
+         WHERE id = ? AND pledge_id = ?`,
+      ).run(input.date, payment.id, itemId, id)
+      db.prepare('UPDATE pledges SET assessed_value = ? WHERE id = ?').run(
+        roundMoney(Math.max(0, row.assessed_value - (item?.itemValue ?? 0))),
+        id,
+      )
       return mapPledge(db, getPledgeRow(db, id))
     })
     res.json(tx())

@@ -1451,4 +1451,72 @@ describe('pledges API', () => {
     // Old ticket + new ticket would be 40000; the renewed chain counts once.
     expect(row?.loan).toBe(20000)
   })
+
+  it('releases one jewel for its share plus interest, and undo restores it', async () => {
+    const customerId = await createPledgeCustomer('Partial Release', '9000000077')
+    const created = await createDraftPledge(customerId, [
+      goldItem('Chain', { grossWeight: 20, netWeight: 20, itemValue: 30000 }),
+      goldItem('Ring', { grossWeight: 8, netWeight: 8, itemValue: 10000 }),
+    ])
+    expect(created.status).toBe(201)
+    const pledgeId = created.body.id as number
+    const sanctioned = await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
+    expect(sanctioned.status).toBe(200)
+
+    const detail = await getTestAgent().get(`/api/pledges/${pledgeId}`)
+    const ring = (detail.body.items as Array<{ id: number; description: string }>).find(
+      (item) => item.description === 'Ring',
+    )
+    const chain = (detail.body.items as Array<{ id: number; description: string }>).find(
+      (item) => item.description === 'Chain',
+    )
+    expect(ring?.id).toBeTruthy()
+
+    const payoff = await getTestAgent().get(`/api/pledges/${pledgeId}/payoff?date=2026-08-01`)
+    expect(payoff.status).toBe(200)
+    const interestDue = payoff.body.interestDue as number
+    expect(interestDue).toBeGreaterThan(0)
+
+    const released = await getTestAgent()
+      .post(`/api/pledges/${pledgeId}/items/${ring!.id}/release`)
+      .send({ date: '2026-08-01', amount: interestDue + 5000, mode: 'cash' })
+    expect(released.status).toBe(200)
+    expect(released.body.status).toBe('active')
+    expect(released.body.assessedValue).toBe(30000)
+    const releasedRing = (
+      released.body.items as Array<{ id: number; releasedAt: string | null }>
+    ).find((item) => item.id === ring!.id)
+    expect(releasedRing?.releasedAt).toBe('2026-08-01')
+    const payment = (
+      released.body.payments as Array<{ interestPart: number; principalPart: number; note: string }>
+    ).at(-1)
+    expect(payment?.interestPart).toBeCloseTo(interestDue, 2)
+    expect(payment?.principalPart).toBeCloseTo(5000, 2)
+    expect(payment?.note).toContain('Ring')
+
+    const after = await getTestAgent().get(`/api/pledges/${pledgeId}/payoff?date=2026-08-01`)
+    expect(after.body.principalOutstanding).toBeCloseTo(15000, 2)
+    expect(after.body.interestDue).toBeCloseTo(0, 2)
+
+    const list = await getTestAgent().get('/api/pledges?status=active&q=Partial Release')
+    const row = (
+      list.body.items as Array<{ id: number; itemCount?: number; totalNetWeight?: number }>
+    ).find((item) => item.id === pledgeId)
+    expect(row?.itemCount).toBe(1)
+    expect(row?.totalNetWeight).toBeCloseTo(20, 3)
+
+    const lastJewel = await getTestAgent()
+      .post(`/api/pledges/${pledgeId}/items/${chain!.id}/release`)
+      .send({ date: '2026-08-01', amount: 15000, mode: 'cash' })
+    expect(lastJewel.status).toBe(400)
+
+    const undone = await getTestAgent().delete(`/api/pledges/${pledgeId}/payments/latest`)
+    expect(undone.status).toBe(200)
+    expect(undone.body.status).toBe('active')
+    expect(undone.body.assessedValue).toBe(40000)
+    const restored = (
+      undone.body.items as Array<{ id: number; releasedAt: string | null }>
+    ).find((item) => item.id === ring!.id)
+    expect(restored?.releasedAt).toBeNull()
+  })
 })

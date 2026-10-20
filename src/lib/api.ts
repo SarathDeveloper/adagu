@@ -33,6 +33,7 @@ import type {
   PledgePhoto,
   PledgePhotoKind,
   PledgeRedeemInput,
+  PledgeReleaseItemInput,
   PledgeReminderEntry,
   PledgeRenewInput,
   PledgeShortfallInput,
@@ -204,6 +205,11 @@ export const api = {
     }),
   collectPledge: (input: PledgeCollectInput) =>
     request<Pledge>(`/api/pledges/${input.id}/collect`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  releasePledgeItem: (id: number, itemId: number, input: PledgeReleaseItemInput) =>
+    request<Pledge>(`/api/pledges/${id}/items/${itemId}/release`, {
       method: 'POST',
       body: JSON.stringify(input),
     }),

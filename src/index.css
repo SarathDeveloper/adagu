@@ -8358,6 +8358,19 @@ label {
 .adagu-action-btn-red:hover {
   background: var(--danger-soft);
 }
+.adagu-release-btn {
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.adagu-release-btn:hover {
+  background: var(--surface-muted, #f4f4f5);
+}
 .bill-empty-hint {
   margin: 0.25rem 0 0.75rem;
   color: var(--text-muted);

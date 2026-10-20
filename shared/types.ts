@@ -396,6 +396,9 @@ export interface PledgeItem {
   pieces: number
   ratePerGram: number
   itemValue: number
+  /** Set when this jewel was handed back while the loan stayed open. */
+  releasedAt: string | null
+  releasedPaymentId: number | null
 }
 
 export interface PledgeItemInput {
@@ -547,6 +550,12 @@ export interface PledgeRedeemInput {
   redeemedDate: string
   amountCollected: number
   discount?: number
+  mode?: PledgePaymentMode
+}
+
+export interface PledgeReleaseItemInput {
+  date: string
+  amount: number
   mode?: PledgePaymentMode
 }
 

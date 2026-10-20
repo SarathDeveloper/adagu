@@ -432,6 +432,21 @@
   height: 28mm;
 }
 
+.adagu-receipt-released {
+  margin: 2mm 0 0;
+  font-size: 8.5pt;
+}
+
+.adagu-receipt-released h2 {
+  margin: 0 0 1mm;
+  font-size: 9pt;
+}
+
+.adagu-receipt-released ul {
+  margin: 0;
+  padding-left: 4mm;
+}
+
 @media print {
   .pledge-print-page {
     min-height: auto;

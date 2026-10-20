@@ -26,6 +26,7 @@ import type {
   PledgePayment,
   PledgePayoff,
   PledgeRedeemInput,
+  PledgeReleaseItemInput,
   PledgeShortfallInput,
   PledgeTopup,
   PledgeTopupInput,
@@ -105,6 +106,7 @@ export interface JewelTrackerProApi {
   sanctionPledge: (id: number) => Promise<Pledge>
   redeemPledge: (input: PledgeRedeemInput) => Promise<Pledge>
   collectPledge: (input: PledgeCollectInput) => Promise<Pledge>
+  releasePledgeItem: (id: number, itemId: number, input: PledgeReleaseItemInput) => Promise<Pledge>
   forfeitPledge: (input: PledgeForfeitInput) => Promise<Pledge>
   listPledgeTopups: (id: number) => Promise<PledgeTopup[]>
   addPledgeTopup: (input: PledgeTopupInput) => Promise<Pledge>

@@ -5,6 +5,7 @@ describe('printPreviewPaths', () => {
   it('builds pledge, gold savings, and sample paths', () => {
     expect(printPreviewPaths.pledge(4)).toBe('/print/pledge/4')
     expect(printPreviewPaths.pledgeRelease(4)).toBe('/print/pledge-release/4')
+    expect(printPreviewPaths.pledgeItemRelease(4, 9)).toBe('/print/pledge-release-item/4/9')
     expect(printPreviewPaths.pledgeNotice(4)).toBe('/print/pledge-notice/4')
     expect(printPreviewPaths.gsPassbook(9)).toBe('/print/gs-passbook/9')
     expect(printPreviewPaths.gsPayout(7)).toBe('/print/gs-payout/7')

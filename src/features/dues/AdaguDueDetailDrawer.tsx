@@ -16,7 +16,7 @@ import {
   User,
   Zap,
 } from 'lucide-react'
-import type { AdaguDueSummary, DueEntry, Pledge, PledgePayment, PledgeStatus } from '@shared/types'
+import type { AdaguDueSummary, DueEntry, Pledge, PledgeItem, PledgePayment, PledgeStatus } from '@shared/types'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Drawer } from '../../components/Drawer'
 import { LoadingState } from '../../components/LoadingState'
@@ -31,6 +31,9 @@ import { useAuth } from '../auth/authContext'
 import { AdaguQuickActions } from './AdaguQuickActions'
 import { pledgePaymentModeLabel } from './pledgePaymentModes'
 import { PledgePhotosStrip } from '../pledges/PledgePhotosStrip'
+import { ReleaseItemModal } from '../pledges/ReleaseItemModal'
+import { PrintPreviewModal } from '../print/PrintPreviewModal'
+import { printPreviewPaths } from '../print/printPreviewPaths'
 
 function paymentKindLabel(kind: PledgePayment['kind']) {
   if (kind === 'redeem') return 'Loan settled'
@@ -120,6 +123,8 @@ export function AdaguDueDetailDrawer({
   const [undoOpen, setUndoOpen] = useState(false)
   const [undoBusy, setUndoBusy] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
+  const [releaseItem, setReleaseItem] = useState<PledgeItem | null>(null)
+  const [releaseSlipId, setReleaseSlipId] = useState<number | null>(null)
   const moreRef = useRef<HTMLDivElement | null>(null)
   const { isAdmin } = useAuth()
 
@@ -168,6 +173,8 @@ export function AdaguDueDetailDrawer({
     [pledge?.topups, summary.topups],
   )
   const items = pledge?.items ?? []
+  const heldCount = items.filter((item) => !item.releasedAt).length
+  const canReleaseItem = summary.status === 'active' && heldCount > 1
   const settled = summary.status === 'redeemed' || summary.remaining <= 0
   const activeLoan = summary.status === 'active' && summary.remaining > 0
   const statusTone =
@@ -513,6 +520,7 @@ export function AdaguDueDetailDrawer({
                     <th>Metal</th>
                     <th>Net Wt</th>
                     <th>Pcs</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -529,6 +537,20 @@ export function AdaguDueDetailDrawer({
                       </td>
                       <td className="num">{formatWeight(item.netWeight)}</td>
                       <td className="num">{item.pieces}</td>
+                      <td>
+                        {item.releasedAt ? (
+                          <span className="muted">Released</span>
+                        ) : canReleaseItem ? (
+                          <button
+                            type="button"
+                            className="adagu-release-btn"
+                            disabled={busy}
+                            onClick={() => setReleaseItem(item)}
+                          >
+                            Release
+                          </button>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -744,6 +766,30 @@ export function AdaguDueDetailDrawer({
           busy={undoBusy}
           onCancel={() => setUndoOpen(false)}
           onConfirm={() => void undoLastPayment()}
+        />
+      ) : null}
+      {releaseItem && pledge ? (
+        <ReleaseItemModal
+          pledgeId={pledge.id}
+          item={releaseItem}
+          assessedValue={pledge.assessedValue}
+          items={pledge.items}
+          onClose={() => setReleaseItem(null)}
+          onReleased={(saved) => {
+            const itemId = releaseItem.id
+            setPledge(saved)
+            setReleaseItem(null)
+            setReloadToken((token) => token + 1)
+            setReleaseSlipId(itemId)
+          }}
+        />
+      ) : null}
+      {releaseSlipId && pledge ? (
+        <PrintPreviewModal
+          title="Item release"
+          path={printPreviewPaths.pledgeItemRelease(pledge.id, releaseSlipId)}
+          pdfFilename={`${pledge.receiptNo}-item.pdf`}
+          onClose={() => setReleaseSlipId(null)}
         />
       ) : null}
     </Drawer>

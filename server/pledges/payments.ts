@@ -248,6 +248,27 @@ export function deleteLatestPledgePayment(
     throw new HttpError(400, 'Only the latest payment can be removed')
   }
 
+  const released = db
+    .prepare(
+      `SELECT COALESCE(SUM(item_value), 0) AS value
+       FROM pledge_items WHERE released_payment_id = ?`,
+    )
+    .get(row.id) as { value: number }
+  if (released.value > 0) {
+    const current = db
+      .prepare('SELECT assessed_value FROM pledges WHERE id = ?')
+      .get(row.pledge_id) as { assessed_value: number }
+    db.prepare('UPDATE pledges SET assessed_value = ? WHERE id = ?').run(
+      roundMoney(current.assessed_value + released.value),
+      row.pledge_id,
+    )
+  }
+  db.prepare(
+    `UPDATE pledge_items
+     SET released_at = NULL, released_payment_id = NULL
+     WHERE released_payment_id = ?`,
+  ).run(row.id)
+
   db.prepare('DELETE FROM customer_dues WHERE pledge_payment_id = ?').run(row.id)
   db.prepare('DELETE FROM pledge_payments WHERE id = ?').run(row.id)
 

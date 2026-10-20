@@ -324,6 +324,12 @@ export const pledgeCollectInputSchema = z.object({
   mode: pledgePaymentModeSchema.optional().default('cash'),
 })
 
+export const pledgeReleaseItemInputSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  amount: z.number().positive(),
+  mode: pledgePaymentModeSchema.optional().default('cash'),
+})
+
 export const pledgeForfeitInputSchema = z.object({
   id: z.number().int().positive(),
   forfeitedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

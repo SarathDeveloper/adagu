@@ -38,10 +38,12 @@ export function PledgePrint({
     pledge.interestPct,
     pledge.pledgeDate,
   )
-  const totalQty = pledge.items.reduce((sum, item) => sum + item.pieces, 0)
-  const totalGross = pledge.items.reduce((sum, item) => sum + item.grossWeight, 0)
-  const totalStone = pledge.items.reduce((sum, item) => sum + (item.stoneWeight ?? 0), 0)
-  const totalNet = pledge.items.reduce((sum, item) => sum + item.netWeight, 0)
+  const heldItems = pledge.items.filter((item) => !item.releasedAt)
+  const releasedItems = pledge.items.filter((item) => item.releasedAt)
+  const totalQty = heldItems.reduce((sum, item) => sum + item.pieces, 0)
+  const totalGross = heldItems.reduce((sum, item) => sum + item.grossWeight, 0)
+  const totalStone = heldItems.reduce((sum, item) => sum + (item.stoneWeight ?? 0), 0)
+  const totalNet = heldItems.reduce((sum, item) => sum + item.netWeight, 0)
   const maskedAadhaar = maskAadhaar(pledge.customerAadhaar)
   const idProofLine = [maskedAadhaar, pledge.customerPan]
     .filter((part) => (part ?? '').trim())
@@ -116,7 +118,7 @@ export function PledgePrint({
           </tr>
         </thead>
         <tbody>
-          {pledge.items.map((item, index) => (
+          {heldItems.map((item, index) => (
             <tr key={item.id}>
               <td className="adagu-receipt-col-center">{index + 1}</td>
               <td className="adagu-receipt-col-desc">
@@ -145,6 +147,20 @@ export function PledgePrint({
           </tr>
         </tbody>
       </table>
+
+      {releasedItems.length > 0 ? (
+        <section className="adagu-receipt-released">
+          <h2>Released</h2>
+          <ul>
+            {releasedItems.map((item) => (
+              <li key={item.id}>
+                {item.description || 'Jewel'} · {item.purity} · net {weight(item.netWeight)}
+                {item.releasedAt ? ` · ${formatDisplayDate(item.releasedAt)}` : ''}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="adagu-receipt-bottom">
         {itemPhoto ? (

@@ -62,7 +62,9 @@ import {
 } from "../../lib/numericField";
 import { CustomerSearch } from "../customers/CustomerSearch";
 import { PledgePreviewModal } from "./PledgePreviewModal";
+import { ReleaseItemModal } from "./ReleaseItemModal";
 import { printPreviewPaths } from "../print/printPreviewPaths";
+import { PrintPreviewModal } from "../print/PrintPreviewModal";
 import { downloadPrintPdf } from "../print/downloadPrintPdf";
 import { PLEDGE_PAYMENT_MODES } from "../dues/pledgePaymentModes";
 import { RenewModal } from "../dues/RenewModal";
@@ -162,6 +164,11 @@ export function PledgeEditorPage() {
   const [redeeming, setRedeeming] = useState(false);
   const [auctioning, setAuctioning] = useState(false);
   const [previewReceiptNo, setPreviewReceiptNo] = useState("");
+  const [releaseItemId, setReleaseItemId] = useState<number | null>(null);
+  const [releaseSlip, setReleaseSlip] = useState<{
+    pledgeId: number;
+    itemId: number;
+  } | null>(null);
   const [loadedPledgeId, setLoadedPledgeId] = useState<string | null>(null);
   const pledgeLoading = !isNew && Boolean(id) && loadedPledgeId !== String(id);
 
@@ -192,6 +199,9 @@ export function PledgeEditorPage() {
   );
   const displayInterestPct = numericFieldToNumber(interestPct);
   const displayBillNo = pledge?.receiptNo || previewReceiptNo || "…";
+  const heldItemCount = (pledge?.items ?? []).filter((row) => !row.releasedAt).length;
+  const releaseTarget =
+    pledge?.items.find((row) => row.id === releaseItemId) ?? null;
 
   useEffect(() => {
     if (!isNew || pledge?.receiptNo) return;
@@ -642,6 +652,15 @@ export function PledgeEditorPage() {
   async function saveDraft() {
     const saved = await persistDraft();
     if (saved) showToast("Draft saved", "success");
+  }
+
+  function handleItemReleased(saved: Pledge) {
+    const itemId = releaseItemId;
+    setPledge(saved);
+    setAssessedValue(saved.assessedValue);
+    setReleaseItemId(null);
+    if (itemId) setReleaseSlip({ pledgeId: saved.id, itemId });
+    showToast("Jewel released", "success");
   }
 
   async function sanctionLoan() {
@@ -1257,6 +1276,9 @@ export function PledgeEditorPage() {
                   const rowMetal = item.metal === "Silver" ? "Silver" : "Gold";
                   const rowPurityOptions =
                     rowMetal === "Silver" ? SILVER_PURITIES : GOLD_PURITIES;
+                  const storedItem = pledge?.items.find(
+                    (row) => String(row.id) === item.key,
+                  );
                   return (
                     <Fragment key={item.key}>
                       <tr data-item={index + 1}>
@@ -1355,14 +1377,29 @@ export function PledgeEditorPage() {
                           </span>
                         </td>
                         <td className="adagu-col-action">
-                          <button
-                            type="button"
-                            className="adagu-action-btn-red"
-                            disabled={!canEdit || busy || jewelleryItems.length <= 1}
-                            onClick={() => removeItem(item.key)}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {isActiveLoan && storedItem?.releasedAt ? (
+                            <span className="muted">Released</span>
+                          ) : null}
+                          {isActiveLoan && storedItem && !storedItem.releasedAt && heldItemCount > 1 ? (
+                            <button
+                              type="button"
+                              className="adagu-release-btn"
+                              disabled={busy}
+                              onClick={() => setReleaseItemId(storedItem.id)}
+                            >
+                              Release
+                            </button>
+                          ) : null}
+                          {!isActiveLoan ? (
+                            <button
+                              type="button"
+                              className="adagu-action-btn-red"
+                              disabled={!canEdit || busy || jewelleryItems.length <= 1}
+                              onClick={() => removeItem(item.key)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          ) : null}
                         </td>
                       </tr>
                       <tr>
@@ -1840,6 +1877,26 @@ export function PledgeEditorPage() {
             setPreviewOpen(false);
             setPreviewTargetId(0);
           }}
+        />
+      ) : null}
+
+      {releaseTarget && pledge ? (
+        <ReleaseItemModal
+          pledgeId={pledge.id}
+          item={releaseTarget}
+          assessedValue={pledge.assessedValue}
+          items={pledge.items}
+          onClose={() => setReleaseItemId(null)}
+          onReleased={handleItemReleased}
+        />
+      ) : null}
+
+      {releaseSlip ? (
+        <PrintPreviewModal
+          title="Item release"
+          path={printPreviewPaths.pledgeItemRelease(releaseSlip.pledgeId, releaseSlip.itemId)}
+          pdfFilename={`${pledge?.receiptNo ?? "release"}-item.pdf`}
+          onClose={() => setReleaseSlip(null)}
         />
       ) : null}
     </div>

@@ -9,6 +9,8 @@ export function withEmbedFlag(path: string): string {
 export const printPreviewPaths = {
   pledge: (pledgeId: number) => `/print/pledge/${pledgeId}`,
   pledgeRelease: (pledgeId: number) => `/print/pledge-release/${pledgeId}`,
+  pledgeItemRelease: (pledgeId: number, itemId: number) =>
+    `/print/pledge-release-item/${pledgeId}/${itemId}`,
   pledgeNotice: (pledgeId: number) => `/print/pledge-notice/${pledgeId}`,
   sample: (kind: SamplePrintKind) => `/print/sample/${kind}`,
   gsPassbook: (accountId: number) => `/print/gs-passbook/${accountId}`,
