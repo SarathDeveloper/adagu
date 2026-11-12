@@ -15,11 +15,7 @@ export function DashboardSearch() {
 
   useEffect(() => {
     const term = query.trim()
-    if (!term) {
-      setResults(null)
-      setOpen(false)
-      return
-    }
+    if (!term) return
     let active = true
     const timer = window.setTimeout(() => {
       void api
@@ -79,7 +75,14 @@ export function DashboardSearch() {
         aria-expanded={open}
         aria-controls="dashboard-search-results"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => {
+          const next = event.target.value
+          setQuery(next)
+          if (!next.trim()) {
+            setResults(null)
+            setOpen(false)
+          }
+        }}
         onFocus={() => {
           if (results && query.trim()) setOpen(true)
         }}

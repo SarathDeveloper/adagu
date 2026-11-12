@@ -62,20 +62,24 @@ function ReportPanel({ report }: { report: ReportDefinition }) {
   const [from, setFrom] = useState(() => defaultFrom(report, todayIso()))
   const [to, setTo] = useState(() => todayIso())
   const [customerId, setCustomerId] = useState('')
-  const [result, setResult] = useState<ReportResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // The last response and the filters it was for. Loading and errors are
+  // derived from it, so the effect only sets state from the async callbacks.
+  const [loaded, setLoaded] = useState<{
+    key: string
+    result: ReportResult | null
+    error: string | null
+  } | null>(null)
+  const requestKey = JSON.stringify([report.id, from, to, customerId])
+  const current = loaded?.key === requestKey ? loaded : null
+  // Keep the previous table on screen while the next filters load.
+  const result = report.available ? (current?.result ?? loaded?.result ?? null) : null
+  const error = report.available ? (current?.error ?? null) : null
+  const loading = Boolean(report.available) && !current
 
   useEffect(() => {
-    if (!report?.available) {
-      setResult(null)
-      setError(null)
-      setLoading(false)
-      return
-    }
+    if (!report?.available) return
     let cancelled = false
-    setLoading(true)
-    setError(null)
+    const key = requestKey
     const asOf = report.dateScope === 'asOf'
     void api
       .runReport(report.id, {
@@ -84,21 +88,21 @@ function ReportPanel({ report }: { report: ReportDefinition }) {
         customerId: customerId ? Number(customerId) : undefined,
       })
       .then((data) => {
-        if (!cancelled) setResult(data)
+        if (!cancelled) setLoaded({ key, result: data, error: null })
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setResult(null)
-          setError(err instanceof Error ? err.message : 'Failed to load report')
+          setLoaded({
+            key,
+            result: null,
+            error: err instanceof Error ? err.message : 'Failed to load report',
+          })
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [report, from, to, customerId])
+  }, [requestKey, report, from, to, customerId])
 
   const group = REPORT_GROUPS.find((item) => item.id === report.group)
 

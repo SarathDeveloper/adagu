@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { quotePledgeItemRelease, type ReleaseQuote } from '@shared/billing/pledgeRelease'
 import { localTodayIso } from '@shared/localDate'
 import type { Pledge, PledgeItem, PledgePaymentMode } from '@shared/types'
@@ -6,11 +6,9 @@ import { DateInput } from '../../components/DateInput'
 import { Modal } from '../../components/Modal'
 import { api } from '../../lib/api'
 import { formatCurrency } from '../../lib/format'
-import { PLEDGE_PAYMENT_MODES } from '../dues/pledgePaymentModes'
+import { PLEDGE_COLLECTION_MODES } from '../dues/pledgePaymentModes'
 
-const PAY_MODES = PLEDGE_PAYMENT_MODES.filter(
-  (mode) => mode.value === 'cash' || mode.value === 'upi' || mode.value === 'card' || mode.value === 'bank_transfer',
-)
+const PAY_MODES = PLEDGE_COLLECTION_MODES
 
 export function ReleaseItemModal({
   pledgeId,
@@ -30,16 +28,27 @@ export function ReleaseItemModal({
   const [date, setDate] = useState(localTodayIso())
   const [mode, setMode] = useState<PledgePaymentMode>('cash')
   const [amount, setAmount] = useState(0)
-  const [amountTouched, setAmountTouched] = useState(false)
-  const [quote, setQuote] = useState<ReleaseQuote | null>(null)
-  const [quoteError, setQuoteError] = useState<string | null>(null)
+  // Once the person types an amount, a re-price must not overwrite it. A ref,
+  // because typing must not trigger another price fetch.
+  const amountTouchedRef = useRef(false)
+  const [priced, setPriced] = useState<{
+    key: string
+    quote: ReleaseQuote | null
+    error: string | null
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Only the price for the current jewel and date is shown; a new date shows
+  // "Calculating…" until its price arrives.
+  const quoteKey = `${pledgeId}|${item.id}|${date}|${assessedValue}`
+  const current = priced?.key === quoteKey ? priced : null
+  const quote = current?.quote ?? null
+  const quoteError = current?.error ?? null
+
   useEffect(() => {
     let active = true
-    setQuote(null)
-    setQuoteError(null)
+    const key = quoteKey
     void Promise.all([api.getPledgePayoff(pledgeId, date), api.getShopSettings()])
       .then(([payoff, settings]) => {
         if (!active) return
@@ -59,19 +68,29 @@ export function ReleaseItemModal({
               released: Boolean(row.releasedAt),
             })),
           })
-          setQuote(next)
-          if (!amountTouched) setAmount(next.requiredTotal)
+          setPriced({ key, quote: next, error: null })
+          if (!amountTouchedRef.current) setAmount(next.requiredTotal)
         } catch (err) {
-          setQuoteError(err instanceof Error ? err.message : 'Cannot release this jewel')
+          setPriced({
+            key,
+            quote: null,
+            error: err instanceof Error ? err.message : 'Cannot release this jewel',
+          })
         }
       })
       .catch((err) => {
-        if (active) setQuoteError(err instanceof Error ? err.message : 'Could not price this release')
+        if (active) {
+          setPriced({
+            key,
+            quote: null,
+            error: err instanceof Error ? err.message : 'Could not price this release',
+          })
+        }
       })
     return () => {
       active = false
     }
-  }, [amountTouched, assessedValue, date, item.id, items, pledgeId])
+  }, [quoteKey, assessedValue, date, item.id, items, pledgeId])
 
   async function release() {
     if (!quote) return
@@ -145,7 +164,7 @@ export function ReleaseItemModal({
             min={0}
             value={amount}
             onChange={(event) => {
-              setAmountTouched(true)
+              amountTouchedRef.current = true
               setAmount(Number(event.target.value))
             }}
           />

@@ -23,12 +23,21 @@ export type PledgeLedgerTrancheInput = {
   amount: number
   rate: number
   date: string
+  /**
+   * For a top-up: the `seq` of the last payment that existed when it was
+   * recorded. Payments on the top-up's own date with a higher `seq` came after
+   * it; the others came before and must not owe the top-up's interest. Leave it
+   * unset when unknown and a same-day payment counts as after the tranche.
+   */
+  afterPaymentSeq?: number | null
 }
 
 export type PledgeLedgerPaymentInput = {
   date: string
   amount: number
   discount?: number
+  /** Recording order (the payment row id); a payment not yet stored sorts last. */
+  seq?: number
 }
 
 export type PledgeLedgerTranche = {
@@ -36,6 +45,7 @@ export type PledgeLedgerTranche = {
   rate: number
   date: string
   paidUpto: string
+  afterPaymentSeq?: number | null
 }
 
 export type PledgePaymentAllocation = {
@@ -105,6 +115,13 @@ function trancheAccrual(tranche: PledgeLedgerTranche, asOfDate: string): {
   return { months, interest }
 }
 
+/** Whether the tranche had been paid out when this payment was taken. */
+function disbursedBefore(tranche: PledgeLedgerTranche, payment: PledgeLedgerPaymentInput): boolean {
+  if (tranche.date !== payment.date) return tranche.date < payment.date
+  if (tranche.afterPaymentSeq == null || payment.seq == null) return true
+  return payment.seq > tranche.afterPaymentSeq
+}
+
 function applyToPrincipal(
   tranches: PledgeLedgerTranche[],
   cash: number,
@@ -145,6 +162,7 @@ export function replayPledge(input: {
       rate: Math.max(0, tranche.rate),
       date: tranche.date,
       paidUpto: tranche.date,
+      afterPaymentSeq: tranche.afterPaymentSeq ?? null,
     }))
 
   const originalPrincipal = roundMoney(
@@ -172,7 +190,12 @@ export function replayPledge(input: {
     const amount = Math.max(0, payment.amount)
     const discount = Math.max(0, payment.discount ?? 0)
 
-    const accruals = tranches.map((tranche) => trancheAccrual(tranche, payment.date))
+    // A top-up taken later the same day was not yet out when this payment was
+    // made, so the payment owes none of its interest and cannot repay it.
+    const live = tranches.map((tranche) => disbursedBefore(tranche, payment))
+    const accruals = tranches.map((tranche, index) =>
+      live[index] ? trancheAccrual(tranche, payment.date) : { months: 0, interest: 0 },
+    )
     const accrued = roundMoney(accruals.reduce((sum, item) => sum + item.interest, 0))
     const dueBeforeCredit = roundMoney(Math.max(0, accrued - credit))
     const discountToInterest = roundMoney(Math.min(discount, dueBeforeCredit))
@@ -200,7 +223,11 @@ export function replayPledge(input: {
       interestPart = cashToInterest
 
       const cashLeft = roundMoney(amount - cashToInterest)
-      const applied = applyToPrincipal(tranches, cashLeft, discountLeft)
+      const applied = applyToPrincipal(
+        tranches.filter((_tranche, index) => live[index]),
+        cashLeft,
+        discountLeft,
+      )
       principalPart = applied.cashApplied
       discountApplied = roundMoney(discountApplied + applied.discountApplied)
       overpayment = roundMoney(
@@ -237,10 +264,15 @@ export function replayPledge(input: {
   const payoff = roundMoney(principalOutstanding + interestDue)
   const grossDue = roundMoney(originalPrincipal + assessedInterest + currentInterest - totalDiscount)
 
-  const interestPaidUpto = tranches.length
-    ? tranches.reduce(
+  // A tranche repaid in full stops accruing, so its paid-up-to date never moves
+  // again. Leaving it in the minimum would pin the loan as "interest overdue"
+  // forever, so only tranches that still carry principal count.
+  const owing = tranches.filter((tranche) => tranche.amount > EPSILON)
+  const paidUptoPool = owing.length ? owing : tranches
+  const interestPaidUpto = paidUptoPool.length
+    ? paidUptoPool.reduce(
         (earliest, tranche) => (tranche.paidUpto < earliest ? tranche.paidUpto : earliest),
-        tranches[0].paidUpto,
+        paidUptoPool[0].paidUpto,
       )
     : input.base.date
 

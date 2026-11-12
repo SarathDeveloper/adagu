@@ -8,6 +8,7 @@ import type {
   PledgePayoff,
 } from '@shared/types'
 import { daysBetween } from '@shared/billing/pledgeMath'
+import { localTodayIso } from '@shared/localDate'
 import { HttpError } from '../lib/http'
 import { syncDueEntryForPledge } from '../dues/pledgeSync'
 import {
@@ -125,6 +126,12 @@ export function recordPledgePayment(
   if (lastPayment && input.date < lastPayment.paymentDate) {
     throw new HttpError(400, 'Payment date cannot be before the last payment')
   }
+  // A mistyped future date (2027 for 2026) would block every correct payment
+  // after it. Auction sales are the exception: the notice period can only end
+  // after the repayment due date, which is never earlier than today.
+  if (input.kind !== 'auction' && input.date > localTodayIso()) {
+    throw new HttpError(400, 'Payment date cannot be in the future')
+  }
 
   // A forfeited loan freezes at its auction date: interest must not grow while
   // a shortfall sits uncollected, so the replay dates are clamped there.
@@ -154,7 +161,11 @@ export function recordPledgePayment(
   const after = replayPledge({
     base,
     topups,
-    payments: [...ledgerPayments, { date: replayDate, amount, discount }],
+    // Not stored yet, so it sorts after every recorded payment and top-up.
+    payments: [
+      ...ledgerPayments,
+      { date: replayDate, amount, discount, seq: Number.MAX_SAFE_INTEGER },
+    ],
     asOfDate: replayDate,
   })
   const allocation = after.allocations[after.allocations.length - 1]
@@ -248,9 +259,11 @@ export function deleteLatestPledgePayment(
     throw new HttpError(400, 'Only the latest payment can be removed')
   }
 
+  // Jewels released before released_assessed_value existed had item_value
+  // subtracted, so that is what goes back for them.
   const released = db
     .prepare(
-      `SELECT COALESCE(SUM(item_value), 0) AS value
+      `SELECT COALESCE(SUM(COALESCE(released_assessed_value, item_value)), 0) AS value
        FROM pledge_items WHERE released_payment_id = ?`,
     )
     .get(row.id) as { value: number }
@@ -265,7 +278,7 @@ export function deleteLatestPledgePayment(
   }
   db.prepare(
     `UPDATE pledge_items
-     SET released_at = NULL, released_payment_id = NULL
+     SET released_at = NULL, released_payment_id = NULL, released_assessed_value = NULL
      WHERE released_payment_id = ?`,
   ).run(row.id)
 

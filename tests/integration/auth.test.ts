@@ -64,6 +64,16 @@ describe('auth and permissions', () => {
     expect(staffLogin.status).toBe(200)
     const staff = staffLogin.body as AuthUser
     expect(staff.features).toEqual(['adagu'])
+    expect(staff.mustChangePassword).toBe(true)
+
+    // A new account can do nothing but change the password the admin chose.
+    const beforeChange = await getTestAgent().get('/api/pledges')
+    expect(beforeChange.status).toBe(403)
+    expect(beforeChange.body.error).toMatch(/change your password/i)
+    const changed = await getTestAgent()
+      .post('/api/auth/change-password')
+      .send({ currentPassword: 'staff123', newPassword: 'cashier-own-pass' })
+    expect(changed.status).toBe(200)
 
     const customers = await getTestAgent().get('/api/customers')
     expect(customers.status).toBe(403)

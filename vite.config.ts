@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
@@ -5,6 +6,17 @@ import { defineConfig, type Plugin } from 'vite'
 /** Same `PORT` as `server/index.ts` (default 3000). Set `PORT=3001` when 3000 is taken. */
 const apiPort = process.env.PORT || '3000'
 const apiTarget = `http://127.0.0.1:${apiPort}`
+
+/**
+ * This folder, with the drive letter cased the way the file system reports it.
+ *
+ * Vite takes its root from process.cwd(), and a Windows terminal opened as
+ * `c:\…` (VS Code does this) gives `c:/…`, while Vite resolves the HTML inputs
+ * through the real path, `C:/…`. Vite then cannot find the inline <style> in
+ * index.html and print.html ("No matching HTML proxy module found") and the
+ * build fails. realpathSync.native returns the real casing.
+ */
+const projectRoot = realpathSync.native(__dirname)
 
 /**
  * Serves `print.html` for `/print/*` during development.
@@ -36,10 +48,11 @@ function printDocumentPlugin(): Plugin {
 }
 
 export default defineConfig({
+  root: projectRoot,
   plugins: [react(), printDocumentPlugin()],
   resolve: {
     alias: {
-      '@shared': resolve(__dirname, 'shared'),
+      '@shared': resolve(projectRoot, 'shared'),
     },
   },
   build: {
@@ -48,8 +61,8 @@ export default defineConfig({
       // Two documents: the application, and the lighter print preview that
       // loads in the preview iframe.
       input: {
-        main: resolve(__dirname, 'index.html'),
-        print: resolve(__dirname, 'print.html'),
+        main: resolve(projectRoot, 'index.html'),
+        print: resolve(projectRoot, 'print.html'),
       },
     },
   },

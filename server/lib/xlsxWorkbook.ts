@@ -88,6 +88,8 @@ export function escapeXml(value: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
+    // XML 1.0 forbids these control characters; stripping them is the point.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
 }
 

@@ -2,11 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: [
-    '**/inventory-billing-scenarios.spec.ts',
-    '**/adagu-scenarios.spec.ts',
-    '**/old-gold-scenarios.spec.ts',
-  ],
+  testMatch: ['**/adagu-scenarios.spec.ts'],
   timeout: 180_000,
   workers: 1,
   fullyParallel: false,

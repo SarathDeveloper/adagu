@@ -66,10 +66,11 @@ import { ReleaseItemModal } from "./ReleaseItemModal";
 import { printPreviewPaths } from "../print/printPreviewPaths";
 import { PrintPreviewModal } from "../print/PrintPreviewModal";
 import { downloadPrintPdf } from "../print/downloadPrintPdf";
-import { PLEDGE_PAYMENT_MODES } from "../dues/pledgePaymentModes";
+import { PLEDGE_COLLECTION_MODES } from "../dues/pledgePaymentModes";
 import { RenewModal } from "../dues/RenewModal";
 import { AuctionModal } from "../dues/AuctionModal";
 import { PledgePhotosStrip } from "./PledgePhotosStrip";
+import { roundMoney } from "@shared/billing/pricing";
 
 type EditorItem = PledgeItemInput & { key: string };
 
@@ -152,6 +153,7 @@ export function PledgeEditorPage() {
   );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewTargetId, setPreviewTargetId] = useState(0);
+  const [renewedReceiptNo, setRenewedReceiptNo] = useState("");
   const [savingPdf, setSavingPdf] = useState(false);
   const [redeemDate, setRedeemDate] = useState(todayIso());
   const [amountCollected, setAmountCollected] = useState<NumericField>(0);
@@ -328,14 +330,15 @@ export function PledgeEditorPage() {
     [loanAmount, charges],
   );
 
-  // KYC lives on the customer; keep the borrower card in step with the selection.
-  useEffect(() => {
-    if (!customerId) return;
-    const customer = customers.find((row) => row.id === customerId);
-    if (!customer) return;
-    setAadhaar(customer.aadhaar ?? "");
-    setPan(customer.pan ?? "");
-  }, [customerId, customers]);
+  // KYC lives on the customer; keep the borrower card in step with the
+  // selection. Synced during render when the selected customer changes (not on
+  // every change to the customer list, which would wipe a typed Aadhaar/PAN).
+  const [kycSyncedFrom, setKycSyncedFrom] = useState<Customer | null>(null);
+  if (selectedCustomer && selectedCustomer !== kycSyncedFrom) {
+    setKycSyncedFrom(selectedCustomer);
+    setAadhaar(selectedCustomer.aadhaar ?? "");
+    setPan(selectedCustomer.pan ?? "");
+  }
 
   useEffect(() => {
     if (!redeemOpen || isNew || !id) return;
@@ -348,7 +351,7 @@ export function PledgeEditorPage() {
         // Keep the amount in step with the payoff for the chosen date, so a
         // back-dated or forward-dated close is not rejected by the server.
         setAmountCollected(
-          Math.max(0, data.payoff - numericFieldToNumber(redeemDiscountRef.current)),
+          roundMoney(Math.max(0, data.payoff - numericFieldToNumber(redeemDiscountRef.current))),
         );
       } catch {
         if (active) setPayoff(null);
@@ -512,7 +515,23 @@ export function PledgeEditorPage() {
     const name = customerName.trim();
     if (!name) throw new Error("Enter customer name");
 
-    const existing = selectedCustomer;
+    // The customer list loads separately and can still be on its way (or have
+    // failed) when an existing draft is saved. Fetch the linked customer
+    // instead of treating the borrower as new and creating a duplicate.
+    let existing = selectedCustomer;
+    if (!existing && customerId > 0) {
+      existing = await api.getCustomer(customerId);
+    }
+    // Typing a different name and a different mobile over a picked customer
+    // means a different person. Updating the picked record would rewrite
+    // someone else's details, so the new borrower gets their own record.
+    if (existing) {
+      const typedPhone = customerPhone.replace(/\D/g, "").slice(0, 10);
+      const sameName =
+        existing.name.trim().toLowerCase() === name.toLowerCase();
+      const samePhone = (existing.phone ?? "") === typedPhone;
+      if (!sameName && !samePhone) existing = undefined;
+    }
     if (existing) {
       const nextPhone = customerPhone.replace(/\D/g, "").slice(0, 10);
       const nextAddress = customerAddress.trim();
@@ -857,6 +876,14 @@ export function PledgeEditorPage() {
       });
       setRenewLoanOpen(false);
       showToast(`Loan renewed as ${created.receiptNo}`, "success");
+      // The old ticket is now "renewed"; reload it so the page stops offering
+      // collect/renew actions on a closed loan.
+      try {
+        setPledge(await api.getPledge(targetId));
+      } catch {
+        // The renewal itself succeeded; the page catches up on the next load.
+      }
+      setRenewedReceiptNo(created.receiptNo);
       setPreviewTargetId(created.id);
       setPreviewOpen(true);
     } catch (err) {
@@ -1127,6 +1154,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <User size={16} className="input-icon" />
                   <input
+                    aria-label="Customer Name"
                     disabled={!canEdit || busy}
                     value={customerName}
                     onChange={(event) => setCustomerName(event.target.value)}
@@ -1143,6 +1171,8 @@ export function PledgeEditorPage() {
                         minHeight: 0,
                       }}
                       onClick={() => clearBorrower()}
+                      aria-label="Clear borrower"
+                      title="Clear borrower"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -1156,6 +1186,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <Phone size={16} className="input-icon" />
                   <input
+                    aria-label="Mobile Number"
                     disabled={!canEdit || busy}
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
@@ -1168,6 +1199,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <Users size={16} className="input-icon" />
                   <input
+                    aria-label="Father / Mother / Husband Name"
                     disabled={!canEdit || busy}
                     value={guardianName}
                     onChange={(event) => setGuardianName(event.target.value)}
@@ -1180,6 +1212,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <MapPin size={16} className="input-icon" />
                   <textarea
+                    aria-label="Address"
                     rows={1}
                     disabled={!canEdit || busy}
                     value={customerAddress}
@@ -1193,6 +1226,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <IdCard size={16} className="input-icon" />
                   <input
+                    aria-label="Aadhaar"
                     disabled={!canEdit || busy}
                     inputMode="numeric"
                     maxLength={12}
@@ -1209,6 +1243,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <IdCard size={16} className="input-icon" />
                   <input
+                    aria-label="PAN"
                     disabled={!canEdit || busy}
                     maxLength={10}
                     value={pan}
@@ -1306,6 +1341,7 @@ export function PledgeEditorPage() {
                         <td className="adagu-col-purity" data-label="Purity">
                           <div className="adagu-input-with-icon adagu-purity-wrap">
                             <select
+                              aria-label={`Jewel ${index + 1} purity`}
                               className="adagu-purity-select"
                               disabled={!canEdit || busy}
                               value={item.purity}
@@ -1327,6 +1363,7 @@ export function PledgeEditorPage() {
                               type="number"
                               step="0.001"
                               disabled={!canEdit || busy}
+                              aria-label={`Jewel ${index + 1} gross weight in grams`}
                               value={weightInputValue(item.grossWeight)}
                               onChange={(event) =>
                                 updateItem(item.key, {
@@ -1342,6 +1379,7 @@ export function PledgeEditorPage() {
                               type="number"
                               step="0.001"
                               disabled={!canEdit || busy}
+                              aria-label={`Jewel ${index + 1} deductions in grams`}
                               value={weightInputValue(item.stoneWeight ?? 0)}
                               onChange={(event) =>
                                 updateItem(item.key, {
@@ -1357,6 +1395,7 @@ export function PledgeEditorPage() {
                               type="number"
                               step="0.001"
                               disabled={!canEdit || busy}
+                              aria-label={`Jewel ${index + 1} net weight in grams`}
                               value={weightInputValue(item.netWeight)}
                               onChange={(event) =>
                                 updateItem(item.key, {
@@ -1396,6 +1435,8 @@ export function PledgeEditorPage() {
                               className="adagu-action-btn-red"
                               disabled={!canEdit || busy || jewelleryItems.length <= 1}
                               onClick={() => removeItem(item.key)}
+                              aria-label={`Remove jewel ${index + 1}`}
+                              title="Remove jewel"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -1408,6 +1449,7 @@ export function PledgeEditorPage() {
                             <textarea
                               rows={1}
                               disabled={!canEdit || busy}
+                              aria-label={`Jewel ${index + 1} description`}
                               value={item.description}
                               onChange={(event) =>
                                 updateItem(item.key, {
@@ -1515,6 +1557,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <IndianRupee size={14} className="input-icon" />
                   <input
+                    aria-label="Loan Amount"
                     type="number"
                     step="0.01"
                     disabled={!canEdit || busy}
@@ -1530,6 +1573,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <IndianRupee size={14} className="input-icon" />
                   <input
+                    aria-label="Paid Amount"
                     type="number"
                     step="0.01"
                     disabled={!canEdit || busy}
@@ -1547,6 +1591,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <Percent size={14} className="input-icon" />
                   <input
+                    aria-label="Interest Rate (%)"
                     type="number"
                     step="0.01"
                     disabled
@@ -1563,6 +1608,7 @@ export function PledgeEditorPage() {
                 <div className="adagu-input-with-icon">
                   <IndianRupee size={14} className="input-icon" />
                   <input
+                    aria-label="Deduction"
                     type="number"
                     step="0.01"
                     disabled={!canEdit || busy}
@@ -1760,6 +1806,8 @@ export function PledgeEditorPage() {
                 type="number"
                 step="0.01"
                 value={redeemDiscount}
+                disabled={!isAdmin}
+                title={isAdmin ? undefined : "Only an admin can give a discount"}
                 onChange={(event) => {
                   const discount = numericFieldToNumber(
                     parseNumericField(event.target.value),
@@ -1768,7 +1816,7 @@ export function PledgeEditorPage() {
                   setRedeemDiscount(field);
                   redeemDiscountRef.current = field;
                   const total = payoff?.payoff ?? duePreview.remaining;
-                  setAmountCollected(Math.max(0, total - discount));
+                  setAmountCollected(roundMoney(Math.max(0, total - discount)));
                 }}
               />
             </label>
@@ -1781,7 +1829,7 @@ export function PledgeEditorPage() {
                   setRedeemMode(event.target.value as PledgePaymentMode)
                 }
               >
-                {PLEDGE_PAYMENT_MODES.map((option) => (
+                {PLEDGE_COLLECTION_MODES.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -1812,10 +1860,12 @@ export function PledgeEditorPage() {
       {renewLoanOpen ? (
         <RenewModal
           summary={{
+            pledgeId: pledge?.id,
             receiptNo: displayBillNo,
             interestDue: payoff?.interestDue ?? duePreview.interest,
-            principalOutstanding:
-              payoff?.principalOutstanding ?? numericFieldToNumber(loanAmount),
+            // Top-ups, part payments and jewel releases all move the principal;
+            // the base loan amount alone would renew the wrong balance.
+            principalOutstanding: payoff?.principalOutstanding ?? duePreview.principal,
             interestPaidUpto: payoff?.interestPaidUpto ?? pledgeDate,
             remaining: payoff?.payoff ?? duePreview.remaining,
             interestPct: numericFieldToNumber(interestPct),
@@ -1872,7 +1922,12 @@ export function PledgeEditorPage() {
       {previewOpen && previewTargetId > 0 ? (
         <PledgePreviewModal
           pledgeId={previewTargetId}
-          pdfFilename={pledge?.receiptNo ? `${pledge.receiptNo}.pdf` : "pledge.pdf"}
+          pdfFilename={(() => {
+            // After a renewal the preview shows the new ticket, not this one.
+            const receiptNo =
+              previewTargetId === pledge?.id ? pledge?.receiptNo : renewedReceiptNo;
+            return receiptNo ? `${receiptNo}.pdf` : "pledge.pdf";
+          })()}
           onClose={() => {
             setPreviewOpen(false);
             setPreviewTargetId(0);

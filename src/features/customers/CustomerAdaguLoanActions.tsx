@@ -17,13 +17,14 @@ import { api } from '../../lib/api'
 import { AdaguDueDetailDrawer } from '../dues/AdaguDueDetailDrawer'
 import { AuctionModal } from '../dues/AuctionModal'
 import { InterestCollectionModal } from '../dues/InterestCollectionModal'
-import { PLEDGE_PAYMENT_MODES } from '../dues/pledgePaymentModes'
+import { PLEDGE_COLLECTION_MODES } from '../dues/pledgePaymentModes'
 import { RenewModal } from '../dues/RenewModal'
 import { ShortfallModal } from '../dues/ShortfallModal'
 import { TopupModal } from '../dues/TopupModal'
 import { PledgePreviewModal } from '../pledges/PledgePreviewModal'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
 import { printPreviewPaths } from '../print/printPreviewPaths'
+import { roundMoney } from '@shared/billing/pricing'
 
 export function CustomerAdaguLoanActions({
   viewTarget,
@@ -39,6 +40,13 @@ export function CustomerAdaguLoanActions({
   onError: (message: string | null) => void
 }) {
   const { showToast } = useToast()
+
+  // Action errors: the page banner sits behind the open modal or drawer, so
+  // also raise a toast, which stays on top of every overlay.
+  function fail(message: string) {
+    onError(message)
+    showToast(message, 'error')
+  }
   const { isAdmin } = useAuth()
   const [busy, setBusy] = useState(false)
   const [redeemAction, setRedeemAction] = useState<'partial' | 'full' | null>(null)
@@ -69,16 +77,19 @@ export function CustomerAdaguLoanActions({
       .then((payoff) => {
         if (!active) return
         setRedeemPayoff({ key, payoff })
-        setRedeemAmount(Math.max(0, payoff.payoff - redeemDiscountRef.current))
+        setRedeemAmount(roundMoney(Math.max(0, payoff.payoff - redeemDiscountRef.current)))
       })
       .catch((err) => {
         if (!active) return
-        onError(err instanceof Error ? err.message : 'Failed to load payoff')
+        // The redeem modal is open, so the toast is what the person sees.
+        const message = err instanceof Error ? err.message : 'Failed to load payoff'
+        onError(message)
+        showToast(message, 'error')
       })
     return () => {
       active = false
     }
-  }, [redeemTarget, redeemDate, onError])
+  }, [redeemTarget, redeemDate, onError, showToast])
 
   const redeemRequestKey = redeemTarget ? `${redeemTarget.pledgeId}|${redeemDate}` : ''
   const activeRedeemPayoff =
@@ -125,7 +136,7 @@ export function CustomerAdaguLoanActions({
       await reloadAndSyncView(interestTarget.pledgeId)
       if (updated.status === 'redeemed') setReleaseTarget(updated.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to collect interest')
+      fail(err instanceof Error ? err.message : 'Failed to collect interest')
     } finally {
       setBusy(false)
     }
@@ -152,7 +163,7 @@ export function CustomerAdaguLoanActions({
       showToast('Extra loan added', 'success')
       await reloadAndSyncView(topupTarget.pledgeId)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to add extra loan')
+      fail(err instanceof Error ? err.message : 'Failed to add extra loan')
     } finally {
       setBusy(false)
     }
@@ -183,7 +194,7 @@ export function CustomerAdaguLoanActions({
       await onReload()
       setRenewedTarget(created.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to renew loan')
+      fail(err instanceof Error ? err.message : 'Failed to renew loan')
     } finally {
       setBusy(false)
     }
@@ -198,7 +209,7 @@ export function CustomerAdaguLoanActions({
       showToast('Last payment undone', 'success')
       await reloadAndSyncView(viewTarget.pledgeId)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to undo the payment')
+      fail(err instanceof Error ? err.message : 'Failed to undo the payment')
       throw err
     } finally {
       setBusy(false)
@@ -224,7 +235,7 @@ export function CustomerAdaguLoanActions({
       showToast('Auction shortfall collected', 'success')
       await reloadAndSyncView(shortfallTarget.pledgeId)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to collect the shortfall')
+      fail(err instanceof Error ? err.message : 'Failed to collect the shortfall')
     } finally {
       setBusy(false)
     }
@@ -250,7 +261,7 @@ export function CustomerAdaguLoanActions({
       await reloadAndSyncView(redeemTarget.pledgeId)
       if (updated.status === 'redeemed') setReleaseTarget(updated.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to collect')
+      fail(err instanceof Error ? err.message : 'Failed to collect')
     } finally {
       setBusy(false)
       setRedeemAction(null)
@@ -275,7 +286,7 @@ export function CustomerAdaguLoanActions({
       await reloadAndSyncView(redeemTarget.pledgeId)
       setReleaseTarget(updated.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to close loan')
+      fail(err instanceof Error ? err.message : 'Failed to close loan')
     } finally {
       setBusy(false)
       setRedeemAction(null)
@@ -295,7 +306,7 @@ export function CustomerAdaguLoanActions({
       showToast('Auction notice saved', 'success')
       await reloadAndSyncView(auctionTarget.pledgeId)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to save auction notice')
+      fail(err instanceof Error ? err.message : 'Failed to save auction notice')
     } finally {
       setBusy(false)
     }
@@ -314,7 +325,7 @@ export function CustomerAdaguLoanActions({
       showToast(`Auction recorded for ${updated.receiptNo}`, 'success')
       await reloadAndSyncView(auctionTarget.pledgeId)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to record auction')
+      fail(err instanceof Error ? err.message : 'Failed to record auction')
     } finally {
       setBusy(false)
     }
@@ -325,6 +336,11 @@ export function CustomerAdaguLoanActions({
       {viewTarget ? (
         <AdaguDueDetailDrawer
           summary={viewTarget}
+          onChanged={() => {
+            void reloadAndSyncView(viewTarget.pledgeId).catch(() => {
+              // The drawer already shows the release; the list catches up on reload.
+            })
+          }}
           payments={payments}
           busy={busy}
           onClose={() => onViewTargetChange(null)}
@@ -485,11 +501,13 @@ export function CustomerAdaguLoanActions({
                 min={0}
                 step="0.01"
                 value={redeemDiscount || ''}
+                disabled={!isAdmin}
+                title={isAdmin ? undefined : 'Only an admin can give a discount'}
                 onChange={(event) => {
                   const discount = Math.max(0, Number(event.target.value) || 0)
                   redeemDiscountRef.current = discount
                   setRedeemDiscount(discount)
-                  setRedeemAmount(Math.max(0, redeemPayoffValue - discount))
+                  setRedeemAmount(roundMoney(Math.max(0, redeemPayoffValue - discount)))
                 }}
               />
             </label>
@@ -500,7 +518,7 @@ export function CustomerAdaguLoanActions({
                 value={redeemMode}
                 onChange={(event) => setRedeemMode(event.target.value as PledgePaymentMode)}
               >
-                {PLEDGE_PAYMENT_MODES.map((option) => (
+                {PLEDGE_COLLECTION_MODES.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

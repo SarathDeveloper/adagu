@@ -10,6 +10,7 @@ import {
 } from '@shared/reportsCatalog'
 import type { z } from 'zod'
 import { getDatabase } from '../db'
+import { refreshActivePledgeDues } from '../dues/pledgeSync'
 import { HttpError } from '../lib/http'
 
 type SqlRow = Record<string, unknown>
@@ -164,6 +165,10 @@ const runners: Record<ReportId, (db: ReturnType<typeof getDatabase>, scope: Scop
     )
   },
   'customer-outstanding': (db, scope) => {
+    // Open Adagu loans keep a due row whose amount grows with interest. It is
+    // only rewritten when the Dues screen loads, so bring it up to today first
+    // or the report misses the interest accrued since then.
+    refreshActivePledgeDues(db)
     const params: unknown[] = []
     const customer = customerClause('d.customer_id', scope, params)
     const rows = rowsOf(

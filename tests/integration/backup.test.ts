@@ -35,7 +35,14 @@ import { getUploadsDir } from '../../server/lib/paths'
 import { crc32, extractZipFile } from '../../server/lib/zip'
 import { getShopSetting, setShopSetting } from '../../server/lib/settingsStore'
 import { localDateIso } from '../../shared/localDate'
-import { getTestAgent, IPC_CHANNELS, ipc, useIntegrationEnv, uniqueCustomerPhone } from './helpers/testEnv'
+import {
+  getTestAgent,
+  IPC_CHANNELS,
+  ipc,
+  loginAsAdmin,
+  useIntegrationEnv,
+  uniqueCustomerPhone,
+} from './helpers/testEnv'
 
 async function seedCustomer(name = 'Test customer'): Promise<Customer> {
   const response = await getTestAgent().post('/api/customers').send({
@@ -84,6 +91,8 @@ describe('database backup and restore', () => {
     expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(2)
 
     await ipc(IPC_CHANNELS.APP_RESTORE_DB, { sourcePath: destination })
+    // A restore signs everyone out (user ids may differ in the restored data).
+    await loginAsAdmin()
     const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
     expect(customers).toHaveLength(1)
     expect(customers[0]?.name).toBe('Test customer')
@@ -134,6 +143,8 @@ describe('database backup and restore', () => {
 
     const restored = await agent.post('/api/backup/restore-local').send({ name: backup.name })
     expect(restored.status).toBe(200)
+    // A restore signs everyone out (user ids may differ in the restored data).
+    await loginAsAdmin()
     const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
     expect(customers).toHaveLength(1)
     expect(customers[0]?.name).toBe('Test customer')
@@ -257,6 +268,8 @@ describe('database backup and restore', () => {
       expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(2)
 
       await restoreDatabaseFrom(offsitePath)
+      // A restore signs everyone out (user ids may differ in the restored data).
+      await loginAsAdmin()
       const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
       expect(customers).toHaveLength(1)
       expect(customers[0]?.name).toBe('Test customer')
@@ -545,6 +558,8 @@ describe('database backup and restore', () => {
       poisoned.close()
 
       await restoreDatabaseFrom(snapshot)
+      // A restore signs everyone out (user ids may differ in the restored data).
+      await loginAsAdmin()
 
       const status = await agent.get('/api/backup/status')
       expect(status.body.frequency).toBe('weekly')
@@ -728,6 +743,8 @@ describe('database backup and restore', () => {
 
       const restored = await agent.post('/api/backup/restore').attach('file', zipPath)
       expect(restored.status).toBe(200)
+      // A restore signs everyone out (user ids may differ in the restored data).
+      await loginAsAdmin()
       const customers = await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)
       expect(customers).toHaveLength(1)
       expect(customers[0]?.name).toBe(customer.name)

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { PledgeAuction, PledgeAuctionBuyerType, PledgeAuctionInput } from '@shared/types'
+import { addDaysIso } from '@shared/billing/pledgeMath'
 import { localTodayIso } from '@shared/localDate'
 import { DateInput } from '../../components/DateInput'
 import { Modal } from '../../components/Modal'
 import { api } from '../../lib/api'
 import { formatCurrency, formatDisplayDate } from '../../lib/format'
+import { useAuth } from '../auth/authContext'
 
 type AuctionMode = 'notice' | 'auction'
 
@@ -39,6 +41,10 @@ export function AuctionModal({
   const [writeOffShortfall, setWriteOffShortfall] = useState(false)
   const [payoff, setPayoff] = useState(summary.remaining)
   const [formPledgeId, setFormPledgeId] = useState(summary.pledgeId)
+  // The shop's notice period. A sent notice carries its own; before that the
+  // eligible date shown has to use the setting, not a fixed 14 days.
+  const [shopNoticeDays, setShopNoticeDays] = useState<number | null>(null)
+  const { isAdmin } = useAuth()
 
   // A reused modal must not carry the previous loan's buyer over.
   if (formPledgeId !== summary.pledgeId) {
@@ -51,6 +57,22 @@ export function AuctionModal({
     setAuctionDate(localTodayIso())
     setSaleAmount(summary.remaining)
   }
+
+  useEffect(() => {
+    if (mode !== 'notice') return
+    let active = true
+    void api
+      .getShopSettings()
+      .then((settings) => {
+        if (active) setShopNoticeDays(settings.adaguAuctionNoticeDays)
+      })
+      .catch(() => {
+        // Falls back to 14 days; the server applies the real setting.
+      })
+    return () => {
+      active = false
+    }
+  }, [mode])
 
   useEffect(() => {
     if (mode !== 'auction') return
@@ -104,8 +126,10 @@ export function AuctionModal({
   )
 
   if (mode === 'notice') {
-    const noticeDays = notice?.noticeDays ?? 14
-    const eligible = addDaysLocal(noticeDate, noticeDays)
+    const noticeDays = notice?.noticeDays ?? shopNoticeDays ?? 14
+    // Same day arithmetic as the server, so the date shown here is the date
+    // the server will accept.
+    const eligible = addDaysIso(noticeDate, noticeDays)
     return (
       <Modal
         title={`Auction notice · ${summary.receiptNo}`}
@@ -182,7 +206,7 @@ export function AuctionModal({
                 buyerType,
                 buyerName: buyerName.trim(),
                 saleAmount,
-                writeOffShortfall,
+                writeOffShortfall: isAdmin && writeOffShortfall,
                 note: '',
               })
             }
@@ -251,7 +275,7 @@ export function AuctionModal({
         ) : null}
       </div>
 
-      {shortfall > 0 ? (
+      {shortfall > 0 && isAdmin ? (
         <label className="adagu-banner-check">
           <input
             type="checkbox"
@@ -261,13 +285,12 @@ export function AuctionModal({
           Write off the {formatCurrency(shortfall)} shortfall
         </label>
       ) : null}
+      {shortfall > 0 && !isAdmin ? (
+        <p className="muted">
+          The {formatCurrency(shortfall)} shortfall stays on the customer&apos;s account. Only an
+          admin can write it off.
+        </p>
+      ) : null}
     </Modal>
   )
-}
-
-function addDaysLocal(isoDate: string, days: number): string {
-  if (!days) return isoDate
-  const date = new Date(`${isoDate}T00:00:00`)
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
 }

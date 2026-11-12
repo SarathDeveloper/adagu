@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 import request from 'supertest'
 import type { IpcResult } from '@shared/types'
 import { createApp } from '../../../server/app'
@@ -186,6 +186,23 @@ export async function ipc<T>(channel: string, input?: unknown): Promise<T> {
   return unwrap(await invokeIpcForTests<T>(channel, input))
 }
 
+/**
+ * Pin "today" for a suite whose fixtures use fixed calendar dates.
+ *
+ * The server compares against the real clock (due-date clamps, maturity,
+ * overdue checks), so a test written in September stops passing once the
+ * real date moves past its fixtures. Only Date is faked; timers stay real so
+ * supertest and better-sqlite3 behave normally.
+ */
+export function useFrozenToday(isoDate: string): void {
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(`${isoDate}T10:00:00`) })
+  })
+  afterAll(() => {
+    vi.useRealTimers()
+  })
+}
+
 export function useIntegrationEnv(): void {
   beforeEach(async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'jtp-int-'))
@@ -204,6 +221,20 @@ export function useIntegrationEnv(): void {
     rmSync(tempDir, { recursive: true, force: true })
     delete process.env.JEWELTRACKERPRO_E2E_USER_DATA
   })
+}
+
+/**
+ * New accounts start with must_change_password, and the API refuses everything
+ * but the change-password screen until it is done. Tests about permissions use
+ * this to skip that step; auth.test.ts covers the step itself.
+ */
+export function skipPasswordChange(username: string): void {
+  getDatabase().prepare('UPDATE users SET must_change_password = 0 WHERE username = ?').run(username)
+}
+
+/** A second, independent client (its own cookie jar) on the same app. */
+export function newTestAgent() {
+  return request.agent(app)
 }
 
 export function getTestAgent() {

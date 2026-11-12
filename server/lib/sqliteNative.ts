@@ -36,14 +36,16 @@ function sidecarAddonPath(): string | undefined {
 }
 
 function packagedAddonPath(): string | undefined {
-  if (typeof process.resourcesPath !== 'string' || process.resourcesPath.length === 0) {
+  // `resourcesPath` only exists when running inside an Electron-style shell.
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: unknown }).resourcesPath
+  if (typeof resourcesPath !== 'string' || resourcesPath.length === 0) {
     return undefined
   }
   const fileName = sqliteAddonFileName()
   return [
-    join(process.resourcesPath, `better-sqlite3-${fileName}`),
-    join(process.resourcesPath, 'better-sqlite3', fileName),
-    join(process.resourcesPath, fileName),
+    join(resourcesPath, `better-sqlite3-${fileName}`),
+    join(resourcesPath, 'better-sqlite3', fileName),
+    join(resourcesPath, fileName),
   ].find((path) => existsSync(path))
 }
 
@@ -81,6 +83,8 @@ function loadSqliteAddon(): object {
 export function sqliteNativeOptions(options: Options = {}): Options {
   return {
     ...options,
-    nativeBinding: loadSqliteAddon(),
+    // better-sqlite3 accepts the loaded addon object as well as a path; its
+    // type definitions only list the path form.
+    nativeBinding: loadSqliteAddon() as unknown as string,
   }
 }

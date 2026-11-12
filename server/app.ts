@@ -1,13 +1,19 @@
 import { existsSync } from 'node:fs'
 import { join, sep } from 'node:path'
-import cors from 'cors'
 import { getAppRoot, getAppVersion } from './lib/appPaths'
 import express from 'express'
-import { attachSession, requireAuth, requireFeature, requireRole } from './auth/middleware'
+import {
+  attachSession,
+  requireAuth,
+  requireFeature,
+  requirePasswordChanged,
+  requireRole,
+} from './auth/middleware'
 import { getDbPath } from './db'
 import { errorMiddleware } from './lib/http'
 import { getLogsDir } from './lib/logger'
 import { getUploadsDir } from './lib/paths'
+import { localHostOnly, sameOriginWrites, securityHeaders } from './lib/requestGuards'
 import authRoutes from './routes/auth.routes'
 import backupRoutes from './routes/backup.routes'
 import customersRoutes from './routes/customers.routes'
@@ -25,7 +31,13 @@ import goldSavingsRoutes from './routes/goldSavings.routes'
 export function createApp(): express.Express {
   const rootDir = getAppRoot()
   const app = express()
-  app.use(cors({ origin: true, credentials: true }))
+  // No CORS: the app is always served from this same origin (directly, or
+  // through the Vite dev proxy), so no other site needs to call the API. The
+  // old `cors({ origin: true, credentials: true })` let any web page the shop
+  // computer opened read and change data with the signed-in user's cookie.
+  app.use(localHostOnly)
+  app.use(sameOriginWrites)
+  app.use(securityHeaders)
   app.use(express.json({ limit: '2mb' }))
   app.use(attachSession)
   // Uploads are named with a random UUID and never overwritten, so a given URL
@@ -33,13 +45,16 @@ export function createApp(): express.Express {
   // signatures are requested on every print preview, so this matters.
   app.use('/uploads', express.static(getUploadsDir(), { maxAge: '365d', immutable: true }))
 
-  app.get('/api/version', (_req, res) => {
+  // The desktop shell polls this before anyone signs in, so it stays open;
+  // the file paths (which contain the Windows user name) need a session.
+  app.get('/api/version', (req, res) => {
     res.json({
       version: getAppVersion(),
-      dbPath: getDbPath(),
-      logsPath: getLogsDir(),
+      ...(req.user ? { dbPath: getDbPath(), logsPath: getLogsDir() } : {}),
     })
   })
+
+  app.use('/api', requirePasswordChanged)
 
   app.use('/api/auth', authRoutes)
   app.use('/api/diagnostics', diagnosticsRoutes)

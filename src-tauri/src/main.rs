@@ -3,6 +3,7 @@
 mod host_log;
 mod recovery;
 
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
@@ -16,6 +17,13 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder}
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+
+/// Paths the person picked in this app's own save dialog. `write_backup_file`
+/// only writes to one of these, once, so a page that reaches the command
+/// cannot write anywhere else (a Startup-folder script, say) without the
+/// person choosing that file themselves.
+#[derive(Default)]
+struct ApprovedSavePaths(Mutex<HashSet<String>>);
 
 /// The running API sidecar.
 #[derive(Default)]
@@ -353,27 +361,49 @@ async fn choose_backup_path(
     filter_name: Option<String>,
     extension: Option<String>,
 ) -> Result<Option<String>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let dialog_app = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
         let filter = filter_name.unwrap_or_else(|| "SQLite database".to_string());
         let ext = extension.unwrap_or_else(|| "db".to_string());
-        let picked = app
+        let picked = dialog_app
             .dialog()
             .file()
             .add_filter(&filter, &[ext.as_str()])
             .set_file_name(&default_filename)
             .blocking_save_file();
         match picked {
-            Some(FilePath::Path(path)) => Ok(Some(path.to_string_lossy().into_owned())),
-            Some(FilePath::Url(url)) => Ok(Some(url.to_string())),
-            None => Ok(None),
+            Some(FilePath::Path(path)) => Some(path.to_string_lossy().into_owned()),
+            Some(FilePath::Url(url)) => Some(url.to_string()),
+            None => None,
         }
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    if let Some(path) = &picked {
+        app.state::<ApprovedSavePaths>()
+            .0
+            .lock()
+            .map_err(|error| error.to_string())?
+            .insert(path.clone());
+    }
+    Ok(picked)
 }
 
 #[tauri::command]
-fn write_backup_file(path: String, bytes: Vec<u8>) -> Result<DesktopExportResult, String> {
+fn write_backup_file(
+    app: AppHandle,
+    path: String,
+    bytes: Vec<u8>,
+) -> Result<DesktopExportResult, String> {
+    let approved = app
+        .state::<ApprovedSavePaths>()
+        .0
+        .lock()
+        .map_err(|error| error.to_string())?
+        .remove(&path);
+    if !approved {
+        return Err("Choose where to save the file first".to_string());
+    }
     std::fs::write(&path, bytes).map_err(|error| error.to_string())?;
     Ok(DesktopExportResult {
         canceled: false,
@@ -454,6 +484,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState::default())
         .manage(Lifecycle::default())
+        .manage(ApprovedSavePaths::default())
         .manage(recovery::RendererGuard::default())
         .invoke_handler(tauri::generate_handler![
             get_app_version,

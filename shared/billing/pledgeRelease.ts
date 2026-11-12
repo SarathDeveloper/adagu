@@ -32,6 +32,19 @@ export type ReleaseQuote = {
   payoff: number
 }
 
+function releaseFraction(held: ReleaseQuoteItem[], item: ReleaseQuoteItem): number {
+  const allValued = held.every((row) => row.itemValue > EPSILON)
+  if (allValued) {
+    const total = held.reduce((sum, row) => sum + row.itemValue, 0)
+    return Math.min(1, item.itemValue / total)
+  }
+  const weight = held.reduce((sum, row) => sum + Math.max(0, row.netWeight), 0)
+  if (weight <= EPSILON || item.netWeight <= 0) {
+    throw new Error('This jewel has no value to release against')
+  }
+  return Math.min(1, item.netWeight / weight)
+}
+
 /**
  * What the customer must pay to take one jewel back. The last jewel is a full
  * redeem. Interest due is collected in full; principal is that jewel's share,
@@ -54,19 +67,14 @@ export function quotePledgeItemRelease(input: ReleaseQuoteInput): ReleaseQuote {
   const principal = roundMoney(Math.max(0, input.principalOutstanding))
   const interest = roundMoney(Math.max(0, input.interestDue))
 
-  let share = 0
-  let valueDropped = 0
-  if (item.itemValue > EPSILON && assessed > EPSILON) {
-    share = roundMoney((Math.min(item.itemValue, assessed) / assessed) * principal)
-    valueDropped = roundMoney(Math.min(assessed, item.itemValue))
-  } else {
-    const weight = held.reduce((sum, row) => sum + Math.max(0, row.netWeight), 0)
-    if (weight <= EPSILON) {
-      throw new Error('This jewel has no value to release against')
-    }
-    share = roundMoney((Math.max(0, item.netWeight) / weight) * principal)
-  }
+  // The jewel's share of the collateral still held: by value when every held
+  // jewel has one, otherwise by net weight. The same share comes off both the
+  // principal and the assessed value, so the rest of the loan keeps the same
+  // LTV footing whether the assessed value was computed or entered by hand.
+  const fraction = releaseFraction(held, item)
+  let share = roundMoney(fraction * principal)
   if (share > principal) share = principal
+  const valueDropped = Math.min(assessed, roundMoney(fraction * assessed))
 
   const remainingAssessed = roundMoney(Math.max(0, assessed - valueDropped))
   const remainingPrincipal = roundMoney(Math.max(0, principal - share))

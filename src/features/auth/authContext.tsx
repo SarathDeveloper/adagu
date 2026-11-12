@@ -38,8 +38,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    let active = true
+    api
+      .me()
+      .then(
+        (next) => {
+          if (active) setUser(next)
+        },
+        () => {
+          if (active) setUser(null)
+        },
+      )
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const login = useCallback(async (input: LoginInput) => {
     const next = await api.login(input)

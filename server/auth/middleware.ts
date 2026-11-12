@@ -27,6 +27,30 @@ export const attachSession: RequestHandler = (req, _res, next) => {
   next()
 }
 
+/**
+ * A user flagged to change their password (the default admin/admin123, or an
+ * account an admin just created or reset) can only reach what the
+ * change-password screen needs until they do. The screen enforces this in the
+ * UI; this makes the API enforce it too. Mounted on /api, so paths are relative
+ * to it.
+ */
+export const requirePasswordChanged: RequestHandler = (req, _res, next) => {
+  if (!req.user?.mustChangePassword) {
+    next()
+    return
+  }
+  const allowed =
+    req.path.startsWith('/auth/') ||
+    req.path.startsWith('/diagnostics/') ||
+    req.path === '/version' ||
+    (req.method === 'GET' && req.path === '/settings')
+  if (allowed) {
+    next()
+    return
+  }
+  next(new HttpError(403, 'Change your password before continuing'))
+}
+
 export const requireAuth: RequestHandler = (req, _res, next) => {
   if (!req.user) {
     next(new HttpError(401, 'Authentication required'))
@@ -47,6 +71,19 @@ export function requireRole(role: UserRole): RequestHandler {
     }
     next()
   }
+}
+
+export function isAdmin(req: { user?: { role: UserRole } | null }): boolean {
+  return req.user?.role === 'admin'
+}
+
+/** Admins have every feature; staff only the ones granted to them. */
+export function userHasFeature(
+  req: { user?: { role: UserRole; features: FeatureKey[] } | null },
+  feature: FeatureKey,
+): boolean {
+  if (!req.user) return false
+  return req.user.role === 'admin' || req.user.features.includes(feature)
 }
 
 export function requireFeature(feature: FeatureKey): RequestHandler {

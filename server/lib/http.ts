@@ -25,9 +25,14 @@ export function parseBody<T>(schema: ZodType<T>, raw: unknown): T {
   return schema.parse(raw ?? undefined)
 }
 
-export function parseIdParam(value: string): number {
-  const id = Number.parseInt(value, 10)
-  if (!Number.isInteger(id) || id <= 0) {
+/** Express 5 types route params as `string | string[]`; ids are single path segments. */
+export function parseIdParam(value: string | string[] | undefined): number {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (raw == null || !/^\d+$/.test(raw.trim())) {
+    throw new HttpError(400, 'Invalid id')
+  }
+  const id = Number.parseInt(raw, 10)
+  if (!Number.isSafeInteger(id) || id <= 0) {
     throw new HttpError(400, 'Invalid id')
   }
   return id

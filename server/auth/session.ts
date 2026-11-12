@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import type { UserRole } from '@shared/types'
+import { resetLoginThrottleForTests } from './loginThrottle'
 
 export const SESSION_COOKIE = 'jeweltrackerpro_session'
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000
@@ -60,8 +61,18 @@ export function destroySessionsForUser(userId: number): void {
   }
 }
 
-export function clearAllSessionsForTests(): void {
+/**
+ * Signs everyone out. Used after a database restore: sessions point at user
+ * ids, and in the restored database the same id can be a different person or a
+ * different role.
+ */
+export function clearAllSessions(): void {
   sessions.clear()
+}
+
+export function clearAllSessionsForTests(): void {
+  clearAllSessions()
+  resetLoginThrottleForTests()
 }
 
 export function sessionCookieValue(sessionId: string): string {
@@ -82,7 +93,14 @@ export function parseCookies(header: string | undefined): Record<string, string>
     if (index <= 0) continue
     const key = part.slice(0, index).trim()
     const value = part.slice(index + 1).trim()
-    if (key) out[key] = decodeURIComponent(value)
+    if (!key) continue
+    // Cookies are shared by every app on 127.0.0.1, so a malformed one set by
+    // something else (e.g. `x=%E0%A4%A`) must not turn every request into a 500.
+    try {
+      out[key] = decodeURIComponent(value)
+    } catch {
+      out[key] = value
+    }
   }
   return out
 }

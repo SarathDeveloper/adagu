@@ -57,14 +57,14 @@ export function controlRole(el: HTMLElement): EntryRole {
       rows: el.rows,
       disabled: el.disabled,
       readOnly: el.readOnly,
-      hidden: el.hidden,
+      hidden: el.hidden !== false,
     })
   }
   if (el instanceof HTMLSelectElement) {
     return controlRoleFrom({
       tag: 'select',
       disabled: el.disabled,
-      hidden: el.hidden,
+      hidden: el.hidden !== false,
     })
   }
   if (el instanceof HTMLInputElement) {
@@ -73,7 +73,7 @@ export function controlRole(el: HTMLElement): EntryRole {
       type: el.type,
       disabled: el.disabled,
       readOnly: el.readOnly,
-      hidden: el.hidden || el.type === 'hidden',
+      hidden: el.hidden !== false || el.type === 'hidden',
     })
   }
   return 'skip'

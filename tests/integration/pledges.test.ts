@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { getDatabase } from '../../server/db'
 import { setShopSetting } from '../../server/lib/settingsStore'
-import { getTestAgent, ipc, IPC_CHANNELS, loginAsAdmin, useIntegrationEnv } from './helpers/testEnv'
+import {
+  getTestAgent,
+  ipc,
+  IPC_CHANNELS,
+  loginAsAdmin,
+  skipPasswordChange,
+  useFrozenToday,
+  useIntegrationEnv,
+} from './helpers/testEnv'
 
 async function createPledgeCustomer(name: string, phone: string): Promise<number> {
   const customer = await ipc<{ id: number }>(IPC_CHANNELS.CUSTOMERS_CREATE, {
@@ -49,6 +57,7 @@ function dropTrigger(name: string): void {
 }
 
 describe('pledges API', () => {
+  useFrozenToday('2026-10-01')
   useIntegrationEnv()
 
   it('previews the next ADG receipt number then allocates it on create', async () => {
@@ -1226,6 +1235,7 @@ describe('pledges API', () => {
     })
     expect(staff.status).toBe(201)
     await getTestAgent().post('/api/auth/logout')
+    skipPasswordChange('adagu-ltv-staff')
     expect(
       (
         await getTestAgent()
@@ -1311,14 +1321,14 @@ describe('pledges API', () => {
     expect(muchLater.body.payoff).toBeCloseTo(remaining, 2)
 
     const tooMuch = await getTestAgent().post(`/api/pledges/${pledgeId}/collect-shortfall`).send({
-      collectedDate: '2026-10-31',
+      collectedDate: '2026-09-30',
       amount: remaining + 100,
       mode: 'cash',
     })
     expect(tooMuch.status).toBe(400)
 
     const collected = await getTestAgent().post(`/api/pledges/${pledgeId}/collect-shortfall`).send({
-      collectedDate: '2026-10-31',
+      collectedDate: '2026-09-30',
       amount: remaining,
       mode: 'cash',
     })
@@ -1351,6 +1361,7 @@ describe('pledges API', () => {
     })
     expect(staff.status).toBe(201)
     await getTestAgent().post('/api/auth/logout')
+    skipPasswordChange('adagu-undo-staff')
     expect(
       (
         await getTestAgent()

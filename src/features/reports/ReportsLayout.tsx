@@ -33,6 +33,12 @@ export function ReportsLayout() {
   const location = useLocation()
   const activeReport = findReport(location.pathname.split('/').pop() ?? '')
   const [openGroup, setOpenGroup] = useState<ReportGroupId | null>(null)
+  const [menuPath, setMenuPath] = useState(location.pathname)
+  // Navigating closes the open report menu.
+  if (menuPath !== location.pathname) {
+    setMenuPath(location.pathname)
+    setOpenGroup(null)
+  }
   const [lookups, setLookups] = useState<ReportLookups>(EMPTY_LOOKUPS)
   const navRef = useRef<HTMLElement>(null)
 
@@ -49,10 +55,6 @@ export function ReportsLayout() {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    setOpenGroup(null)
-  }, [location.pathname])
 
   useEffect(() => {
     if (!openGroup) return

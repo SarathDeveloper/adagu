@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { looksLikePhone, prefillFromSearch } from '../../src/features/customers/CustomerFormModal'
+import { looksLikePhone, prefillFromSearch } from '../../src/features/customers/customerFormDefaults'
 
 describe('customerFormModal prefill', () => {
   it('prefills name from text search', () => {

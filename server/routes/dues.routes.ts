@@ -20,6 +20,7 @@ import type {
 import type Database from 'better-sqlite3'
 import { getDatabase } from '../db'
 import { refreshActivePledgeDues } from '../dues/pledgeSync'
+import { userHasFeature } from '../auth/middleware'
 import { asyncHandler, HttpError, parseBody, parseIdParam } from '../lib/http'
 import { replayForPledge } from '../pledges/ledger'
 import { loadPledgeTopups } from '../pledges/topups'
@@ -409,6 +410,16 @@ router.delete(
     if (linkedPledgePayment && req.user?.role !== 'admin') {
       throw new HttpError(403, 'Only an admin can undo a payment')
     }
+    // A pledge payment row with no pledge_payments link is a legacy or
+    // safety-net row. Deleting it does not change the loan: on an open loan the
+    // next sync writes it straight back, and on a closed one it leaves a phantom
+    // balance. Undo the payment from the loan instead.
+    if (linkedPledgePayment && existing.pledge_payment_id === null) {
+      throw new HttpError(
+        400,
+        'This Adagu payment is not linked to a loan payment. Undo it from the loan instead.',
+      )
+    }
 
     const tx = db.transaction(() => {
       if (linkedPledgePayment && existing.pledge_payment_id !== null) {
@@ -421,9 +432,6 @@ router.delete(
       const result = db.prepare('DELETE FROM customer_dues WHERE id = ?').run(id)
       if (result.changes === 0) {
         throw new Error('Due entry not found')
-      }
-      if (linkedPledgePayment) {
-        refreshActivePledgeDues(db)
       }
     })
     tx()
@@ -439,6 +447,11 @@ router.post(
     const db = getDatabase()
     const tx = db.transaction(() => {
       const due = loadDueEntry(db, input.dueEntryId)
+      // Paying an Adagu due posts a loan payment, so it needs the same
+      // permission as the Adagu screens; Dues access alone is not enough.
+      if (due.pledgeId !== null && !userHasFeature(req, 'adagu')) {
+        throw new HttpError(403, 'You need Adagu access to collect on a loan')
+      }
       const remaining = remainingForDue(db, due)
 
       if (remaining <= 0) {
@@ -488,6 +501,10 @@ router.post(
     const db = getDatabase()
     const tx = db.transaction(() => {
       const due = loadDueEntry(db, id)
+      // Marking an Adagu due paid redeems the loan, so it needs Adagu access.
+      if (due.pledgeId !== null && !userHasFeature(req, 'adagu')) {
+        throw new HttpError(403, 'You need Adagu access to settle a loan')
+      }
       const remaining = remainingForDue(db, due)
 
       if (remaining <= 0) {

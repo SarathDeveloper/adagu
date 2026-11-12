@@ -4,7 +4,7 @@ import type { AdaguDueSummary, PledgePaymentMode } from '@shared/types'
 import { DateInput } from '../../components/DateInput'
 import { Modal } from '../../components/Modal'
 import { formatCurrency, formatDisplayDate } from '../../lib/format'
-import { PLEDGE_PAYMENT_MODES } from './pledgePaymentModes'
+import { PLEDGE_COLLECTION_MODES } from './pledgePaymentModes'
 
 /**
  * Collects whatever the auction sale did not recover. Interest is frozen at the
@@ -105,7 +105,7 @@ export function ShortfallModal({
             value={mode}
             onChange={(event) => setMode(event.target.value as PledgePaymentMode)}
           >
-            {PLEDGE_PAYMENT_MODES.map((option) => (
+            {PLEDGE_COLLECTION_MODES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

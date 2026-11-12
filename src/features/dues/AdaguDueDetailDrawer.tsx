@@ -82,6 +82,8 @@ type HistoryRow = {
   note: string
 }
 
+const NO_PAYMENTS: PledgePayment[] = []
+
 export function AdaguDueDetailDrawer({
   summary,
   payments = [],
@@ -98,6 +100,7 @@ export function AdaguDueDetailDrawer({
   onReleaseReceipt,
   onCollectShortfall,
   onUndoPayment,
+  onChanged,
 }: {
   summary: AdaguDueSummary
   payments?: DueEntry[]
@@ -114,11 +117,19 @@ export function AdaguDueDetailDrawer({
   onReleaseReceipt: () => void
   onCollectShortfall?: () => void
   onUndoPayment?: () => Promise<void>
+  /** Called after the drawer itself changes the loan (a jewel release). */
+  onChanged?: () => void
 }) {
-  const [pledge, setPledge] = useState<Pledge | null>(null)
-  const [pledgePayments, setPledgePayments] = useState<PledgePayment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // What was loaded, and for which request. Kept as one value so the effect
+  // below only sets state from its async callback.
+  const [loaded, setLoaded] = useState<{
+    key: string
+    pledgeId: number
+    pledge: Pledge | null
+    payments: PledgePayment[]
+    error: string | null
+  } | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   const [undoOpen, setUndoOpen] = useState(false)
   const [undoBusy, setUndoBusy] = useState(false)
@@ -128,33 +139,55 @@ export function AdaguDueDetailDrawer({
   const moreRef = useRef<HTMLDivElement | null>(null)
   const { isAdmin } = useAuth()
 
+  // The parent replaces `summary` after every action it runs (collect, top-up,
+  // redeem, renew). Reload whenever the loan's figures move, not only when a
+  // different loan is opened, or the history and the Undo prompt go stale.
+  const requestKey = [
+    summary.pledgeId,
+    reloadToken,
+    summary.status,
+    summary.remaining,
+    summary.amountCollected,
+    summary.principalOutstanding,
+    summary.interestPaidUpto,
+  ].join('|')
+
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setError(null)
-    // Clear the previous loan so switching rows never shows stale items/history.
-    setPledge(null)
-    setPledgePayments([])
+    const pledgeId = summary.pledgeId
     void (async () => {
       try {
         const [data, payments] = await Promise.all([
-          api.getPledge(summary.pledgeId),
-          api.listPledgePayments(summary.pledgeId).catch(() => [] as PledgePayment[]),
+          api.getPledge(pledgeId),
+          api.listPledgePayments(pledgeId).catch(() => [] as PledgePayment[]),
         ])
-        if (active) {
-          setPledge(data)
-          setPledgePayments(payments)
-        }
+        if (active) setLoaded({ key: requestKey, pledgeId, pledge: data, payments, error: null })
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Failed to load Adagu details')
-      } finally {
-        if (active) setLoading(false)
+        if (active) {
+          setLoaded({
+            key: requestKey,
+            pledgeId,
+            pledge: null,
+            payments: [],
+            error: err instanceof Error ? err.message : 'Failed to load Adagu details',
+          })
+        }
       }
     })()
     return () => {
       active = false
     }
-  }, [summary.pledgeId, reloadToken])
+  }, [requestKey, summary.pledgeId])
+
+  // Data for another loan is never shown, so switching rows cannot show stale
+  // items or history; a reload of the same loan keeps the old data until the
+  // new data arrives.
+  const current = loaded && loaded.pledgeId === summary.pledgeId ? loaded : null
+  const pledge = current?.pledge ?? null
+  const pledgePayments = current?.payments ?? NO_PAYMENTS
+  const loading = current?.key !== requestKey
+  const error = actionError ?? current?.error ?? null
+  const setError = setActionError
 
   useEffect(() => {
     if (!moreOpen) return
@@ -775,12 +808,13 @@ export function AdaguDueDetailDrawer({
           assessedValue={pledge.assessedValue}
           items={pledge.items}
           onClose={() => setReleaseItem(null)}
-          onReleased={(saved) => {
+          onReleased={() => {
             const itemId = releaseItem.id
-            setPledge(saved)
             setReleaseItem(null)
             setReloadToken((token) => token + 1)
             setReleaseSlipId(itemId)
+            // Interest due and the remaining balance live in the parent's list.
+            onChanged?.()
           }}
         />
       ) : null}

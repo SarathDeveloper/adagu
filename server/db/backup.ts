@@ -12,7 +12,7 @@ import {
   unlinkSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import Database from 'better-sqlite3'
 import type { BackupFile, BackupInspection, BackupKind, BackupStatus } from '@shared/types'
 import { backupKindForName } from '@shared/backupRetention'
@@ -35,7 +35,8 @@ import { closeDatabase, getDatabase, getDbPath, initDatabase } from './index'
 import { excelPathFor, writeExcelBackupFromSqliteFile } from './excelBackup'
 import { getAppVersion } from '../lib/appPaths'
 import { latestMigrationVersion } from './migrations'
-import { offsiteDirError } from './offsitePath'
+import { isSameOrInside, offsiteDirError } from './offsitePath'
+import { clearAllSessions } from '../auth/session'
 import { prerestoreSnapshotName, pruneBackupFiles, removeBackupSiblings } from './snapshot'
 import { writeZipFile, type ZipSource } from '../lib/zip'
 
@@ -724,6 +725,15 @@ async function writePrerestoreSnapshot(): Promise<string> {
   return destination
 }
 
+/**
+ * The app only ever stores PNG and JPEG uploads, and /uploads is served on the
+ * app's own origin. Anything else in a backup (an .html or .js file, say) would
+ * become a page that runs inside the app, so it is never restored.
+ */
+export function isRestorableUploadName(name: string): boolean {
+  return /^[^/\\]+\.(png|jpe?g)$/i.test(name) && basename(name) === name
+}
+
 function copyNewFiles(sourceDir: string, targetDir: string, logLabel: string): void {
   if (!existsSync(sourceDir)) return
   mkdirSync(targetDir, { recursive: true })
@@ -731,7 +741,7 @@ function copyNewFiles(sourceDir: string, targetDir: string, logLabel: string): v
     try {
       const source = join(sourceDir, name)
       if (!statSync(source).isFile()) continue
-      if (basename(name) !== name) continue
+      if (!isRestorableUploadName(name)) continue
       const target = join(targetDir, name)
       if (existsSync(target)) continue
       copyFileSync(source, target)
@@ -773,8 +783,27 @@ export async function restoreDatabaseFrom(
   return withBackupLock(() => runRestore(sourcePath, options.uploadsDir))
 }
 
+/**
+ * A backup with no active admin would lock everyone out, and with an empty
+ * users table the app would recreate the default admin/admin123 login.
+ */
+function assertBackupHasActiveAdmin(filePath: string): void {
+  const db = openBackup(filePath)
+  try {
+    const row = db
+      .prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND active = 1`)
+      .get() as { n: number }
+    if (row.n < 1) {
+      throw new HttpError(400, 'This backup has no active admin user, so it cannot be restored')
+    }
+  } finally {
+    db.close()
+  }
+}
+
 async function runRestore(sourcePath: string, uploadsDir?: string): Promise<BackupStatus> {
   assertRestorableBackup(sourcePath)
+  assertBackupHasActiveAdmin(sourcePath)
 
   const preserved = readBackupState()
   const offsiteDir = preserved.get(OFFSITE_DIR_KEY) ?? ''
@@ -819,6 +848,10 @@ async function runRestore(sourcePath: string, uploadsDir?: string): Promise<Back
   if (uploadsDir) {
     copyNewFiles(uploadsDir, getUploadsDir(), 'Backup photo could not be restored')
   }
+  // Sessions hold user ids from the old database. In the restored one the same
+  // id may be someone else, or the same person with a different role, so
+  // everyone signs in again.
+  clearAllSessions()
   return getBackupStatus()
 }
 
@@ -826,7 +859,7 @@ export function allowFullBackupEntry(name: string): boolean {
   if (name === 'manifest.json' || name === 'jeweltrackerpro.db') return true
   if (!name.startsWith('uploads/')) return false
   const base = name.slice('uploads/'.length)
-  return base.length > 0 && !base.includes('/') && basename(base) === base
+  return base.length > 0 && !base.includes('/') && isRestorableUploadName(base)
 }
 
 export function assertFullBackupDestination(filePath: string): string {
@@ -837,8 +870,8 @@ export function assertFullBackupDestination(filePath: string): string {
   if (!resolved.toLowerCase().endsWith('.zip')) {
     throw new HttpError(400, 'Choose a .zip file path')
   }
-  const dataDir = resolve(getDataDir())
-  if (resolved === dataDir || resolved.startsWith(dataDir + sep)) {
+  // path.relative ignores case on Windows, so c:\users\… cannot slip past.
+  if (isSameOrInside(resolved, getDataDir())) {
     throw new HttpError(400, "Choose a folder outside this computer's app data")
   }
   const parent = dirname(resolved)

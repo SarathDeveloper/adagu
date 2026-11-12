@@ -4,6 +4,28 @@ import { DEFAULT_CASH_VISIBILITY, DEFAULT_TAX_VISIBILITY } from './billTemplate'
 
 export const idSchema = z.number().int().positive()
 
+/** True for a real yyyy-mm-dd day; rejects 2026-02-30, 2026-13-01 and the like. */
+export function isCalendarDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  )
+}
+
+/**
+ * A calendar date as yyyy-mm-dd. A regex alone lets 2026-02-30 through, and
+ * V8 then reads it as 2 March while string comparisons treat it as February.
+ */
+export const calendarDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date')
+  .refine(isCalendarDate, 'Invalid date')
+
 const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]$/
 
 export const customerInputSchema = z.object({
@@ -33,6 +55,7 @@ export const customerInputSchema = z.object({
   idProofType: z.string().trim().max(50).optional().default(''),
 })
 
+/** Every mode a stored pledge payment can have, including internal ones. */
 export const pledgePaymentModeSchema = z.enum([
   'cash',
   'upi',
@@ -41,6 +64,13 @@ export const pledgePaymentModeSchema = z.enum([
   'transfer',
   'auction',
 ])
+/**
+ * Modes a person can choose when collecting money. `transfer` (renewal
+ * bookkeeping) and `auction` (sale proceeds) are written by the server only;
+ * both are left out of collection totals, so accepting them from a request
+ * would hide real cash from the drawer and the collections report.
+ */
+export const pledgeCollectionModeSchema = z.enum(['cash', 'upi', 'card', 'bank_transfer'])
 export const paperSizeSchema = z.enum(['a5', 'a4', 'thermal'])
 export const printCopiesSchema = z.number().int().min(1).max(5)
 
@@ -225,7 +255,7 @@ export const dueEntryKindSchema = z.enum(['due', 'payment'])
 
 export const dueEntryInputSchema = z.object({
   customerId: z.number().int().positive(),
-  entryDate: z.string().min(1),
+  entryDate: calendarDateSchema,
   kind: dueEntryKindSchema,
   amount: z.number().positive(),
   note: z.string().max(500),
@@ -233,7 +263,7 @@ export const dueEntryInputSchema = z.object({
 
 export const dueEntryUpdateInputSchema = z.object({
   id: idSchema,
-  entryDate: z.string().min(1),
+  entryDate: calendarDateSchema,
   kind: dueEntryKindSchema,
   amount: z.number().positive(),
   note: z.string().max(500),
@@ -242,9 +272,9 @@ export const dueEntryUpdateInputSchema = z.object({
 export const duePaymentInputSchema = z.object({
   dueEntryId: idSchema,
   amount: z.number().positive(),
-  entryDate: z.string().min(1),
+  entryDate: calendarDateSchema,
   note: z.string().max(500).default(''),
-  mode: pledgePaymentModeSchema.optional(),
+  mode: pledgeCollectionModeSchema.optional(),
 })
 
 export const reportErrorSchema = z.object({
@@ -253,7 +283,7 @@ export const reportErrorSchema = z.object({
   source: z.enum(['boundary', 'window', 'rejection']),
 })
 
-export const businessDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+export const businessDateSchema = calendarDateSchema
 
 export const pledgeStatusSchema = z.enum(['draft', 'active', 'redeemed', 'forfeited', 'renewed'])
 
@@ -281,7 +311,7 @@ export const pledgeItemInputSchema = z
 
 const pledgeBaseSchema = z.object({
   customerId: z.number().int().positive(),
-  pledgeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  pledgeDate: calendarDateSchema,
   pledgeType: z.string().max(100).optional(),
   guardianName: z.string().max(200).optional(),
   customerAddress: z.string().max(500).optional(),
@@ -311,42 +341,42 @@ export const pledgeSanctionInputSchema = z.object({
 
 export const pledgeRedeemInputSchema = z.object({
   id: z.number().int().positive(),
-  redeemedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  redeemedDate: calendarDateSchema,
   amountCollected: z.number().nonnegative(),
   discount: z.number().nonnegative().optional().default(0),
-  mode: pledgePaymentModeSchema.optional().default('cash'),
+  mode: pledgeCollectionModeSchema.optional().default('cash'),
 })
 
 export const pledgeCollectInputSchema = z.object({
   id: z.number().int().positive(),
-  collectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  collectedDate: calendarDateSchema,
   amount: z.number().positive(),
-  mode: pledgePaymentModeSchema.optional().default('cash'),
+  mode: pledgeCollectionModeSchema.optional().default('cash'),
 })
 
 export const pledgeReleaseItemInputSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: calendarDateSchema,
   amount: z.number().positive(),
-  mode: pledgePaymentModeSchema.optional().default('cash'),
+  mode: pledgeCollectionModeSchema.optional().default('cash'),
 })
 
 export const pledgeForfeitInputSchema = z.object({
   id: z.number().int().positive(),
-  forfeitedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  forfeitedDate: calendarDateSchema,
 })
 
 export const pledgeRenewInputSchema = z.object({
   id: z.number().int().positive(),
-  renewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  mode: pledgePaymentModeSchema.optional().default('cash'),
-  newLoanAmount: z.number().nonnegative().optional(),
+  renewDate: calendarDateSchema,
+  mode: pledgeCollectionModeSchema.optional().default('cash'),
+  newLoanAmount: z.number().positive('The renewed loan must be more than zero').optional(),
   note: z.string().max(500).optional().default(''),
   allowAboveLtv: z.boolean().optional(),
 })
 
 export const pledgeTopupInputSchema = z.object({
   pledgeId: z.number().int().positive(),
-  topupDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  topupDate: calendarDateSchema,
   amount: z.number().positive(),
   note: z.string().max(500).optional().default(''),
   allowAboveLtv: z.boolean().optional(),
@@ -354,12 +384,12 @@ export const pledgeTopupInputSchema = z.object({
 
 export const pledgeAuctionNoticeInputSchema = z.object({
   id: z.number().int().positive(),
-  noticeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  noticeDate: calendarDateSchema,
 })
 
 export const pledgeAuctionInputSchema = z.object({
   id: z.number().int().positive(),
-  auctionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  auctionDate: calendarDateSchema,
   buyerType: z.enum(['outside', 'shop']),
   buyerName: z.string().max(200).optional().default(''),
   saleAmount: z.number().nonnegative(),
@@ -369,15 +399,15 @@ export const pledgeAuctionInputSchema = z.object({
 
 export const pledgeAuctionSurplusInputSchema = z.object({
   id: z.number().int().positive(),
-  surplusPaidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  mode: pledgePaymentModeSchema.optional().default('cash'),
+  surplusPaidDate: calendarDateSchema,
+  mode: pledgeCollectionModeSchema.optional().default('cash'),
 })
 
 export const pledgeShortfallInputSchema = z.object({
   id: z.number().int().positive(),
-  collectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  collectedDate: calendarDateSchema,
   amount: z.number().positive(),
-  mode: pledgePaymentModeSchema.optional().default('cash'),
+  mode: pledgeCollectionModeSchema.optional().default('cash'),
 })
 
 export const pledgePhotoKindSchema = z.enum(['item', 'customer', 'id_proof'])
@@ -406,7 +436,7 @@ export const backupSettingsSchema = z.object({
   offsiteDir: z.string().trim().max(260).optional(),
 })
 
-const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date')
+const isoDateSchema = calendarDateSchema
 const optionalIsoDateSchema = z
   .union([isoDateSchema, z.literal(''), z.null()])
   .optional()

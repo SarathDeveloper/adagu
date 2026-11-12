@@ -113,11 +113,16 @@ export function loadPledgeTranches(
 ): { base: PledgeLedgerTrancheInput; topups: PledgeLedgerTrancheInput[] } {
   const rows = db
     .prepare(
-      `SELECT topup_date, amount, interest_pct
+      `SELECT topup_date, amount, interest_pct, after_payment_id
        FROM pledge_topups WHERE pledge_id = ?
        ORDER BY topup_date ASC, id ASC`,
     )
-    .all(pledge.id) as Array<{ topup_date: string; amount: number; interest_pct: number }>
+    .all(pledge.id) as Array<{
+    topup_date: string
+    amount: number
+    interest_pct: number
+    after_payment_id: number | null
+  }>
   return {
     base: {
       amount: pledge.loan_amount,
@@ -128,6 +133,7 @@ export function loadPledgeTranches(
       amount: row.amount,
       rate: row.interest_pct,
       date: row.topup_date,
+      afterPaymentSeq: row.after_payment_id,
     })),
   }
 }
@@ -137,6 +143,7 @@ export function toLedgerPayments(rows: PledgePayment[]): PledgeLedgerPaymentInpu
     date: row.paymentDate,
     amount: row.amount,
     discount: row.discount,
+    seq: row.id,
   }))
 }
 

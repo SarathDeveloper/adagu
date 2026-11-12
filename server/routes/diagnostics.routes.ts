@@ -16,7 +16,17 @@ let lastCrash:
   | { message: string; at: number; referenceId: string; timestamp: string }
   | null = null
 
-function recordCrash(message: string, error?: unknown): { referenceId: string; timestamp: string } {
+/**
+ * A crash message is one log line. Newlines in it would let a caller forge
+ * extra entries in the log, so they are folded into spaces; the stack trace
+ * travels separately as the error.
+ */
+function oneLine(message: string): string {
+  return message.replace(/[\r\n\u2028\u2029]+/g, ' ').trim()
+}
+
+function recordCrash(rawMessage: string, error?: unknown): { referenceId: string; timestamp: string } {
+  const message = oneLine(rawMessage)
   const now = Date.now()
   if (lastCrash && lastCrash.message === message && now - lastCrash.at < DUPLICATE_WINDOW_MS) {
     return { referenceId: lastCrash.referenceId, timestamp: lastCrash.timestamp }
@@ -41,6 +51,9 @@ const router = Router()
 
 // These are deliberately unauthenticated: a crash can happen on the login
 // screen, and the desktop shell reports WebView2 failures with no session.
+// What keeps other websites out is in app.ts: no CORS, so a page from another
+// origin cannot send these JSON requests, and the Host check refuses DNS
+// rebinding.
 router.post(
   '/client',
   asyncHandler((req, res) => {
@@ -67,7 +80,7 @@ router.post(
         timestamp: reference.timestamp,
         version: getAppVersion(),
         category: 'crash',
-        message: input.message,
+        message: oneLine(input.message),
         ...(input.detail ? { stack: input.detail } : {}),
       })
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { REPORT_IDS, type ReportDefinition, type ReportResult } from '@shared/reportsCatalog'
-import { getTestAgent, IPC_CHANNELS, invokeIpcForTests, ipc, useIntegrationEnv } from './helpers/testEnv'
+import { getTestAgent, IPC_CHANNELS, invokeIpcForTests, ipc, useFrozenToday, useIntegrationEnv } from './helpers/testEnv'
 
 async function seedActivePledge(customerId: number): Promise<{ id: number; receiptNo: string }> {
   const created = await getTestAgent().post('/api/pledges').send({
@@ -22,6 +22,7 @@ async function seedActivePledge(customerId: number): Promise<{ id: number; recei
 }
 
 describe('reports', () => {
+  useFrozenToday('2026-10-01')
   useIntegrationEnv()
 
   it('exposes only the Adagu and customer reports', async () => {

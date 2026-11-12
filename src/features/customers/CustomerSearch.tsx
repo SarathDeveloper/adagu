@@ -3,10 +3,8 @@ import { createPortal } from 'react-dom'
 import { Plus, Search, X } from 'lucide-react'
 import type { Customer } from '@shared/types'
 import { useAnchoredPanel } from '../../lib/useAnchoredPanel'
-import {
-  CustomerFormModal,
-  prefillFromSearch,
-} from './CustomerFormModal'
+import { CustomerFormModal } from './CustomerFormModal'
+import { prefillFromSearch } from './customerFormDefaults'
 
 type CustomerSearchProps = {
   customers: Customer[]
@@ -40,6 +38,9 @@ export function CustomerSearch({
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
+  // True once the person moves through the list (arrow keys or pointer). Until
+  // then the first row is only a suggestion and Enter must not pick it.
+  const [chosenOnPurpose, setChosenOnPurpose] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalPrefill, setModalPrefill] = useState<ReturnType<typeof prefillFromSearch> | undefined>()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -71,9 +72,10 @@ export function CustomerSearch({
   const showNoMatch = query.trim().length > 0 && filtered.length === 0
   const optionCount = filtered.length > 0 ? filtered.length : showNoMatch ? 1 : 0
 
-  useEffect(() => {
+  function resetHighlight() {
     setHighlight(0)
-  }, [query])
+    setChosenOnPurpose(false)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -108,6 +110,7 @@ export function CustomerSearch({
       event.preventDefault()
       event.stopPropagation()
       if (optionCount === 0) return
+      setChosenOnPurpose(true)
       setHighlight((current) => {
         const next = event.key === 'ArrowDown' ? current + 1 : current - 1
         return (next + optionCount) % optionCount
@@ -115,6 +118,16 @@ export function CustomerSearch({
       return
     }
     if (event.key === 'Enter') {
+      // With nothing typed (or the current customer's own name, which focus
+      // fills in) and no row chosen, the first row is just the newest customer.
+      // Picking it would put an unrelated borrower on the bill, so Enter closes
+      // the list and carries on to the next field instead.
+      const typed = query.trim()
+      const keepsSelection = Boolean(selected) && typed === selected?.name.trim()
+      if (!chosenOnPurpose && (!typed || keepsSelection)) {
+        setOpen(false)
+        return
+      }
       event.preventDefault()
       event.stopPropagation()
       if (filtered.length === 0) {
@@ -144,13 +157,16 @@ export function CustomerSearch({
           disabled={disabled}
           value={keepSearchEmpty || open || !selected ? query : selected.name}
           placeholder="Search customer by name, phone or ID…"
+          aria-label={`Search ${label.toLowerCase()}`}
           onChange={(e) => {
             setQuery(e.target.value)
+            resetHighlight()
             setOpen(true)
             if (customerId && !keepSearchEmpty) onClear()
           }}
           onFocus={() => {
             if (selected && !keepSearchEmpty) setQuery(selected.name)
+            resetHighlight()
             setOpen(true)
           }}
           onKeyDown={onSearchKeyDown}
@@ -206,7 +222,10 @@ export function CustomerSearch({
                   className={`billing-customer-option${index === highlight ? ' is-active' : ''}`}
                   role="option"
                   aria-selected={index === highlight}
-                  onMouseEnter={() => setHighlight(index)}
+                  onMouseEnter={() => {
+                    setHighlight(index)
+                    setChosenOnPurpose(true)
+                  }}
                   onClick={() => pick(customer)}
                 >
                   <span className="billing-customer-option-name">{customer.name}</span>

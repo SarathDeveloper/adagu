@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getTestAgent, invokeIpcForTests } from './helpers/testEnv'
-import { IPC_CHANNELS, ipc, useIntegrationEnv } from './helpers/testEnv'
+import { IPC_CHANNELS, ipc, useFrozenToday, useIntegrationEnv } from './helpers/testEnv'
 
 describe('dues IPC', () => {
+  useFrozenToday('2026-10-01')
   useIntegrationEnv()
 
   it('posts Adagu pledge outstanding onto the dues ledger and accepts collection', async () => {

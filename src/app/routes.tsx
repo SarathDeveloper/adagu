@@ -3,6 +3,7 @@ import { AppLayout } from './layout/AppLayout'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { LoginPage } from '../features/auth/LoginPage'
 import { AdaguLayout } from '../features/pledges/AdaguLayout'
+import { PledgeEditorRoute } from './PledgeEditorRoute'
 import { ReportsLayout } from '../features/reports/ReportsLayout'
 import {
   GoldSavingsIndexRedirect,
@@ -27,7 +28,6 @@ import {
   GoldSavingsReportsPage,
   MaturityPage,
   OverdueAgingPage,
-  PledgeEditorPage,
   ReportViewPage,
   SchemeConfigPage,
   SchemeLedgerPage,
@@ -84,8 +84,8 @@ export const router = createBrowserRouter([
             element: <AdaguLayout />,
             children: [
               { index: true, element: <AdaguListPage /> },
-              { path: 'new', element: <PledgeEditorPage /> },
-              { path: ':id', element: <PledgeEditorPage /> },
+              { path: 'new', element: <PledgeEditorRoute /> },
+              { path: ':id', element: <PledgeEditorRoute /> },
             ],
           },
           { path: 'customers', element: <CustomersPage /> },

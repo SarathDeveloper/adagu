@@ -22,13 +22,14 @@ import { AdaguDueDetailDrawer } from './AdaguDueDetailDrawer'
 import { AdaguRemindersTab } from './AdaguRemindersTab'
 import { AuctionModal } from './AuctionModal'
 import { InterestCollectionModal } from './InterestCollectionModal'
-import { PLEDGE_PAYMENT_MODES } from './pledgePaymentModes'
+import { PLEDGE_COLLECTION_MODES } from './pledgePaymentModes'
 import { RenewModal } from './RenewModal'
 import { ShortfallModal } from './ShortfallModal'
 import { TopupModal } from './TopupModal'
 import { PledgePreviewModal } from '../pledges/PledgePreviewModal'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
 import { printPreviewPaths } from '../print/printPreviewPaths'
+import { roundMoney } from '@shared/billing/pricing'
 
 type AdaguFilter = 'all' | 'overdue' | 'due' | 'paid' | 'notice' | 'auctioned' | 'reminders'
 
@@ -46,6 +47,13 @@ export function AdaguDuesTab({
   onReload: () => Promise<DuesLedger>
 }) {
   const { showToast } = useToast()
+
+  // Action errors: the page banner sits behind the open modal or drawer, so
+  // also raise a toast, which stays on top of every overlay.
+  function fail(message: string) {
+    onError(message)
+    showToast(message, 'error')
+  }
   const { isAdmin } = useAuth()
   const [filter, setFilter] = useState<AdaguFilter>('all')
   const [page, setPage] = useState(1)
@@ -82,7 +90,7 @@ export function AdaguDuesTab({
       setReminders(await api.listPledgeReminders())
       remindersLoadedRef.current = true
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to load reminders')
+      fail(err instanceof Error ? err.message : 'Failed to load reminders')
     } finally {
       setRemindersLoading(false)
     }
@@ -108,11 +116,11 @@ export function AdaguDuesTab({
       .then((payoff) => {
         if (!active) return
         setRedeemPayoff({ key, payoff })
-        setRedeemAmount(Math.max(0, payoff.payoff - redeemDiscountRef.current))
+        setRedeemAmount(roundMoney(Math.max(0, payoff.payoff - redeemDiscountRef.current)))
       })
       .catch((err) => {
         if (!active) return
-        onError(err instanceof Error ? err.message : 'Failed to load payoff')
+        fail(err instanceof Error ? err.message : 'Failed to load payoff')
       })
     return () => {
       active = false
@@ -122,7 +130,7 @@ export function AdaguDuesTab({
 
   async function sendWhatsApp(row: PledgeReminderEntry) {
     if (!row.whatsappUrl) {
-      onError('Add a mobile number to this customer to send a reminder')
+      fail('Add a mobile number to this customer to send a reminder')
       return
     }
     try {
@@ -136,7 +144,7 @@ export function AdaguDuesTab({
       showToast('WhatsApp reminder opened', 'success')
       await loadReminders(true)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to open WhatsApp')
+      fail(err instanceof Error ? err.message : 'Failed to open WhatsApp')
     } finally {
       setBusy(false)
     }
@@ -145,7 +153,7 @@ export function AdaguDuesTab({
   function remindInterest(row: PledgeReminderEntry) {
     const summary = (ledger.adaguDues ?? []).find((entry) => entry.pledgeId === row.pledgeId)
     if (!summary) {
-      onError('Open the loan to collect interest')
+      fail('Open the loan to collect interest')
       return
     }
     setInterestTarget(summary)
@@ -217,7 +225,7 @@ export function AdaguDuesTab({
       await reloadAndSyncView()
       if (updated.status === 'redeemed') setReleaseTarget(updated.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to collect interest')
+      fail(err instanceof Error ? err.message : 'Failed to collect interest')
     } finally {
       setBusy(false)
     }
@@ -244,7 +252,7 @@ export function AdaguDuesTab({
       showToast('Extra loan added', 'success')
       await reloadAndSyncView()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to add extra loan')
+      fail(err instanceof Error ? err.message : 'Failed to add extra loan')
     } finally {
       setBusy(false)
     }
@@ -275,7 +283,7 @@ export function AdaguDuesTab({
       await reloadAndSyncView()
       setRenewedTarget(created.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to renew loan')
+      fail(err instanceof Error ? err.message : 'Failed to renew loan')
     } finally {
       setBusy(false)
     }
@@ -290,7 +298,7 @@ export function AdaguDuesTab({
       showToast('Last payment undone', 'success')
       await reloadAndSyncView()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to undo the payment')
+      fail(err instanceof Error ? err.message : 'Failed to undo the payment')
       throw err
     } finally {
       setBusy(false)
@@ -316,7 +324,7 @@ export function AdaguDuesTab({
       showToast('Auction shortfall collected', 'success')
       await reloadAndSyncView()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to collect the shortfall')
+      fail(err instanceof Error ? err.message : 'Failed to collect the shortfall')
     } finally {
       setBusy(false)
     }
@@ -341,7 +349,7 @@ export function AdaguDuesTab({
       await reloadAndSyncView()
       if (updated.status === 'redeemed') setReleaseTarget(updated.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to collect')
+      fail(err instanceof Error ? err.message : 'Failed to collect')
     } finally {
       setBusy(false)
       setRedeemAction(null)
@@ -366,7 +374,7 @@ export function AdaguDuesTab({
       await reloadAndSyncView()
       setReleaseTarget(updated.id)
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to close loan')
+      fail(err instanceof Error ? err.message : 'Failed to close loan')
     } finally {
       setBusy(false)
       setRedeemAction(null)
@@ -386,7 +394,7 @@ export function AdaguDuesTab({
       showToast('Auction notice saved', 'success')
       await reloadAndSyncView()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to save auction notice')
+      fail(err instanceof Error ? err.message : 'Failed to save auction notice')
     } finally {
       setBusy(false)
     }
@@ -405,7 +413,7 @@ export function AdaguDuesTab({
       showToast(`Auction recorded for ${updated.receiptNo}`, 'success')
       await reloadAndSyncView()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to record auction')
+      fail(err instanceof Error ? err.message : 'Failed to record auction')
     } finally {
       setBusy(false)
     }
@@ -524,6 +532,11 @@ export function AdaguDuesTab({
       {viewTarget ? (
         <AdaguDueDetailDrawer
           summary={viewTarget}
+          onChanged={() => {
+            void reloadAndSyncView().catch((err) =>
+              fail(err instanceof Error ? err.message : 'Failed to refresh dues'),
+            )
+          }}
           payments={
             ledger.columns
               .find((column) => column.customerId === viewTarget.customerId)
@@ -690,11 +703,13 @@ export function AdaguDuesTab({
                 min={0}
                 step="0.01"
                 value={redeemDiscount || ''}
+                disabled={!isAdmin}
+                title={isAdmin ? undefined : 'Only an admin can give a discount'}
                 onChange={(event) => {
                   const discount = Math.max(0, Number(event.target.value) || 0)
                   redeemDiscountRef.current = discount
                   setRedeemDiscount(discount)
-                  setRedeemAmount(Math.max(0, redeemPayoffValue - discount))
+                  setRedeemAmount(roundMoney(Math.max(0, redeemPayoffValue - discount)))
                 }}
               />
             </label>
@@ -705,7 +720,7 @@ export function AdaguDuesTab({
                 value={redeemMode}
                 onChange={(event) => setRedeemMode(event.target.value as PledgePaymentMode)}
               >
-                {PLEDGE_PAYMENT_MODES.map((option) => (
+                {PLEDGE_COLLECTION_MODES.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

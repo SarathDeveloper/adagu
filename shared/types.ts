@@ -233,8 +233,9 @@ export interface DuesLedger {
 
 export interface AppInfo {
   version: string
-  dbPath: string
-  logsPath: string
+  /** Only sent to a signed-in user: the paths contain the Windows user name. */
+  dbPath?: string
+  logsPath?: string
 }
 
 export interface RecordCounts {

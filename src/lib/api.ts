@@ -66,6 +66,7 @@ import type {
   GoldSavingSchemeInput,
 } from '@shared/types'
 import type { ReportDefinition, ReportId, ReportLookups, ReportResult } from '@shared/reportsCatalog'
+import { localTodayIso } from '@shared/localDate'
 import { downscaleImageFile } from './downscaleImage'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -417,7 +418,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `jeweltrackerpro-backup-${new Date().toISOString().slice(0, 10)}.db`
+    link.download = `jeweltrackerpro-backup-${localTodayIso()}.db`
     link.click()
     URL.revokeObjectURL(url)
   },
@@ -437,7 +438,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `jeweltrackerpro-full-${new Date().toISOString().slice(0, 10)}.zip`
+    link.download = `jeweltrackerpro-full-${localTodayIso()}.zip`
     link.click()
     URL.revokeObjectURL(url)
   },
@@ -457,7 +458,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `jeweltrackerpro-tables-${new Date().toISOString().slice(0, 10)}.xlsx`
+    link.download = `jeweltrackerpro-tables-${localTodayIso()}.xlsx`
     link.click()
     URL.revokeObjectURL(url)
   },

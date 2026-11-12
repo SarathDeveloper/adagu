@@ -24,6 +24,7 @@ import {
 import { extractZipFile, isZipFile } from '../lib/zip'
 import { writeExcelBackupFromDatabaseYielding } from '../db/excelBackup'
 import { getDatabase, getDbPath } from '../db'
+import { requireRole } from '../auth/middleware'
 import { asyncHandler, HttpError, parseBody } from '../lib/http'
 
 const upload = multer({
@@ -32,6 +33,15 @@ const upload = multer({
 })
 
 const router = Router()
+
+/**
+ * Status, the backup list, inspecting a backup and making a new one stay open
+ * to anyone with Settings access. Everything that sends the data out of the
+ * app (exports hold Aadhaar/PAN and password hashes), replaces it (restore),
+ * deletes backups or changes where copies are written is admin-only: a restore
+ * in particular can rewrite the users table, roles included.
+ */
+const adminOnly = requireRole('admin')
 
 function removeTempFile(filePath: string | undefined): void {
   if (!filePath) return
@@ -53,6 +63,7 @@ router.get(
 
 router.put(
   '/settings',
+  adminOnly,
   asyncHandler((req, res) => {
     const input = parseBody(backupSettingsSchema, req.body)
     res.json(updateBackupSchedule(input))
@@ -83,6 +94,7 @@ router.post(
 
 router.post(
   '/offsite-copy',
+  adminOnly,
   asyncHandler(async (_req, res) => {
     if (!getOffsiteDir()) {
       throw new HttpError(400, 'Choose an off-machine folder first')
@@ -97,6 +109,7 @@ router.post(
 
 router.get(
   '/export',
+  adminOnly,
   asyncHandler(async (_req, res) => {
     const filename = `jeweltrackerpro-backup-${new Date().toISOString().slice(0, 10)}.db`
     const destination = join(tmpdir(), filename)
@@ -109,6 +122,7 @@ router.get(
 
 router.get(
   '/export-full',
+  adminOnly,
   asyncHandler(async (_req, res) => {
     const filename = `jeweltrackerpro-full-${new Date().toISOString().slice(0, 10)}.zip`
     const destination = join(tmpdir(), `jeweltrackerpro-full-${Date.now()}.zip`)
@@ -121,6 +135,7 @@ router.get(
 
 router.post(
   '/export-full',
+  adminOnly,
   asyncHandler(async (req, res) => {
     const { path: filePath } = parseBody(exportFullBackupSchema, req.body)
     const destination = assertFullBackupDestination(filePath)
@@ -133,6 +148,7 @@ router.post(
 
 router.get(
   '/export-excel',
+  adminOnly,
   asyncHandler(async (_req, res) => {
     const filename = `jeweltrackerpro-tables-${new Date().toISOString().slice(0, 10)}.xlsx`
     const destination = join(tmpdir(), filename)
@@ -145,6 +161,7 @@ router.get(
 
 router.post(
   '/restore',
+  adminOnly,
   upload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) {
@@ -182,6 +199,7 @@ router.post(
 
 router.post(
   '/restore-local',
+  adminOnly,
   asyncHandler(async (req, res) => {
     const { name } = parseBody(restoreBackupNameSchema, req.body)
     res.json(await restoreBackupByName(name))
@@ -190,6 +208,7 @@ router.post(
 
 router.delete(
   '/:name',
+  adminOnly,
   asyncHandler((req, res) => {
     const name = Array.isArray(req.params.name) ? req.params.name[0] : req.params.name
     if (!name) {

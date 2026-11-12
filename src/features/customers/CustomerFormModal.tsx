@@ -1,34 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Customer, CustomerInput } from '@shared/types'
 import { customerInputSchema } from '@shared/schemas'
 import { Modal } from '../../components/Modal'
 import { api } from '../../lib/api'
+import { emptyCustomerInput } from './customerFormDefaults'
 
-export const emptyCustomerInput: CustomerInput = {
-  name: '',
-  phone: '',
-  address: '',
-  guardianName: '',
-  notes: '',
-  gstin: '',
-  aadhaar: '',
-  pan: '',
-  idProofType: '',
-}
-
-export function looksLikePhone(query: string): boolean {
-  const digits = query.replace(/\D/g, '')
-  return digits.length >= 6 && /^[\d\s+\-()]+$/.test(query.trim())
-}
-
-export function prefillFromSearch(query: string): CustomerInput {
-  const trimmed = query.trim()
-  if (!trimmed) return emptyCustomerInput
-  if (looksLikePhone(trimmed)) {
-    const digits = trimmed.replace(/\D/g, '').slice(0, 10)
-    return { ...emptyCustomerInput, phone: digits }
+function formFromCustomer(customer: Customer): CustomerInput {
+  return {
+    name: customer.name,
+    phone: customer.phone,
+    address: customer.address,
+    guardianName: customer.guardianName ?? '',
+    notes: customer.notes ?? '',
+    gstin: customer.gstin ?? '',
+    aadhaar: customer.aadhaar ?? '',
+    pan: customer.pan ?? '',
+    idProofType: customer.idProofType ?? '',
   }
-  return { ...emptyCustomerInput, name: trimmed }
 }
 
 function digitsOnly(value: string, maxLen: number): string {
@@ -54,25 +42,25 @@ export function CustomerFormModal({
 }: CustomerFormModalProps) {
   const [form, setForm] = useState<CustomerInput>(emptyCustomerInput)
   const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    if (editing) {
-      setForm({
-        name: editing.name,
-        phone: editing.phone,
-        address: editing.address,
-        guardianName: editing.guardianName ?? '',
-        notes: editing.notes ?? '',
-        gstin: editing.gstin ?? '',
-        aadhaar: editing.aadhaar ?? '',
-        pan: editing.pan ?? '',
-        idProofType: editing.idProofType ?? '',
-      })
-    } else {
-      setForm(initialValues ?? emptyCustomerInput)
-    }
-  }, [open, editing, initialValues])
+  // Shown inside the modal: the parent's banner is behind the backdrop.
+  const [formError, setFormError] = useState<string | null>(null)
+  // What the form was last filled from. When the modal opens, or is pointed at
+  // a different customer or prefill, it is refilled during render (React's
+  // "adjust state when props change" pattern) rather than in an effect.
+  const [filledFrom, setFilledFrom] = useState<{
+    editing: Customer | null
+    initialValues?: CustomerInput
+  } | null>(null)
+  if (!open && filledFrom) {
+    setFilledFrom(null)
+  } else if (
+    open &&
+    (!filledFrom || filledFrom.editing !== editing || filledFrom.initialValues !== initialValues)
+  ) {
+    setFilledFrom({ editing, initialValues })
+    setForm(editing ? formFromCustomer(editing) : (initialValues ?? emptyCustomerInput))
+    setFormError(null)
+  }
 
   async function save() {
     const payload: CustomerInput = {
@@ -90,12 +78,14 @@ export function CustomerFormModal({
     const parsed = customerInputSchema.safeParse(payload)
     if (!parsed.success) {
       const message = parsed.error.issues[0]?.message ?? 'Invalid customer details'
+      setFormError(message)
       onError?.(message)
       return
     }
 
     try {
       setSaving(true)
+      setFormError(null)
       const customer = editing
         ? await api.updateCustomer(editing.id, parsed.data)
         : await api.createCustomer(parsed.data)
@@ -103,6 +93,7 @@ export function CustomerFormModal({
       onClose()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save customer'
+      setFormError(message)
       onError?.(message)
     } finally {
       setSaving(false)
@@ -127,6 +118,11 @@ export function CustomerFormModal({
         </div>
       }
     >
+      {formError ? (
+        <div className="error-banner" role="alert">
+          {formError}
+        </div>
+      ) : null}
       <div className="form-grid">
         <label>
           <span className="field-label">

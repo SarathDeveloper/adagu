@@ -112,6 +112,11 @@ export function maxLoanForValue(assessedValue: number, ltvPct: number): number {
   return round2(Math.max(0, assessedValue) * (pct / 100))
 }
 
+/**
+ * True when the loan is more than the LTV band allows. With no assessed value
+ * (the shop has no metal rates) there is nothing to measure against; the
+ * server values the items itself when rates exist, so this matches it.
+ */
 export function isAboveLtv(loanAmount: number, assessedValue: number, ltvPct: number): boolean {
   if (assessedValue <= 0) return false
   return loanAmount > maxLoanForValue(assessedValue, ltvPct) + 0.01

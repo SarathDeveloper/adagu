@@ -46,6 +46,7 @@ import type {
   PledgeStatus,
   PledgeTopupInput,
 } from '@shared/types'
+import { isAdmin } from '../auth/middleware'
 import { getDatabase } from '../db'
 import { syncDueEntryForPledge } from '../dues/pledgeSync'
 import { asyncHandler, HttpError, parseBody, parseIdParam, parsePaging, queryString } from '../lib/http'
@@ -341,6 +342,9 @@ function assertWithinLtv(
   input: { assessedValue: number; loanAmount: number; allowAboveLtv?: boolean },
   isAdmin: boolean,
 ): void {
+  // No valuation at all means the shop has no metal rates to value jewels
+  // with; there is nothing to measure the loan against. A request cannot use
+  // this to skip the check while rates exist: assessedForLtv values the items.
   if (input.assessedValue <= 0) return
   const ltvPct = loadShopSettings(db).pledgeLtvPct
   const max = maxLoanForValue(input.assessedValue, ltvPct)
@@ -353,6 +357,24 @@ function assertWithinLtv(
     400,
     `Loan exceeds the LTV limit of ${ltvPct}% (max ${max.toFixed(2)} on ${input.assessedValue.toFixed(2)})`,
   )
+}
+
+/**
+ * The assessed value a new or edited pledge is measured (and stored) with.
+ * The editor sends the value of the jewels at today's rates. A request that
+ * sends 0 while the shop has rates would otherwise skip the LTV check
+ * entirely, so the items are valued here with the same rates instead.
+ */
+function assessedForLtv<T extends PledgeInput>(db: ReturnType<typeof getDatabase>, input: T): T {
+  if (input.assessedValue > 0) return input
+  const rates = getLatestMetalRates(db)
+  const valued = roundMoney(
+    input.items.reduce(
+      (sum, item) => sum + itemValue(rates, item.metal, item.purity, item.netWeight),
+      0,
+    ),
+  )
+  return valued > 0 ? { ...input, assessedValue: valued } : input
 }
 
 function assertKycForSanction(db: ReturnType<typeof getDatabase>, pledgeId: number): void {
@@ -555,8 +577,8 @@ router.get(
 router.post(
   '/',
   asyncHandler((req, res) => {
-    const input = parseBody(pledgeInputSchema, req.body)
     const db = getDatabase()
+    const input = assessedForLtv(db, parseBody(pledgeInputSchema, req.body))
     assertWithinLtv(db, input, req.user?.role === 'admin')
     const tx = db.transaction(() => savePledge(db, input))
     res.status(201).json(tx())
@@ -567,8 +589,8 @@ router.put(
   '/:id',
   asyncHandler((req, res) => {
     const id = parseIdParam(req.params.id)
-    const input = parseBody(pledgeUpdateInputSchema, { ...req.body, id })
     const db = getDatabase()
+    const input = assessedForLtv(db, parseBody(pledgeUpdateInputSchema, { ...req.body, id }))
     assertWithinLtv(db, input, req.user?.role === 'admin')
     const tx = db.transaction(() => savePledge(db, input, id))
     res.json(tx())
@@ -607,6 +629,10 @@ router.post(
   asyncHandler((req, res) => {
     const id = parseIdParam(req.params.id)
     const input = parseBody(pledgeRedeemInputSchema, { ...req.body, id }) as PledgeRedeemInput
+    // A discount is money the shop gives up, so only an admin can grant it.
+    if ((input.discount ?? 0) > EPSILON && !isAdmin(req)) {
+      throw new HttpError(403, 'Only an admin can give a discount on redeem')
+    }
     const db = getDatabase()
     const tx = db.transaction(() => {
       const payoff = computePledgePayoff(db, id, input.redeemedDate)
@@ -700,13 +726,14 @@ router.post(
         note: `Released: ${item?.description?.trim() || 'jewel'}`,
         closeWhenSettled: false,
       })
+      // Store what came off the assessment so undo restores exactly that.
       db.prepare(
         `UPDATE pledge_items
-         SET released_at = ?, released_payment_id = ?
+         SET released_at = ?, released_payment_id = ?, released_assessed_value = ?
          WHERE id = ? AND pledge_id = ?`,
-      ).run(input.date, payment.id, itemId, id)
+      ).run(input.date, payment.id, quote.itemValue, itemId, id)
       db.prepare('UPDATE pledges SET assessed_value = ? WHERE id = ?').run(
-        roundMoney(Math.max(0, row.assessed_value - (item?.itemValue ?? 0))),
+        quote.remainingAssessedValue,
         id,
       )
       return mapPledge(db, getPledgeRow(db, id))
@@ -804,9 +831,29 @@ router.post(
   asyncHandler((req, res) => {
     const id = parseIdParam(req.params.id)
     const input = parseBody(pledgeForfeitInputSchema, { ...req.body, id }) as PledgeForfeitInput
+    // Forfeiting skips the auction notice and freezes interest, so it is an
+    // admin-only correction. The normal path is auction notice, then auction.
+    if (!isAdmin(req)) {
+      throw new HttpError(403, 'Only an admin can forfeit a loan')
+    }
     const db = getDatabase()
     const tx = db.transaction(() => {
       assertActive(db, id)
+      const row = getPledgeRow(db, id)
+      if (input.forfeitedDate < row.pledge_date) {
+        throw new HttpError(400, 'Forfeit date cannot be before the pledge date')
+      }
+      if (input.forfeitedDate > localTodayIso()) {
+        throw new HttpError(400, 'Forfeit date cannot be in the future')
+      }
+      const lastPayment = db
+        .prepare(
+          'SELECT MAX(payment_date) AS date FROM pledge_payments WHERE pledge_id = ?',
+        )
+        .get(id) as { date: string | null }
+      if (lastPayment.date && input.forfeitedDate < lastPayment.date) {
+        throw new HttpError(400, 'Forfeit date cannot be before the last payment')
+      }
       db.prepare(
         `UPDATE pledges SET
           status = 'forfeited',
@@ -876,6 +923,10 @@ router.post(
   asyncHandler((req, res) => {
     const id = parseIdParam(req.params.id)
     const input = parseBody(pledgeAuctionInputSchema, { ...req.body, id }) as PledgeAuctionInput
+    // Writing off a shortfall forgives the customer's debt: admin only.
+    if (input.writeOffShortfall && !isAdmin(req)) {
+      throw new HttpError(403, 'Only an admin can write off an auction shortfall')
+    }
     const db = getDatabase()
     const tx = db.transaction(() => {
       assertActive(db, id)
@@ -1052,7 +1103,10 @@ router.post(
       // 4. Create the new active ticket.
       const settings = loadShopSettings(db)
       const receiptNo = nextReceiptNo(db)
-      const oldItems = loadItems(db, id)
+      // Only jewels still in the shop move to the new ticket. A released jewel
+      // has gone back to the customer and its value already came off
+      // assessed_value, so copying it would put it back on the loan.
+      const heldItems = loadItems(db, id).filter((item) => !item.releasedAt)
       const inserted = db
         .prepare(
           `INSERT INTO pledges (
@@ -1076,7 +1130,7 @@ router.post(
           id,
         )
       const newId = Number(inserted.lastInsertRowid)
-      insertItems(db, newId, oldItems)
+      insertItems(db, newId, heldItems)
       db.prepare('UPDATE pledges SET renewed_to_id = ? WHERE id = ?').run(newId, id)
       syncDueEntryForPledge(db, newId)
 
@@ -1121,6 +1175,23 @@ router.post(
       if (input.topupDate < row.pledge_date) {
         throw new HttpError(400, 'Top-up date cannot be before the pledge date')
       }
+      if (input.topupDate > localTodayIso()) {
+        throw new HttpError(400, 'Top-up date cannot be in the future')
+      }
+      // A top-up dated before an existing payment would be replayed ahead of
+      // it and rewrite how that payment was split. The same day is fine: the
+      // top-up records which payments came before it.
+      const lastPayment = db
+        .prepare(
+          `SELECT MAX(id) AS id, MAX(payment_date) AS date FROM pledge_payments WHERE pledge_id = ?`,
+        )
+        .get(id) as { id: number | null; date: string | null }
+      if (lastPayment.date && input.topupDate < lastPayment.date) {
+        throw new HttpError(
+          400,
+          `Top-up date cannot be before the last payment on ${lastPayment.date}`,
+        )
+      }
 
       // A top-up raises the principal, so it has to stay inside the LTV band
       // for the same gold unless an admin overrides it.
@@ -1136,9 +1207,9 @@ router.post(
       )
 
       db.prepare(
-        `INSERT INTO pledge_topups (pledge_id, topup_date, amount, interest_pct, note)
-         VALUES (?, ?, ?, ?, ?)`,
-      ).run(id, input.topupDate, input.amount, row.interest_pct, input.note ?? '')
+        `INSERT INTO pledge_topups (pledge_id, topup_date, amount, interest_pct, note, after_payment_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(id, input.topupDate, input.amount, row.interest_pct, input.note ?? '', lastPayment.id ?? 0)
 
       syncDueEntryForPledge(db, id)
       return mapPledge(db, getPledgeRow(db, id))

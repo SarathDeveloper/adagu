@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { maxLoanForValue } from '@shared/billing/pledgeValuation'
 import { localTodayIso } from '@shared/localDate'
-import type { PledgePaymentMode } from '@shared/types'
+import type { PledgePaymentMode, PledgePayoff } from '@shared/types'
 import { DateInput } from '../../components/DateInput'
 import { Modal } from '../../components/Modal'
 import { api } from '../../lib/api'
 import { formatCurrency, formatDisplayDate } from '../../lib/format'
-import { PLEDGE_PAYMENT_MODES } from './pledgePaymentModes'
+import { PLEDGE_COLLECTION_MODES } from './pledgePaymentModes'
 
 export type RenewModalSummary = {
+  /**
+   * When given, the modal asks the server for the payoff on the chosen
+   * renewal date. The figures passed in can be stale or only approximate (the
+   * base loan without top-ups or part payments), and the new loan is pre-filled
+   * from the outstanding principal, so it has to be the server's number.
+   */
+  pledgeId?: number
   receiptNo: string
   interestDue: number
   principalOutstanding: number
@@ -46,6 +53,32 @@ export function RenewModal({
   const [allowAboveLtv, setAllowAboveLtv] = useState(false)
   const [shopRate, setShopRate] = useState(summary.interestPct)
   const [ltvPct, setLtvPct] = useState(0)
+  const [live, setLive] = useState<PledgePayoff | null>(null)
+  // Once the person types an amount, a later payoff refresh must not replace it.
+  const amountTouchedRef = useRef(false)
+
+  useEffect(() => {
+    if (!summary.pledgeId) return
+    let active = true
+    void api
+      .getPledgePayoff(summary.pledgeId, renewDate)
+      .then((payoff) => {
+        if (!active) return
+        setLive(payoff)
+        if (!amountTouchedRef.current) setNewLoanAmount(payoff.principalOutstanding)
+      })
+      .catch(() => {
+        // Keep the figures passed in; the server recomputes them on renew.
+      })
+    return () => {
+      active = false
+    }
+  }, [summary.pledgeId, renewDate])
+
+  const interestDue = live?.interestDue ?? summary.interestDue
+  const principalOutstanding = live?.principalOutstanding ?? summary.principalOutstanding
+  const interestPaidUpto = live?.interestPaidUpto ?? summary.interestPaidUpto
+  const remaining = live?.payoff ?? summary.remaining
 
   useEffect(() => {
     let active = true
@@ -64,7 +97,7 @@ export function RenewModal({
     }
   }, [])
 
-  const difference = newLoanAmount - summary.principalOutstanding
+  const difference = newLoanAmount - principalOutstanding
   const maxPrincipal = ltvPct > 0 ? maxLoanForValue(summary.assessedValue, ltvPct) : 0
   const aboveLtv = ltvPct > 0 && newLoanAmount > maxPrincipal + 0.01
   const blocked = aboveLtv && !(isAdmin && allowAboveLtv)
@@ -86,7 +119,7 @@ export function RenewModal({
             className="btn"
             data-entry-save=""
             title="Ctrl+S"
-            disabled={busy || newLoanAmount < 0 || blocked}
+            disabled={busy || newLoanAmount <= 0 || blocked}
             onClick={() =>
               onSubmit({ renewDate, mode, newLoanAmount, note, allowAboveLtv: isAdmin && allowAboveLtv })
             }
@@ -103,19 +136,19 @@ export function RenewModal({
       <dl className="dues-detail-totals">
         <div>
           <dt>Interest due</dt>
-          <dd className="num">{formatCurrency(summary.interestDue)}</dd>
+          <dd className="num">{formatCurrency(interestDue)}</dd>
         </div>
         <div>
           <dt>Outstanding principal</dt>
-          <dd className="num">{formatCurrency(summary.principalOutstanding)}</dd>
+          <dd className="num">{formatCurrency(principalOutstanding)}</dd>
         </div>
         <div>
           <dt>Interest paid up to</dt>
-          <dd>{formatDisplayDate(summary.interestPaidUpto)}</dd>
+          <dd>{formatDisplayDate(interestPaidUpto)}</dd>
         </div>
         <div>
           <dt>Total payoff</dt>
-          <dd className="num">{formatCurrency(summary.remaining)}</dd>
+          <dd className="num">{formatCurrency(remaining)}</dd>
         </div>
         <div>
           <dt>New ticket rate</dt>
@@ -167,7 +200,10 @@ export function RenewModal({
             min={0}
             step="0.01"
             value={newLoanAmount || ''}
-            onChange={(event) => setNewLoanAmount(Number(event.target.value) || 0)}
+            onChange={(event) => {
+              amountTouchedRef.current = true
+              setNewLoanAmount(Number(event.target.value) || 0)
+            }}
           />
         </label>
         <label>
@@ -177,7 +213,7 @@ export function RenewModal({
             value={mode}
             onChange={(event) => setMode(event.target.value as PledgePaymentMode)}
           >
-            {PLEDGE_PAYMENT_MODES.map((option) => (
+            {PLEDGE_COLLECTION_MODES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -205,7 +241,7 @@ export function RenewModal({
         type="button"
         className="btn ghost"
         style={{ marginTop: '0.5rem' }}
-        onClick={() => setNewLoanAmount(summary.principalOutstanding)}
+        onClick={() => setNewLoanAmount(principalOutstanding)}
       >
         Use outstanding principal
       </button>

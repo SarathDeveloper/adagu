@@ -7,7 +7,8 @@ import { DataTable, TablePager } from '../../components/DataTable'
 import { EmptyState } from '../../components/EmptyState'
 import { LoadingState } from '../../components/LoadingState'
 import { Modal } from '../../components/Modal'
-import { CustomerFormModal, emptyCustomerInput } from './CustomerFormModal'
+import { CustomerFormModal } from './CustomerFormModal'
+import { emptyCustomerInput } from './customerFormDefaults'
 import { PageHeader } from '../../components/PageHeader'
 import { SearchBar } from '../../components/SearchBar'
 import { StatCard } from '../../components/StatCard'
@@ -18,6 +19,7 @@ import { CollectPaymentModal } from '../goldSavings/collections/CollectPaymentMo
 import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 import { PrintPreviewModal } from '../print/PrintPreviewModal'
 import { monthRange } from '../../lib/dateRange'
+import { localDateIso, localTodayIso } from '@shared/localDate'
 
 export function CustomersPage() {
   const { showToast } = useToast()
@@ -133,12 +135,15 @@ export function CustomersPage() {
     return map
   }, [ledger])
 
-  const today = new Date().toISOString().slice(0, 10)
+  // Local dates: toISOString() is UTC, which is the previous day in India
+  // until 05:30.
+  const today = localTodayIso()
   const thisMonth = monthRange(today)
   const listedCustomers = customers
   const withDues = ledger.columns.filter((column) => column.balance > 0).length
   const newThisMonth = listedCustomers.filter((customer) => {
-    const created = customer.createdAt.slice(0, 10)
+    // createdAt is SQLite datetime('now'), i.e. UTC without a zone marker.
+    const created = localDateIso(new Date(`${customer.createdAt.replace(' ', 'T')}Z`))
     return created >= thisMonth.from && created <= thisMonth.to
   }).length
 

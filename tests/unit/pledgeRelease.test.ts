@@ -43,9 +43,38 @@ describe('quotePledgeItemRelease', () => {
       itemId: 2,
     })
     expect(quote.principalShare).toBe(2000)
-    expect(quote.itemValue).toBe(0)
+    // The same 40% weight share comes off the assessed value, so the rest of
+    // the loan is not measured against collateral that has left the shop.
+    expect(quote.itemValue).toBe(4000)
     expect(quote.extraPrincipal).toBe(0)
-    expect(quote.remainingAssessedValue).toBe(10000)
+    expect(quote.remainingAssessedValue).toBe(6000)
+  })
+
+  it('uses the jewel share of held value when the assessed value was entered by hand', () => {
+    const quote = quotePledgeItemRelease({
+      ...base,
+      assessedValue: 20000,
+      principalOutstanding: 10000,
+      payoff: 10400,
+    })
+    // Ring is 10000 of 40000 held value: a quarter of the loan and of the assessment.
+    expect(quote.principalShare).toBe(2500)
+    expect(quote.itemValue).toBe(5000)
+    expect(quote.remainingAssessedValue).toBe(15000)
+  })
+
+  it('falls back to weight when only some held jewels have a value', () => {
+    const quote = quotePledgeItemRelease({
+      ...base,
+      assessedValue: 10000,
+      principalOutstanding: 5000,
+      interestDue: 0,
+      payoff: 5000,
+      items: [item(1, 0, 6), item(2, 8000, 4)],
+      itemId: 2,
+    })
+    expect(quote.principalShare).toBe(2000)
+    expect(quote.remainingAssessedValue).toBe(6000)
   })
 
   it('adds extra principal when the remaining loan would exceed LTV', () => {

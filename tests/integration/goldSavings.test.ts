@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { GoldSavingScheme, GoldSavingSchemeInput } from '@shared/types'
 import { getDatabase } from '../../server/db'
-import { getTestAgent, loginAsAdmin, useIntegrationEnv } from './helpers/testEnv'
+import {
+  getTestAgent,
+  loginAsAdmin,
+  skipPasswordChange,
+  useFrozenToday,
+  useIntegrationEnv,
+} from './helpers/testEnv'
 
 const TODAY = '2026-09-30'
 
@@ -44,6 +50,7 @@ function schemeToInput(scheme: GoldSavingScheme, overrides: Partial<GoldSavingSc
 }
 
 describe('gold savings schemes', () => {
+  useFrozenToday(TODAY)
   useIntegrationEnv()
 
   async function seedRate(date = TODAY, gold22k = 10000, gold24k = 11000) {
@@ -417,6 +424,7 @@ describe('gold savings schemes', () => {
     })
     expect(created.status).toBe(201)
     await getTestAgent().post('/api/auth/logout')
+    skipPasswordChange('gs-cashier')
     const staffLogin = await getTestAgent().post('/api/auth/login').send({
       username: 'gs-cashier',
       password: 'staff123',
@@ -600,6 +608,7 @@ describe('gold savings schemes', () => {
       expect(missingReason.body.error).toMatch(/reason is required/i)
 
       await getTestAgent().post('/api/auth/logout')
+      skipPasswordChange('gs-collector')
       const staffLogin = await getTestAgent().post('/api/auth/login').send({
         username: 'gs-collector',
         password: 'staff123',
@@ -1063,6 +1072,7 @@ describe('gold savings schemes', () => {
       })
       expect(staff.status).toBe(201)
       await getTestAgent().post('/api/auth/logout')
+      skipPasswordChange('gs-no-feature')
       const staffLogin = await getTestAgent().post('/api/auth/login').send({
         username: 'gs-no-feature',
         password: 'staff123',
@@ -1255,6 +1265,7 @@ describe('gold savings schemes', () => {
       })
       expect(staff.status).toBe(201)
       await getTestAgent().post('/api/auth/logout')
+      skipPasswordChange('gs-scheme-staff')
       const login = await getTestAgent().post('/api/auth/login').send({
         username: 'gs-scheme-staff',
         password: 'staff123',
@@ -1484,6 +1495,7 @@ describe('gold savings schemes', () => {
       })
       expect(staff.status).toBe(201)
       await getTestAgent().post('/api/auth/logout')
+      skipPasswordChange('gs-refund-staff')
       const login = await getTestAgent().post('/api/auth/login').send({
         username: 'gs-refund-staff',
         password: 'staff123',
@@ -1600,6 +1612,7 @@ describe('gold savings schemes', () => {
       })
       expect(staff.status).toBe(201)
       await getTestAgent().post('/api/auth/logout')
+      skipPasswordChange('gs-late-staff')
       const login = await getTestAgent().post('/api/auth/login').send({
         username: 'gs-late-staff',
         password: 'staff123',
@@ -1694,6 +1707,7 @@ describe('gold savings schemes', () => {
       })
       expect(staff.status).toBe(201)
       await getTestAgent().post('/api/auth/logout')
+      skipPasswordChange('gs-waive-staff')
       const login = await getTestAgent().post('/api/auth/login').send({
         username: 'gs-waive-staff',
         password: 'staff123',
@@ -1757,6 +1771,7 @@ describe('gold savings schemes', () => {
       })
       expect(staff.status).toBe(201)
       await getTestAgent().post('/api/auth/logout')
+      skipPasswordChange('gs-rate-staff')
       const login = await getTestAgent().post('/api/auth/login').send({
         username: 'gs-rate-staff',
         password: 'staff123',

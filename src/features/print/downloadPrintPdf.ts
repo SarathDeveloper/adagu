@@ -11,6 +11,8 @@ function paperPageMm(paper: string | undefined): { width: number; height: number
 }
 
 function safePdfFilename(name: string): string {
+  // Windows rejects control characters in file names; stripping them is the point.
+  // eslint-disable-next-line no-control-regex
   const cleaned = name.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, '-').trim() || 'document'
   return /\.pdf$/i.test(cleaned) ? cleaned : `${cleaned}.pdf`
 }

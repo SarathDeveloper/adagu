@@ -31,12 +31,29 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // A context module exports its provider and the hook that reads it.
+      // Editing one of these three files does a full reload instead of a fast
+      // refresh, which is fine for files that rarely change.
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true, allowExportNames: ['useAuth', 'useShopBranding', 'useReportLookups'] },
+      ],
+    },
   },
   {
     files: ['server/**/*.ts'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
       globals: globals.node,
+    },
+    rules: {
+      // Express only treats a handler as an error handler when it declares all
+      // four parameters, so `_next` has to stay even when unused.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
     },
   },
 ])

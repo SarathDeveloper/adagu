@@ -130,3 +130,74 @@ describe('replayPledge', () => {
     expect(result.grossDue).toBe(collected)
   })
 })
+
+describe('pledgeLedger top-up ordering', () => {
+  // Base 10000 @2% from 1 Jan. On 31 Jan the customer pays the 200 interest,
+  // then takes a 5000 top-up the same day.
+  const topup = { amount: 5000, rate: 2, date: '2026-01-31', afterPaymentSeq: 1 }
+  const interestPaid = { date: '2026-01-31', amount: 200, seq: 1 }
+
+  it('keeps a payment taken before a same-day top-up fully covering its interest', () => {
+    const result = replayPledge({
+      base,
+      topups: [topup],
+      payments: [interestPaid],
+      asOfDate: '2026-01-31',
+    })
+    expect(result.allocations[0].coversInterest).toBe(true)
+    expect(result.allocations[0].interestPart).toBe(200)
+    // The base is paid to 31 Jan; only the new top-up owes its first month.
+    expect(result.interestDue).toBe(100)
+    expect(result.interestPaidUpto).toBe('2026-01-31')
+    expect(result.isInterestOverdue).toBe(false)
+  })
+
+  it('still lets a payment taken after a same-day top-up close the loan', () => {
+    const before = replayPledge({
+      base,
+      topups: [topup],
+      payments: [interestPaid],
+      asOfDate: '2026-01-31',
+    })
+    const result = replayPledge({
+      base,
+      topups: [topup],
+      payments: [interestPaid, { date: '2026-01-31', amount: before.payoff, seq: 2 }],
+      asOfDate: '2026-01-31',
+    })
+    expect(result.principalOutstanding).toBe(0)
+    expect(result.overpayment).toBe(0)
+    expect(result.allocations[1].interestPart).toBe(100)
+  })
+
+  it('treats a same-day payment as after the top-up when the order is unknown', () => {
+    const result = replayPledge({
+      base,
+      topups: [{ amount: 5000, rate: 2, date: '2026-01-31' }],
+      payments: [{ date: '2026-01-31', amount: 200 }],
+      asOfDate: '2026-01-31',
+    })
+    // Previous behaviour for top-ups recorded before the order was stored.
+    expect(result.allocations[0].coversInterest).toBe(false)
+  })
+})
+
+describe('pledgeLedger interest-paid-up-to', () => {
+  it('ignores a tranche that has been repaid in full', () => {
+    // Base 10000 from 1 Jan, top-up 50000 on 15 Jan. A part payment on 31 Jan
+    // clears all interest and the whole base; the top-up keeps accruing.
+    const result = replayPledge({
+      base,
+      topups: [{ amount: 50000, rate: 2, date: '2026-01-15' }],
+      payments: [
+        { date: '2026-01-31', amount: 200 + 1000 + 10000 },
+        { date: '2026-02-14', amount: 1000 },
+        { date: '2026-03-16', amount: 1000 },
+      ],
+      asOfDate: '2026-03-20',
+    })
+    expect(result.tranches[0].amount).toBe(0)
+    expect(result.interestPaidUpto).toBe('2026-03-16')
+    expect(result.isInterestOverdue).toBe(false)
+  })
+})

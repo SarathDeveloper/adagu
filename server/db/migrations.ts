@@ -74,6 +74,8 @@ export function getMigrations(): { version: number; sql: string; disableForeignK
     { version: 64, sql: loadMigrationSql('064_pledge_lifecycle_backfill.sql') },
     { version: 65, sql: loadMigrationSql('065_drop_rates_feature.sql') },
     { version: 66, sql: loadMigrationSql('066_pledge_item_release.sql') },
+    { version: 67, sql: loadMigrationSql('067_pledge_item_release_value.sql') },
+    { version: 68, sql: loadMigrationSql('068_pledge_topup_order.sql') },
   ]
 }
 

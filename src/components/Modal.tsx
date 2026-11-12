@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 interface ModalProps {
@@ -23,6 +23,22 @@ interface ModalProps {
 
 const OVERLAY_SELECTOR = '.modal-backdrop, .drawer-backdrop'
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'iframe',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
+
+function focusableIn(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) => !element.hasAttribute('hidden') && element.getClientRects().length > 0,
+  )
+}
+
 function isTopOverlay(element: HTMLElement | null) {
   if (!element) return false
   const overlays = document.querySelectorAll<HTMLElement>(OVERLAY_SELECTOR)
@@ -42,7 +58,51 @@ export function Modal({
   entry,
 }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const canClose = dismissible && !busy
+
+  // Move focus into the dialog when it opens and give it back when it closes.
+  // Without this, focus stays on the button behind the backdrop, so Tab walks
+  // the page underneath and Enter fires that button again.
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    // A field with autoFocus has already taken focus; otherwise start on the
+    // first field, then the first control, then the dialog itself.
+    if (!dialog.contains(document.activeElement)) {
+      const fields = focusableIn(dialog).filter((element) =>
+        ['INPUT', 'SELECT', 'TEXTAREA'].includes(element.tagName),
+      )
+      const target = fields[0] ?? focusableIn(dialog)[0] ?? dialog
+      target.focus({ preventScroll: true })
+    }
+    return () => {
+      if (previous && previous.isConnected) previous.focus({ preventScroll: true })
+    }
+  }, [])
+
+  function keepFocusInside(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Tab' || !dialogRef.current) return
+    // React events bubble through portals: a confirm dialog opened from this
+    // one handles its own Tab, so ignore keys from outside this dialog's DOM.
+    if (event.defaultPrevented || !dialogRef.current.contains(event.target as Node)) return
+    const items = focusableIn(dialogRef.current)
+    if (items.length === 0) {
+      event.preventDefault()
+      return
+    }
+    const first = items[0]
+    const last = items[items.length - 1]
+    const current = document.activeElement
+    if (event.shiftKey && (current === first || current === dialogRef.current)) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && current === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -68,9 +128,12 @@ export function Modal({
       role="presentation"
     >
       <div
+        ref={dialogRef}
         className={`modal${className ? ` ${className}` : ''}`}
         data-entry={entry ? '' : undefined}
         onClick={(event) => event.stopPropagation()}
+        onKeyDown={keepFocusInside}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}

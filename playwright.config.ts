@@ -3,11 +3,9 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: 'e2e',
   testMatch: '**/*.spec.ts',
-  testIgnore: [
-    '**/adagu-scenarios.spec.ts',
-    '**/inventory-billing-scenarios.spec.ts',
-    '**/old-gold-scenarios.spec.ts',
-  ],
+  // The live Tauri scenarios write into the running app's database, so they
+  // only run through playwright.tauri.config.ts.
+  testIgnore: ['**/adagu-scenarios.spec.ts'],
   timeout: 90_000,
   workers: 1,
   fullyParallel: false,

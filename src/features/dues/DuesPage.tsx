@@ -23,8 +23,10 @@ export function DuesPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const hasLoadedRef = useRef(false)
+  const latestRequestRef = useRef(0)
 
   async function loadLedger(query: string = searchQuery) {
+    const request = ++latestRequestRef.current
     setError(null)
     const data = await api.listDues(query)
     const next: DuesLedger = {
@@ -32,8 +34,12 @@ export function DuesPage() {
       adaguDues: data.adaguDues ?? [],
       adaguOutstanding: data.adaguOutstanding ?? 0,
     }
-    setLedger(next)
-    hasLoadedRef.current = true
+    // Searches overlap while the person types: a slower, broader "ra" can
+    // answer after "ram". Only the newest request may replace the list.
+    if (request === latestRequestRef.current) {
+      setLedger(next)
+      hasLoadedRef.current = true
+    }
     return next
   }
 
