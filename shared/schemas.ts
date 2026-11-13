@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DEFAULT_ADAGU_REMINDER_TEMPLATE } from './adagu/reminders'
+import { DEFAULT_ADAGU_RECEIPT_TEMPLATE, DEFAULT_ADAGU_REMINDER_TEMPLATE, isValidUpiId } from './adagu/reminders'
 import { DEFAULT_CASH_VISIBILITY, DEFAULT_TAX_VISIBILITY } from './billTemplate'
 
 export const idSchema = z.number().int().positive()
@@ -175,13 +175,23 @@ export const shopSettingsSchema = z.object({
   cashVisibility: cashVisibilitySchema.default(DEFAULT_CASH_VISIBILITY),
   taxVisibility: taxVisibilitySchema.default(DEFAULT_TAX_VISIBILITY),
   pledgeLtvPct: z.number().nonnegative().max(100).default(75),
-  adaguInterestPct: z.number().nonnegative().max(100).default(2.1),
+  adaguInterestPct: z.number().nonnegative().max(100).default(2),
   adaguAuctionNoticeDays: z.number().int().nonnegative().max(365).default(14),
   adaguRequireKyc: z.boolean().default(false),
   adaguReminderTemplate: z
     .string()
     .max(500)
     .default(DEFAULT_ADAGU_REMINDER_TEMPLATE),
+  adaguReceiptTemplate: z.string().max(500).default(DEFAULT_ADAGU_RECEIPT_TEMPLATE),
+  upiId: z
+    .string()
+    .trim()
+    .max(100)
+    .refine((value) => value === '' || isValidUpiId(value), {
+      message: 'UPI ID looks wrong (expected something like shopname@okaxis)',
+    })
+    .default(''),
+  upiPayeeName: z.string().trim().max(50).default(''),
   pawnbrokerLicenseNo: z.string().max(60).default(''),
 })
 
@@ -352,6 +362,13 @@ export const pledgeCollectInputSchema = z.object({
   collectedDate: calendarDateSchema,
   amount: z.number().positive(),
   mode: pledgeCollectionModeSchema.optional().default('cash'),
+  reference: z
+    .string()
+    .trim()
+    .max(64)
+    .regex(/^[A-Za-z0-9 ./_-]*$/, 'Reference can use letters, digits and - / . _ only')
+    .optional()
+    .default(''),
 })
 
 export const pledgeReleaseItemInputSchema = z.object({
@@ -410,11 +427,22 @@ export const pledgeShortfallInputSchema = z.object({
   mode: pledgeCollectionModeSchema.optional().default('cash'),
 })
 
+export const customerDocumentKindSchema = z.enum(['photo', 'aadhaar', 'pan'])
+
+export const customerNoteInputSchema = z.object({
+  body: z.string().trim().min(1, 'Note cannot be empty').max(1000),
+})
+
 export const pledgePhotoKindSchema = z.enum(['item', 'customer', 'id_proof'])
 
 export const pledgeWhatsAppOpenSchema = z.object({
   pledgeId: z.number().int().positive(),
   url: z.string().trim().max(2000),
+  kind: z.string().trim().max(50).optional().default('interest'),
+})
+
+export const pledgeReminderSkipSchema = z.object({
+  pledgeId: z.number().int().positive(),
   kind: z.string().trim().max(50).optional().default('interest'),
 })
 

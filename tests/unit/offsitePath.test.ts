@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { isSameOrInside, offsiteDirError } from '../../server/db/offsitePath'
 
 describe('offsite path', () => {
-  const dataDir = resolve(join(tmpdir(), 'jtp-app-data'))
+  const dataDir = resolve(join(tmpdir(), 'pd-app-data'))
 
   it('allows an empty folder (feature off)', () => {
     expect(offsiteDirError('', [dataDir])).toBeNull()
@@ -23,7 +23,7 @@ describe('offsite path', () => {
   })
 
   it('allows a folder on another path', () => {
-    const usb = resolve(join(tmpdir(), 'jtp-usb'))
+    const usb = resolve(join(tmpdir(), 'pd-usb'))
     expect(isSameOrInside(usb, dataDir)).toBe(false)
     expect(offsiteDirError(usb, [dataDir])).toBeNull()
   })

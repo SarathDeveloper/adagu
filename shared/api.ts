@@ -56,7 +56,7 @@ import type {
 } from './types'
 import type { ReportDefinition, ReportId, ReportLookups, ReportResult } from './reportsCatalog'
 
-export interface JewelTrackerProApi {
+export interface PawnDeskApi {
   getVersion: () => Promise<AppInfo>
   login: (input: LoginInput) => Promise<AuthUser>
   logout: () => Promise<void>

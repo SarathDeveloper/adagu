@@ -125,6 +125,9 @@ test('the loan drawer refreshes after a collection, so Undo names the latest pay
     await modal.getByLabel('Amount').fill(amount)
     await modal.getByRole('button', { name: 'Record collection' }).click()
     await expect(modal).toBeHidden()
+    const recorded = window.getByRole('dialog', { name: /Interest receipt/ })
+    await recorded.getByRole('button', { name: 'Done' }).click()
+    await expect(recorded).toBeHidden()
   }
 
   await drawer.getByRole('button', { name: 'Undo last payment' }).click()

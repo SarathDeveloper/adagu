@@ -28,7 +28,7 @@ function readLeadingBytes(path, length) {
 // --- Windows -----------------------------------------------------------------
 
 const sourceAddon = join(root, 'src-tauri', 'binaries', 'better-sqlite3-win32-x64.node')
-const sourceSidecar = join(root, 'src-tauri', 'binaries', 'jeweltrackerpro-api-x86_64-pc-windows-msvc.exe')
+const sourceSidecar = join(root, 'src-tauri', 'binaries', 'pawndesk-api-x86_64-pc-windows-msvc.exe')
 // `tauri build` copies `binaries/*.node` resources next to the built app, keeping the
 // subdirectory from tauri.conf.json. These mirror resolve_sqlite_addon() in
 // src-tauri/src/main.rs, which probes <resource>/binaries, <resource>/resources and the
@@ -59,7 +59,7 @@ function assertWindowsAddon(path, label) {
 
 const macTriple = 'aarch64-apple-darwin'
 const macAddonName = 'better-sqlite3-darwin-arm64.node'
-const sourceMacSidecar = join(root, 'src-tauri', 'binaries', `jeweltrackerpro-api-${macTriple}`)
+const sourceMacSidecar = join(root, 'src-tauri', 'binaries', `pawndesk-api-${macTriple}`)
 const sourceMacAddon = join(root, 'src-tauri', 'binaries', macAddonName)
 const macAppBundle = join(
   root,
@@ -69,7 +69,7 @@ const macAppBundle = join(
   'release',
   'bundle',
   'macos',
-  'AdaguTrackerPro.app',
+  'PawnDesk.app',
 )
 
 // Thin 64-bit little-endian Mach-O (arm64) and a universal (fat) binary.
@@ -165,15 +165,15 @@ async function smokeTestSidecar({ label, executable, appRoot, migrationsDir, sql
     console.log(`SKIP ${label} smoke test: macOS-only`)
     return
   }
-  const dataDir = mkdtempSync(join(tmpdir(), 'jtp-mac-verify-'))
+  const dataDir = mkdtempSync(join(tmpdir(), 'pd-mac-verify-'))
   const child = spawn(executable, [], {
     env: {
       ...process.env,
-      JEWELTRACKERPRO_SIDECAR: '1',
-      JEWELTRACKERPRO_DATA_DIR: dataDir,
-      JEWELTRACKERPRO_APP_ROOT: appRoot,
-      JEWELTRACKERPRO_MIGRATIONS_DIR: migrationsDir,
-      JEWELTRACKERPRO_SQLITE_ADDON: sqliteAddon,
+      PAWNDESK_SIDECAR: '1',
+      PAWNDESK_DATA_DIR: dataDir,
+      PAWNDESK_APP_ROOT: appRoot,
+      PAWNDESK_MIGRATIONS_DIR: migrationsDir,
+      PAWNDESK_SQLITE_ADDON: sqliteAddon,
       PORT: '0',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -198,8 +198,8 @@ async function smokeTestSidecar({ label, executable, appRoot, migrationsDir, sql
 
 async function main() {
   if (mode === 'source') {
-    if (!existsSync(join(root, 'sidecar-dist', 'jeweltrackerpro-api.cjs'))) {
-      fail('sidecar-dist/jeweltrackerpro-api.cjs is missing. Run npm run sidecar:build first.')
+    if (!existsSync(join(root, 'sidecar-dist', 'pawndesk-api.cjs'))) {
+      fail('sidecar-dist/pawndesk-api.cjs is missing. Run npm run sidecar:build first.')
     }
     if (isMac) {
       assertMachO(sourceMacSidecar, 'macOS sidecar executable')
@@ -222,7 +222,7 @@ async function main() {
     const resourcesDir = join(macAppBundle, 'Contents', 'Resources')
     const appRoot = join(resourcesDir, 'resources')
     const members = [
-      [join(macosDir, 'jeweltrackerpro-api'), 'Packaged macOS sidecar'],
+      [join(macosDir, 'pawndesk-api'), 'Packaged macOS sidecar'],
       [join(resourcesDir, 'binaries', macAddonName), 'Packaged macOS SQLite addon'],
       [join(appRoot, 'dist', 'print.html'), 'Packaged print document'],
       [join(appRoot, 'package.json'), 'Packaged app manifest'],
@@ -236,7 +236,7 @@ async function main() {
     codesignVerify(macAppBundle, 'Packaged macOS app bundle', true)
     await smokeTestSidecar({
       label: 'Packaged macOS sidecar',
-      executable: join(macosDir, 'jeweltrackerpro-api'),
+      executable: join(macosDir, 'pawndesk-api'),
       appRoot,
       migrationsDir: join(appRoot, 'migrations'),
       sqliteAddon: join(resourcesDir, 'binaries', macAddonName),

@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
  *
  * React Router raises a 404 route error for unmatched paths; without this the
  * top-level error element renders the fatal "Something went wrong" crash screen
- * and reports a `JTP-ERR-ROUTE` crash, which is misleading for a missing page.
+ * and reports a `PD-ERR-ROUTE` crash, which is misleading for a missing page.
  */
 export function NotFoundPage() {
   const location = useLocation()

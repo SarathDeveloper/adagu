@@ -152,7 +152,7 @@ async function savePdfFile(pdf: jsPDF, filename: string): Promise<DesktopExportR
   return { canceled: false }
 }
 
-export async function downloadPrintDocument(doc: Document, filename: string): Promise<DesktopExportResult> {
+async function buildPrintDocumentPdf(doc: Document): Promise<jsPDF> {
   const root = (doc.querySelector('[data-print-root]') as HTMLElement | null) ?? doc.body
   if (!root) {
     throw new Error('Print template is not ready')
@@ -180,11 +180,15 @@ export async function downloadPrintDocument(doc: Document, filename: string): Pr
     windowWidth: captureWidth,
     windowHeight: captureHeight,
   })
-  const pdf = saveCanvasAsPdf(canvas, paperPageMm(doc.documentElement.dataset.paper))
-  return savePdfFile(pdf, filename)
+  return saveCanvasAsPdf(canvas, paperPageMm(doc.documentElement.dataset.paper))
 }
 
-export async function downloadPrintPdf(path: string, filename: string): Promise<DesktopExportResult> {
+export async function downloadPrintDocument(doc: Document, filename: string): Promise<DesktopExportResult> {
+  return savePdfFile(await buildPrintDocumentPdf(doc), filename)
+}
+
+/** Load a print route in an off-screen frame and run `run` on its document. */
+async function withPrintDocument<T>(path: string, run: (doc: Document) => Promise<T>): Promise<T> {
   const iframe = document.createElement('iframe')
   iframe.setAttribute('aria-hidden', 'true')
   iframe.title = 'PDF export'
@@ -196,9 +200,20 @@ export async function downloadPrintPdf(path: string, filename: string): Promise<
   iframe.src = withEmbedFlag(path)
 
   try {
-    const doc = await ready
-    return await downloadPrintDocument(doc, filename)
+    return await run(await ready)
   } finally {
     iframe.remove()
   }
+}
+
+/** Render a print route to PDF bytes without saving it (e.g. to send on WhatsApp). */
+export async function renderPrintPdfBytes(path: string): Promise<Uint8Array> {
+  return withPrintDocument(path, async (doc) => {
+    const pdf = await buildPrintDocumentPdf(doc)
+    return new Uint8Array(pdf.output('arraybuffer'))
+  })
+}
+
+export async function downloadPrintPdf(path: string, filename: string): Promise<DesktopExportResult> {
+  return withPrintDocument(path, (doc) => downloadPrintDocument(doc, filename))
 }

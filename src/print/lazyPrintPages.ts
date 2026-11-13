@@ -12,6 +12,11 @@ export const PledgePrintPage = lazy(() =>
     default: module.PledgePrintPage,
   })),
 )
+export const PledgePaymentReceiptPrintPage = lazy(() =>
+  import('../features/pledges/PledgePaymentReceiptPrintPage').then((module) => ({
+    default: module.PledgePaymentReceiptPrintPage,
+  })),
+)
 export const PledgeReleasePrintPage = lazy(() =>
   import('../features/pledges/PledgeReleasePrintPage').then((module) => ({
     default: module.PledgeReleasePrintPage,

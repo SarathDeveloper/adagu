@@ -17,8 +17,8 @@ import {
 } from '../../server/lib/logger'
 
 function setTempUserData(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'jtp-logs-'))
-  process.env.JEWELTRACKERPRO_E2E_USER_DATA = dir
+  const dir = mkdtempSync(join(tmpdir(), 'pd-logs-'))
+  process.env.PAWNDESK_E2E_USER_DATA = dir
   resetLoggerStateForTests()
   return dir
 }
@@ -60,13 +60,13 @@ describe('diagnostic logger', () => {
   afterEach(() => {
     resetLoggerStateForTests()
     rmSync(tempDir, { recursive: true, force: true })
-    delete process.env.JEWELTRACKERPRO_E2E_USER_DATA
+    delete process.env.PAWNDESK_E2E_USER_DATA
   })
 
   it('issues daily reference IDs in sequence', () => {
     const date = todayStamp()
-    expect(nextReferenceId()).toBe(`JTP-ERR-${date}-001`)
-    expect(nextReferenceId()).toBe(`JTP-ERR-${date}-002`)
+    expect(nextReferenceId()).toBe(`PD-ERR-${date}-001`)
+    expect(nextReferenceId()).toBe(`PD-ERR-${date}-002`)
   })
 
   it('writes each category to its own log file', () => {
@@ -87,7 +87,7 @@ describe('diagnostic logger', () => {
     logInfo('application', 'Application started')
     const text = readFileSync(categoryLogFile('application'), 'utf8')
     expect(text).toContain('Application started')
-    expect(text).not.toMatch(/JTP-ERR-/)
+    expect(text).not.toMatch(/PD-ERR-/)
   })
 
   it('rotates a log file after 1 MB and keeps one previous copy', () => {
@@ -104,7 +104,7 @@ describe('diagnostic logger', () => {
   it('formats a support clipboard report', () => {
     expect(
       formatErrorReport({
-        referenceId: 'JTP-ERR-20260925-001',
+        referenceId: 'PD-ERR-20260925-001',
         timestamp: '2026-09-25T05:00:00.000Z',
         version: '1.0.0',
         category: 'crash',
@@ -113,7 +113,7 @@ describe('diagnostic logger', () => {
       }),
     ).toBe(
       [
-        'Reference ID: JTP-ERR-20260925-001',
+        'Reference ID: PD-ERR-20260925-001',
         `Time: ${formatDisplayDateTime('2026-09-25T05:00:00.000Z')}`,
         'App version: 1.0.0',
         'Category: crash',
@@ -144,14 +144,14 @@ describe('pending fatal marker', () => {
   afterEach(() => {
     resetLoggerStateForTests()
     rmSync(tempDir, { recursive: true, force: true })
-    delete process.env.JEWELTRACKERPRO_E2E_USER_DATA
+    delete process.env.PAWNDESK_E2E_USER_DATA
   })
 
   it('keeps an unrecovered crash until it is acknowledged', () => {
     expect(readPendingFatal()).toBeNull()
 
     writePendingFatal({
-      referenceId: 'JTP-ERR-20261007-001',
+      referenceId: 'PD-ERR-20261007-001',
       timestamp: '2026-10-07T10:51:46.650Z',
       version: '1.0.0',
       category: 'crash',
@@ -159,7 +159,7 @@ describe('pending fatal marker', () => {
     })
 
     expect(readPendingFatal()).toEqual({
-      referenceId: 'JTP-ERR-20261007-001',
+      referenceId: 'PD-ERR-20261007-001',
       timestamp: '2026-10-07T10:51:46.650Z',
       version: '1.0.0',
       category: 'crash',

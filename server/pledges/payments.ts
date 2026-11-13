@@ -35,6 +35,8 @@ export type RecordPledgePaymentInput = {
   mode: PledgePaymentMode
   kind: PledgePaymentKind
   note?: string
+  /** UPI / bank transaction reference. */
+  reference?: string
   /** Close the loan automatically once the principal reaches zero. */
   closeWhenSettled?: boolean
   /** Allow recording on a forfeited (auctioned) pledge, e.g. auction shortfall. */
@@ -174,8 +176,9 @@ export function recordPledgePayment(
   const info = db
     .prepare(
       `INSERT INTO pledge_payments (
-         pledge_id, payment_date, kind, mode, amount, interest_part, principal_part, discount, note
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         pledge_id, payment_date, kind, mode, amount, interest_part, principal_part, discount, note,
+         reference
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       pledge.id,
@@ -187,6 +190,7 @@ export function recordPledgePayment(
       allocation.principalPart,
       discount,
       note,
+      (input.reference ?? '').trim(),
     )
   const paymentId = Number(info.lastInsertRowid)
 
@@ -215,7 +219,7 @@ export function mapPaymentById(db: Database.Database, paymentId: number): Pledge
   const row = db
     .prepare(
       `SELECT id, pledge_id, payment_date, kind, mode, amount, interest_part,
-              principal_part, discount, note, created_at
+              principal_part, discount, note, reference, created_at
        FROM pledge_payments WHERE id = ?`,
     )
     .get(paymentId) as PledgePaymentDbRow | undefined

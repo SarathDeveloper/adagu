@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import type { UserRole } from '@shared/types'
 import { resetLoginThrottleForTests } from './loginThrottle'
 
-export const SESSION_COOKIE = 'jeweltrackerpro_session'
+export const SESSION_COOKIE = 'pawndesk_session'
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 
 export type SessionRecord = {

@@ -22,6 +22,8 @@ import { AdaguDueDetailDrawer } from './AdaguDueDetailDrawer'
 import { AdaguRemindersTab } from './AdaguRemindersTab'
 import { AuctionModal } from './AuctionModal'
 import { InterestCollectionModal } from './InterestCollectionModal'
+import { PaymentReceiptModal } from './PaymentReceiptModal'
+import { latestPaymentId } from './duesHelpers'
 import { PLEDGE_COLLECTION_MODES } from './pledgePaymentModes'
 import { RenewModal } from './RenewModal'
 import { ShortfallModal } from './ShortfallModal'
@@ -63,6 +65,7 @@ export function AdaguDuesTab({
   const [billTarget, setBillTarget] = useState<number | null>(null)
   const [releaseTarget, setReleaseTarget] = useState<number | null>(null)
   const [interestTarget, setInterestTarget] = useState<AdaguDueSummary | null>(null)
+  const [receiptPaymentId, setReceiptPaymentId] = useState<number | null>(null)
   const [topupTarget, setTopupTarget] = useState<AdaguDueSummary | null>(null)
   const [renewTarget, setRenewTarget] = useState<AdaguDueSummary | null>(null)
   const [shortfallTarget, setShortfallTarget] = useState<AdaguDueSummary | null>(null)
@@ -128,10 +131,10 @@ export function AdaguDuesTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [redeemTarget, redeemDate])
 
-  async function sendWhatsApp(row: PledgeReminderEntry) {
+  async function sendWhatsApp(row: PledgeReminderEntry, options: { quiet?: boolean } = {}): Promise<boolean> {
     if (!row.whatsappUrl) {
       fail('Add a mobile number to this customer to send a reminder')
-      return
+      return false
     }
     try {
       setBusy(true)
@@ -141,12 +144,25 @@ export function AdaguDuesTab({
         url: row.whatsappUrl,
         kind: row.reason,
       })
-      showToast('WhatsApp reminder opened', 'success')
-      await loadReminders(true)
+      if (!options.quiet) showToast('WhatsApp reminder opened', 'success')
+      void loadReminders(true)
+      return true
     } catch (err) {
       fail(err instanceof Error ? err.message : 'Failed to open WhatsApp')
+      return false
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function skipReminder(row: PledgeReminderEntry): Promise<boolean> {
+    try {
+      await api.skipPledgeReminder({ pledgeId: row.pledgeId, kind: row.reason })
+      void loadReminders(true)
+      return true
+    } catch (err) {
+      fail(err instanceof Error ? err.message : 'Failed to skip the reminder')
+      return false
     }
   }
 
@@ -206,6 +222,7 @@ export function AdaguDuesTab({
     amount: number
     collectedDate: string
     mode: PledgePaymentMode
+    reference: string
   }) {
     if (!interestTarget) return
     try {
@@ -216,6 +233,7 @@ export function AdaguDuesTab({
         collectedDate: input.collectedDate,
         amount: input.amount,
         mode: input.mode,
+        reference: input.reference,
       })
       setInterestTarget(null)
       showToast(
@@ -224,6 +242,7 @@ export function AdaguDuesTab({
       )
       await reloadAndSyncView()
       if (updated.status === 'redeemed') setReleaseTarget(updated.id)
+      else setReceiptPaymentId(latestPaymentId(updated))
     } catch (err) {
       fail(err instanceof Error ? err.message : 'Failed to collect interest')
     } finally {
@@ -444,6 +463,8 @@ export function AdaguDuesTab({
           loading={remindersLoading}
           busy={busy}
           onWhatsApp={(row) => void sendWhatsApp(row)}
+          onQueueSend={(row) => sendWhatsApp(row, { quiet: true })}
+          onQueueSkip={skipReminder}
           onCollectInterest={remindInterest}
         />
       ) : loading && !error ? (
@@ -586,6 +607,10 @@ export function AdaguDuesTab({
           onClose={() => setInterestTarget(null)}
           onSubmit={(input) => void collectInterest(input)}
         />
+      ) : null}
+
+      {receiptPaymentId ? (
+        <PaymentReceiptModal paymentId={receiptPaymentId} onClose={() => setReceiptPaymentId(null)} />
       ) : null}
 
       {topupTarget ? (

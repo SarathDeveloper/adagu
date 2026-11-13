@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const bundle = join(root, 'sidecar-dist', 'jeweltrackerpro-api.cjs')
+const bundle = join(root, 'sidecar-dist', 'pawndesk-api.cjs')
 const binariesDir = join(root, 'src-tauri', 'binaries')
 const cacheDir = join(root, 'sidecar-dist', 'node-dist')
 
@@ -22,7 +22,7 @@ const nodeVersion = process.version.replace(/^v/, '')
 const targets = [
   {
     triple: 'x86_64-pc-windows-msvc',
-    output: join(binariesDir, 'jeweltrackerpro-api-x86_64-pc-windows-msvc.exe'),
+    output: join(binariesDir, 'pawndesk-api-x86_64-pc-windows-msvc.exe'),
     nodeUrl: `https://nodejs.org/dist/v${nodeVersion}/win-x64/node.exe`,
     cacheName: `node-v${nodeVersion}-win-x64.exe`,
     samePlatform: process.platform === 'win32' && process.arch === 'x64',
@@ -37,7 +37,7 @@ if (process.platform === 'darwin') {
   const archiveRoot = `node-v${nodeVersion}-darwin-arm64`
   targets.push({
     triple: 'aarch64-apple-darwin',
-    output: join(binariesDir, 'jeweltrackerpro-api-aarch64-apple-darwin'),
+    output: join(binariesDir, 'pawndesk-api-aarch64-apple-darwin'),
     nodeUrl: `https://nodejs.org/dist/v${nodeVersion}/${archiveRoot}.tar.gz`,
     cacheName: `${archiveRoot}.tar.gz`,
     tarballMember: join(archiveRoot, 'bin', 'node'),

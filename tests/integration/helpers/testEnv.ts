@@ -205,8 +205,8 @@ export function useFrozenToday(isoDate: string): void {
 
 export function useIntegrationEnv(): void {
   beforeEach(async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'jtp-int-'))
-    process.env.JEWELTRACKERPRO_E2E_USER_DATA = tempDir
+    tempDir = mkdtempSync(join(tmpdir(), 'pd-int-'))
+    process.env.PAWNDESK_E2E_USER_DATA = tempDir
     clearAllSessionsForTests()
     closeDatabase()
     initDatabase()
@@ -219,7 +219,7 @@ export function useIntegrationEnv(): void {
     clearAllSessionsForTests()
     closeDatabase()
     rmSync(tempDir, { recursive: true, force: true })
-    delete process.env.JEWELTRACKERPRO_E2E_USER_DATA
+    delete process.env.PAWNDESK_E2E_USER_DATA
   })
 }
 

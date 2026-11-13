@@ -1,4 +1,4 @@
-# AdaguTrackerPro
+# PawnDesk
 
 Adagu (pledge loan) and Gold Savings software for a jewellery pawn shop. Tracks pledges from sanction through interest collections, renewals, redemption, forfeit and auction; and monthly gold savings schemes from enrollment through collections and a maturity cash payout. Ships as a **desktop app** (Windows and macOS) and can still run as a localhost web app.
 
@@ -62,7 +62,7 @@ This starts the Vite frontend at `http://localhost:5173` and the Express API at 
 npm run tauri:dev
 ```
 
-This opens a Tauri window on the same Vite + Express process as `npm run dev`. WebView2 keeps GPU acceleration enabled on Windows; set `JEWELTRACKERPRO_SAFE_GRAPHICS=1` to fall back to software rendering on a machine whose graphics driver misbehaves.
+This opens a Tauri window on the same Vite + Express process as `npm run dev`. WebView2 keeps GPU acceleration enabled on Windows; set `PAWNDESK_SAFE_GRAPHICS=1` to fall back to software rendering on a machine whose graphics driver misbehaves.
 
 ## Packaged desktop app
 
@@ -72,10 +72,10 @@ npm run tauri:build:win  # Windows NSIS .exe (Windows, or macOS with cargo-xwin)
 npm run tauri:build:mac  # Apple Silicon .dmg (must run on a Mac)
 ```
 
-Installers land in `src-tauri/target/release/bundle/` (or `src-tauri/target/<triple>/release/bundle/` for a cross target), and the Windows installer is copied to `release/AdaguTrackerPro-Setup-1.0.0.exe`. Shop data (database, uploads, logs, backups) is stored in the app's own user-data folder, so it sits beside a full JewelTrackerPro install. The first launch moves an existing `JewelTrackerPro Adagu` folder to `AdaguTrackerPro` when the new folder is not already there.
+Installers land in `src-tauri/target/release/bundle/` (or `src-tauri/target/<triple>/release/bundle/` for a cross target), and the Windows installer is copied to `release/PawnDesk-Setup-1.0.0.exe`. Shop data (database, uploads, logs, backups) is stored in the app's own user-data folder, so it sits beside a full JewelTrackerPro install. The first launch moves an existing `AdaguTrackerPro` (or older `JewelTrackerPro Adagu`) folder to `PawnDesk`, and renames `jeweltrackerpro.db` to `pawndesk.db`, when the new folder is not already there.
 
-- Windows: `%APPDATA%\AdaguTrackerPro\`
-- macOS: `~/Library/Application Support/AdaguTrackerPro/`
+- Windows: `%APPDATA%\PawnDesk\`
+- macOS: `~/Library/Application Support/PawnDesk/`
 
 ### macOS (Apple Silicon)
 
@@ -96,17 +96,17 @@ The build runs in order: the frontend, the Node sidecar (ad-hoc signed), the pac
 Copy the result to `release/`:
 
 ```bash
-cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/AdaguTrackerPro_1.0.0_aarch64.dmg \
-  release/AdaguTrackerPro-Setup-1.0.0-mac-arm64.dmg
+cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/PawnDesk_1.0.0_aarch64.dmg \
+  release/PawnDesk-Setup-1.0.0-mac-arm64.dmg
 ```
 
 The app is ad-hoc signed, not notarized with an Apple Developer ID, so the first launch on another Mac is blocked by Gatekeeper. On macOS 15 open **System Settings → Privacy & Security**, click **Open Anyway**, and confirm. On older versions right-click the app and choose **Open**. The alternative for either:
 
 ```bash
-xattr -cr "/Applications/AdaguTrackerPro.app"
+xattr -cr "/Applications/PawnDesk.app"
 ```
 
-If the window ever goes blank, what happened is written to `logs/crash.log` in that folder and reported with a `JTP-ERR-…` reference ID the user can quote. The log folder is also shown under **Settings → Data**.
+If the window ever goes blank, what happened is written to `logs/crash.log` in that folder and reported with a `PD-ERR-…` reference ID the user can quote. The log folder is also shown under **Settings → Data**.
 
 ## Production (localhost web)
 
@@ -119,7 +119,7 @@ The Express server serves the built SPA from `dist/` plus the JSON API on `http:
 
 ## Database
 
-- Web/dev SQLite file: `data/jeweltrackerpro.db` (override with `JEWELTRACKERPRO_DATA_DIR`)
+- Web/dev SQLite file: `data/pawndesk.db` (override with `PAWNDESK_DATA_DIR`)
 - Desktop: same file name inside the app's own user-data folder above
 - Shop images: `uploads/` under the data directory
 - Use **Settings → Backup** to download or restore a `.db` file

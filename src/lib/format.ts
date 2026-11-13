@@ -5,8 +5,10 @@ export function formatInr(amount: number, fractionDigits = 0): string {
   }).format(amount)
 }
 
+/** Whole rupees show no decimals (₹1,02,000); paise always show two (₹16,406.50, not ₹16,406.5). */
 export function formatCurrency(amount: number): string {
-  return `₹${formatInr(amount)}`
+  const hasPaise = Math.round(Math.abs(amount) * 100) % 100 !== 0
+  return `₹${formatInr(amount, hasPaise ? 2 : 0)}`
 }
 
 export function formatWeight(weight: number, fractionDigits = 2): string {

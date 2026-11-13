@@ -44,15 +44,17 @@ export async function openGoldSavingsTab(
   await expect(tabEl).toHaveAttribute('aria-selected', 'true')
 }
 
-/** Open an Adagu chrome tab. */
+/**
+ * Open an Adagu screen. The sidebar link lands on Receipts, which hides the
+ * module tab bar and offers its own "New Adagu" button instead.
+ */
 export async function openAdaguTab(page: Page, tab: 'Receipts' | 'New Adagu') {
   await sidebarLink(page, 'Adagu').click()
-  const tabEl = page.locator('.billing-chrome').getByRole('tab', { name: tab, exact: true })
-  await expect(tabEl).toBeVisible()
-  if ((await tabEl.getAttribute('aria-selected')) !== 'true') {
-    await tabEl.click()
+  await expect(page).toHaveURL(/\/adagu$/)
+  if (tab === 'New Adagu') {
+    await page.getByRole('link', { name: 'New Adagu' }).first().click()
+    await expect(page).toHaveURL(/\/adagu\/new$/)
   }
-  await expect(tabEl).toHaveAttribute('aria-selected', 'true')
 }
 
 /** Print/preview stays in a dialog; the app URL must not change to /print/. */

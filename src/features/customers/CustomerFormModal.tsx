@@ -216,17 +216,20 @@ export function CustomerFormModal({
             aria-label="Address"
           />
         </label>
-        <label className="full">
-          <span className="field-label">Notes</span>
-          <textarea
-            className="textarea"
-            value={form.notes ?? ''}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            rows={2}
-            placeholder="Optional"
-            aria-label="Notes"
-          />
-        </label>
+        {/* After creation, notes are kept as a dated log on the customer page. */}
+        {editing ? null : (
+          <label className="full">
+            <span className="field-label">Notes</span>
+            <textarea
+              className="textarea"
+              value={form.notes ?? ''}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={2}
+              placeholder="Optional"
+              aria-label="Notes"
+            />
+          </label>
+        )}
       </div>
     </Modal>
   )

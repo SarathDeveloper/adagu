@@ -19,14 +19,14 @@ export function vacuumSnapshot(db: Database, destinationPath: string): void {
 }
 
 export function prerestoreSnapshotName(stamp = localNowStamp()): string {
-  return `jeweltrackerpro-prerestore-${stamp}.db`
+  return `pawndesk-prerestore-${stamp}.db`
 }
 
 export function premigrateSnapshotName(fromVersion: number, stamp = localNowStamp()): string {
-  return `jeweltrackerpro-premigrate-v${fromVersion}-${stamp}.db`
+  return `pawndesk-premigrate-v${fromVersion}-${stamp}.db`
 }
 
-const STALE_PARTIAL_RE = /^~\$jeweltrackerpro-.+\.tmp$/
+const STALE_PARTIAL_RE = /^~\$(?:pawndesk|jeweltrackerpro)-.+\.tmp$/
 
 /** Deletes half-written snapshots left behind when a backup was interrupted. */
 export function removeStalePartials(dir: string): void {

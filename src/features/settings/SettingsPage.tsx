@@ -27,8 +27,20 @@ import { printPreviewPaths } from '../print/printPreviewPaths'
 import { PrintersSettings } from './PrintersSettings'
 import { BackupSettings } from './BackupSettings'
 import { RequiredMark } from './ShopHeaderFields'
-import { useShopBranding } from './shopBrandingContext'
+import { DEFAULT_WINDOW_TITLE, useShopBranding } from './shopBrandingContext'
 import { shopInitials } from './shopInitials'
+
+/**
+ * Keeps the drive and the last two parts of a long path ("C:\…\data\pawndesk.db")
+ * so the header chip shows the file name instead of cutting it off. The full
+ * path stays in the tooltip.
+ */
+function shortenPath(path: string): string {
+  const separator = path.includes('\\') ? '\\' : '/'
+  const parts = path.split(/[\\/]/)
+  if (parts.length <= 4) return path
+  return [parts[0], '…', ...parts.slice(-2)].join(separator)
+}
 import { GOLD_SAVINGS_VISIBLE } from '../goldSavings/visibility'
 
 type SettingsTab = 'invoice' | 'printers' | 'backup' | 'data'
@@ -310,7 +322,7 @@ export function SettingsPage() {
                 </span>
               )}
               <div className="settings-header-chip-text">
-                <strong>{shopDisplay.name}</strong>
+                <strong>{shopDisplay.name.trim() || DEFAULT_WINDOW_TITLE}</strong>
                 <span>v{info?.version ?? '1.0.0'}</span>
               </div>
             </div>
@@ -318,7 +330,7 @@ export function SettingsPage() {
               <Database className="settings-header-chip-icon" size={18} strokeWidth={1.75} aria-hidden />
               <div className="settings-header-chip-text">
                 <strong>Database Location</strong>
-                <span title={info?.dbPath}>{info?.dbPath ?? '—'}</span>
+                <span title={info?.dbPath}>{info?.dbPath ? shortenPath(info.dbPath) : '—'}</span>
               </div>
             </div>
           </>
@@ -722,7 +734,7 @@ export function SettingsPage() {
                           }
                         />
                       </label>
-                      <label className="span-3">
+                      <label className="span-3 check-row">
                         <input
                           type="checkbox"
                           checked={shop.adaguRequireKyc}
@@ -740,7 +752,45 @@ export function SettingsPage() {
                           onChange={(e) => patchShop({ adaguReminderTemplate: e.target.value })}
                         />
                         <span className="settings-reminder-preview">
-                          Placeholders: {'{name} {receiptNo} {interestDue} {dueDate} {principal} {shopName}'}
+                          Placeholders: {'{name} {receiptNo} {interestDue} {totalDue} {dueDate} {principal} {shopName} {upiId}'}
+                          . When a UPI ID is set and the message has no {'{upiId}'}, a “Pay by UPI” line is added.
+                        </span>
+                      </label>
+                      <label className="span-3">
+                        Shop UPI ID
+                        <input
+                          className="input"
+                          value={shop.upiId}
+                          maxLength={100}
+                          placeholder="shopname@okaxis"
+                          onChange={(e) => patchShop({ upiId: e.target.value.trim() })}
+                        />
+                        <span className="settings-reminder-preview">
+                          Shows an exact-amount QR when collecting by UPI. Leave empty to turn it off.
+                        </span>
+                      </label>
+                      <label className="span-3">
+                        UPI payee name
+                        <input
+                          className="input"
+                          value={shop.upiPayeeName}
+                          maxLength={50}
+                          placeholder={shop.shopName || 'Shop name'}
+                          onChange={(e) => patchShop({ upiPayeeName: e.target.value })}
+                        />
+                      </label>
+                      <label className="span-3">
+                        WhatsApp receipt message
+                        <textarea
+                          className="textarea"
+                          rows={3}
+                          maxLength={500}
+                          value={shop.adaguReceiptTemplate}
+                          onChange={(e) => patchShop({ adaguReceiptTemplate: e.target.value })}
+                        />
+                        <span className="settings-reminder-preview">
+                          Sent with the receipt PDF after a collection. Placeholders:{' '}
+                          {'{name} {receiptNo} {amount} {date} {paidUpto} {principal} {reference} {shopName}'}
                         </span>
                       </label>
                     </div>

@@ -293,43 +293,45 @@ export function BackupSettings() {
             )}
           </div>
         </div>
-        <div className="backup-health-actions">
-          <button type="button" className="btn" disabled={busy} onClick={() => void backupNow()}>
-            Back Up Now
-          </button>
-          <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportCopy()}>
-            <Download size={16} strokeWidth={1.75} aria-hidden />
-            Export Copy
-          </button>
-          <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportFull()}>
-            <Archive size={16} strokeWidth={1.75} aria-hidden />
-            Full Backup (.zip)
-          </button>
-          <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportExcel()}>
-            <FileSpreadsheet size={16} strokeWidth={1.75} aria-hidden />
-            Export Excel
-          </button>
-          <label className={`btn secondary${busy ? ' backup-action-disabled' : ''}`}>
-            <Upload size={16} strokeWidth={1.75} aria-hidden />
-            Restore from File
-            <input
-              type="file"
-              accept=".db,.zip"
-              hidden
-              disabled={busy}
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                if (file) {
-                  setPending({ type: 'restore-file', file })
-                }
-                event.target.value = ''
-              }}
-            />
-          </label>
+        <div className="backup-health-side">
+          <div className="backup-health-actions">
+            <button type="button" className="btn" disabled={busy} onClick={() => void backupNow()}>
+              Back Up Now
+            </button>
+            <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportCopy()}>
+              <Download size={16} strokeWidth={1.75} aria-hidden />
+              Export Copy
+            </button>
+            <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportFull()}>
+              <Archive size={16} strokeWidth={1.75} aria-hidden />
+              Full Backup (.zip)
+            </button>
+            <button type="button" className="btn secondary" disabled={busy} onClick={() => void exportExcel()}>
+              <FileSpreadsheet size={16} strokeWidth={1.75} aria-hidden />
+              Export Excel
+            </button>
+            <label className={`btn secondary${busy ? ' backup-action-disabled' : ''}`}>
+              <Upload size={16} strokeWidth={1.75} aria-hidden />
+              Restore from File
+              <input
+                type="file"
+                accept=".db,.zip"
+                hidden
+                disabled={busy}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) {
+                    setPending({ type: 'restore-file', file })
+                  }
+                  event.target.value = ''
+                }}
+              />
+            </label>
+          </div>
+          <p className="muted backup-health-note">
+            Export Copy downloads the database only. Full Backup includes pledge photos and shop images.
+          </p>
         </div>
-        <p className="muted">
-          Export Copy downloads the database only. Full Backup includes pledge photos and shop images.
-        </p>
       </div>
 
       <div className="card padded backup-schedule" data-entry="">
@@ -397,7 +399,7 @@ export function BackupSettings() {
             <input
               className="input"
               aria-label="Off-machine folder"
-              placeholder={isMacPlatform() ? '/Volumes/AdaguTrackerPro' : 'E:\\AdaguTrackerPro'}
+              placeholder={isMacPlatform() ? '/Volumes/PawnDesk' : 'E:\\PawnDesk'}
               value={offsiteDir}
               disabled={busy}
               onChange={(event) => setOffsiteDir(event.target.value)}

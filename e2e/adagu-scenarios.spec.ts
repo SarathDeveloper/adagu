@@ -33,6 +33,7 @@ import {
   adaguDueRow,
   adaguField,
   calculatedValue,
+  closePaymentRecorded,
   closePrintPreview,
   fillAdaguBorrower,
   fillPledgeItem,
@@ -228,6 +229,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     await expect(interest.getByLabel('Amount')).toHaveValue('2400')
     await interest.getByRole('button', { name: 'Record collection' }).click()
     await expect(window.getByText('Interest collected')).toBeVisible()
+    await closePaymentRecorded(window)
 
     await closeDrawer(window, afterExtraDrawer)
     const afterInterest = await adaguDueRow(window, receiptNo)
@@ -283,6 +285,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     await expect(interest.getByLabel('Amount')).toHaveValue('1000')
     await interest.getByRole('button', { name: 'Record collection' }).click()
     await expect(window.getByText('Interest collected')).toBeVisible()
+    await closePaymentRecorded(window)
 
     await closeDrawer(window, drawer)
     const afterInterest = await adaguDueRow(window, receiptNo)
@@ -631,12 +634,12 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     const reminderRow = window.locator('tbody tr').filter({ hasText: customerName })
     await expect(reminderRow).toBeVisible()
     await expect(reminderRow.getByText('Interest overdue')).toBeVisible()
-    await expect(reminderRow.locator('td').nth(6)).toHaveText('—')
+    await expect(reminderRow.locator('td').nth(6)).toHaveText('Never')
 
-    // The server validates the wa.me link and hands it to the default browser.
+    // The server validates the wa.me link and hands it to WhatsApp Desktop.
     await reminderRow.getByRole('button', { name: 'WhatsApp' }).click()
     await expect(window.getByText('WhatsApp reminder opened')).toBeVisible()
-    await expect(reminderRow.locator('td').nth(6)).not.toHaveText('—')
+    await expect(reminderRow.locator('td').nth(6)).toHaveText('Sent today')
   })
 
   test('teardown — turn the KYC requirement back off', async ({ window }) => {

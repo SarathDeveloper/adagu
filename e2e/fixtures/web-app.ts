@@ -14,14 +14,16 @@ type Fixtures = {
 
 export const test = base.extend<Fixtures>({
   userDataDir: async ({}, use) => {
-    const dir = mkdtempSync(join(tmpdir(), 'jtp-e2e-'))
+    const dir = mkdtempSync(join(tmpdir(), 'pd-e2e-'))
     await use(dir)
     rmSync(dir, { recursive: true, force: true })
   },
 
   window: async ({ userDataDir, browser }, use) => {
-    process.env.JEWELTRACKERPRO_E2E = '1'
-    process.env.JEWELTRACKERPRO_E2E_USER_DATA = userDataDir
+    process.env.PAWNDESK_E2E = '1'
+    process.env.PAWNDESK_E2E_USER_DATA = userDataDir
+    // Never launch WhatsApp or touch the clipboard from a test run.
+    process.env.PAWNDESK_NO_OPEN = '1'
     clearAllSessionsForTests()
     closeDatabase()
     initDatabase()

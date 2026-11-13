@@ -1,13 +1,13 @@
 import type Database from 'better-sqlite3'
-import { buildAdaguWhatsAppUrl } from '@shared/adagu/reminders'
+import { buildAdaguWhatsAppUrl, messageDate, reminderBucket, withUpiLine } from '@shared/adagu/reminders'
 import { addDaysIso } from '@shared/billing/pledgeMath'
 import { localTodayIso } from '@shared/localDate'
 import type { PledgeReminderEntry, PledgeReminderReason, PledgeStatus } from '@shared/types'
 import { loadShopSettings } from '../lib/settingsStore'
 import { replayForPledge, type PledgeLedgerCore } from './ledger'
 
-/** Interest is flagged when it is due within this many days. */
-const INTEREST_DUE_WINDOW_DAYS = 3
+/** Interest is flagged when it is due within this many days (the "this week" queue). */
+const INTEREST_DUE_WINDOW_DAYS = 7
 /** Loans maturing within this many days are flagged. */
 const MATURITY_WINDOW_DAYS = 30
 
@@ -28,6 +28,8 @@ type ReminderPledgeRow = PledgeLedgerCore & {
   notice_date: string | null
   auction_date: string | null
   last_reminded_at: string | null
+  sent_today: number
+  skipped_today: number
 }
 
 /** Signed day difference: negative when `to` is already in the past. */
@@ -55,14 +57,22 @@ export function buildPledgeReminders(
               c.name AS customer_name, c.phone AS customer_phone,
               (SELECT notice_date FROM pledge_auctions WHERE pledge_id = p.id) AS notice_date,
               (SELECT auction_date FROM pledge_auctions WHERE pledge_id = p.id) AS auction_date,
-              (SELECT MAX(sent_at) FROM pledge_reminders WHERE pledge_id = p.id) AS last_reminded_at
+              (SELECT MAX(sent_at) FROM pledge_reminders
+                WHERE pledge_id = p.id AND status = 'sent' AND kind <> 'receipt') AS last_reminded_at,
+              EXISTS (SELECT 1 FROM pledge_reminders
+                WHERE pledge_id = p.id AND status = 'sent' AND kind <> 'receipt'
+                  AND date(sent_at, 'localtime') = @asOf) AS sent_today,
+              EXISTS (SELECT 1 FROM pledge_reminders
+                WHERE pledge_id = p.id AND status = 'skipped'
+                  AND date(sent_at, 'localtime') = @asOf) AS skipped_today
        FROM pledges p
        JOIN customers c ON c.id = p.customer_id
        WHERE p.status = 'active'
        ORDER BY p.pledge_date ASC, p.id ASC`,
     )
-    .all() as ReminderPledgeRow[]
+    .all({ asOf }) as ReminderPledgeRow[]
 
+  const template = withUpiLine(settings.adaguReminderTemplate, settings.upiId)
   const entries: PledgeReminderEntry[] = []
 
   for (const row of rows) {
@@ -128,14 +138,19 @@ export function buildPledgeReminders(
       nextInterestDue,
       isInterestOverdue: result.isInterestOverdue,
       lastRemindedAt: row.last_reminded_at,
-      whatsappUrl: buildAdaguWhatsAppUrl(row.customer_phone ?? '', settings.adaguReminderTemplate, {
+      whatsappUrl: buildAdaguWhatsAppUrl(row.customer_phone ?? '', template, {
         name: row.customer_name,
         receiptNo: row.receipt_no,
         interestDue: result.interestDue,
-        dueDate: chosen.dueDate,
+        dueDate: messageDate(chosen.dueDate),
         principal: result.principalOutstanding,
         shopName: settings.shopName,
+        totalDue: result.payoff,
+        upiId: settings.upiId,
       }),
+      bucket: reminderBucket(chosen.daysUntil),
+      remindedToday: Boolean(row.sent_today),
+      skippedToday: Boolean(row.skipped_today) && !row.sent_today,
     })
   }
 

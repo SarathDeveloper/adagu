@@ -36,7 +36,7 @@ await esbuild.build({
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  outfile: 'sidecar-dist/jeweltrackerpro-api.cjs',
+  outfile: 'sidecar-dist/pawndesk-api.cjs',
   sourcemap: false,
   logLevel: 'info',
   plugins: [sharedAliasPlugin],

@@ -81,8 +81,41 @@ export function getUserDataDir(): string {
   return getDataDir()
 }
 
+const DB_FILE_NAME = 'pawndesk.db'
+/** The database file name used before the PawnDesk rename. */
+const LEGACY_DB_FILE_NAME = 'jeweltrackerpro.db'
+/**
+ * Files that belong to one database: the WAL and shared-memory files hold
+ * committed rows that are not yet in the main file, and the last two are left
+ * by an interrupted replace or restore (see recoverInterruptedReplace).
+ */
+const DB_COMPANION_SUFFIXES = ['-wal', '-shm', '.replacing', '.restore.tmp']
+
 export function getDbPath(): string {
-  return join(getUserDataDir(), 'jeweltrackerpro.db')
+  return join(getUserDataDir(), DB_FILE_NAME)
+}
+
+/**
+ * Renames a database left under the old file name, with its companion files,
+ * so an install upgraded from AdaguTrackerPro opens its existing data.
+ *
+ * Runs only while nothing exists under the new name. Companions move before
+ * the main file: if the move is interrupted, the main file is still under the
+ * old name and the next start finishes the job (rename replaces any companion
+ * already moved).
+ */
+export function migrateLegacyDbFile(dbPath: string): void {
+  const legacyPath = join(dirname(dbPath), LEGACY_DB_FILE_NAME)
+  const anyNew = ['', '.replacing', '.restore.tmp'].some((suffix) => existsSync(`${dbPath}${suffix}`))
+  if (anyNew) return
+  const anyLegacy = ['', '.replacing', '.restore.tmp'].some((suffix) => existsSync(`${legacyPath}${suffix}`))
+  if (!anyLegacy) return
+  for (const suffix of [...DB_COMPANION_SUFFIXES, '']) {
+    if (existsSync(`${legacyPath}${suffix}`)) {
+      renameSync(`${legacyPath}${suffix}`, `${dbPath}${suffix}`)
+    }
+  }
+  logInfo('database', `Renamed ${legacyPath} to ${dbPath}`)
 }
 
 /**
@@ -115,13 +148,14 @@ export function initDatabase(): Database.Database {
 
   const dbPath = getDbPath()
   mkdirSync(dirname(dbPath), { recursive: true })
+  migrateLegacyDbFile(dbPath)
   recoverInterruptedReplace(dbPath)
   db = new Database(dbPath, sqliteNativeOptions())
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
   runMigrations(db)
   backfillLegacyPledgePayments(db)
-  if (process.env.JEWELTRACKERPRO_E2E === '1') {
+  if (process.env.PAWNDESK_E2E === '1') {
     seedE2eAdmin(db)
   } else {
     ensureDefaultAdmin(db)

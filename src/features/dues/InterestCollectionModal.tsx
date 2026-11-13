@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { localTodayIso } from '@shared/localDate'
 import type { AdaguDueSummary, PledgePaymentMode } from '@shared/types'
 import { DateInput } from '../../components/DateInput'
 import { Modal } from '../../components/Modal'
+import { api } from '../../lib/api'
 import { formatCurrency, formatDisplayDate } from '../../lib/format'
 import { PLEDGE_COLLECTION_MODES } from './pledgePaymentModes'
+import { UpiQrCode } from './UpiQrCode'
 
 export function InterestCollectionModal({
   summary,
@@ -15,12 +17,36 @@ export function InterestCollectionModal({
   summary: AdaguDueSummary
   busy?: boolean
   onClose: () => void
-  onSubmit: (input: { amount: number; collectedDate: string; mode: PledgePaymentMode }) => void
+  onSubmit: (input: {
+    amount: number
+    collectedDate: string
+    mode: PledgePaymentMode
+    reference: string
+  }) => void
 }) {
   const suggested = Math.min(summary.monthlyInterest, summary.remaining) || summary.remaining
   const [amount, setAmount] = useState(suggested)
   const [collectedDate, setCollectedDate] = useState(localTodayIso())
   const [mode, setMode] = useState<PledgePaymentMode>('cash')
+  const [reference, setReference] = useState('')
+  const [upi, setUpi] = useState<{ id: string; payee: string } | null>(null)
+
+  useEffect(() => {
+    let active = true
+    api
+      .getShopSettings()
+      .then((settings) => {
+        if (active && settings.upiId) {
+          setUpi({ id: settings.upiId, payee: settings.upiPayeeName || settings.shopName })
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const showsReference = mode === 'upi' || mode === 'bank_transfer' || mode === 'card'
 
   const interestDue = useMemo(
     () => Math.max(summary.interestDue, 0),
@@ -44,7 +70,9 @@ export function InterestCollectionModal({
             data-entry-save=""
             title="Ctrl+S"
             disabled={busy || amount <= 0}
-            onClick={() => onSubmit({ amount, collectedDate, mode })}
+            onClick={() =>
+              onSubmit({ amount, collectedDate, mode, reference: showsReference ? reference.trim() : '' })
+            }
           >
             {busy ? 'Recording…' : 'Record collection'}
           </button>
@@ -110,6 +138,32 @@ export function InterestCollectionModal({
           </select>
         </label>
       </div>
+      {showsReference ? (
+        <div className="form-grid">
+          <label className="full">
+            {mode === 'upi' ? 'UPI reference (UTR)' : 'Transaction reference'}
+            <input
+              className="input"
+              value={reference}
+              maxLength={64}
+              placeholder="Optional · from the customer's payment screen"
+              onChange={(event) => setReference(event.target.value.replace(/[^A-Za-z0-9 ./_-]/g, ''))}
+            />
+          </label>
+        </div>
+      ) : null}
+      {mode === 'upi' ? (
+        upi ? (
+          <UpiQrCode
+            upiId={upi.id}
+            payeeName={upi.payee}
+            amount={amount}
+            note={`${summary.receiptNo} interest`}
+          />
+        ) : (
+          <p className="upi-qr-hint">Add the shop UPI ID in Settings → Adagu to show a payment QR here.</p>
+        )
+      ) : null}
       <div className="form-inline-actions">
         <button
           type="button"

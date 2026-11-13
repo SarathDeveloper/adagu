@@ -8,11 +8,11 @@ function sqliteAddonFileName(): string {
 }
 
 function envAddonPath(): string | undefined {
-  const override = process.env.JEWELTRACKERPRO_SQLITE_ADDON
+  const override = process.env.PAWNDESK_SQLITE_ADDON
   if (override && override.length > 0) {
     return override
   }
-  const appRoot = process.env.JEWELTRACKERPRO_APP_ROOT
+  const appRoot = process.env.PAWNDESK_APP_ROOT
   if (!appRoot) {
     return undefined
   }

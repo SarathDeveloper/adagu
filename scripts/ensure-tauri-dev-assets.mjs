@@ -11,13 +11,13 @@ const migrationsSrc = join(root, 'server', 'db', 'migrations')
 function sidecarPaths() {
   if (process.platform === 'win32') {
     return {
-      sidecar: join(binariesDir, 'jeweltrackerpro-api-x86_64-pc-windows-msvc.exe'),
+      sidecar: join(binariesDir, 'pawndesk-api-x86_64-pc-windows-msvc.exe'),
       sqliteAddon: join(binariesDir, 'better-sqlite3-win32-x64.node'),
     }
   }
   if (process.platform === 'darwin') {
     return {
-      sidecar: join(binariesDir, 'jeweltrackerpro-api-aarch64-apple-darwin'),
+      sidecar: join(binariesDir, 'pawndesk-api-aarch64-apple-darwin'),
       sqliteAddon: join(binariesDir, 'better-sqlite3-darwin-arm64.node'),
     }
   }

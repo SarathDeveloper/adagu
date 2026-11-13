@@ -14,7 +14,11 @@ import type {
   ShopSettings,
   TaxInvoiceVisibility,
 } from '@shared/types'
-import { DEFAULT_ADAGU_REMINDER_TEMPLATE } from '@shared/adagu/reminders'
+import {
+  DEFAULT_ADAGU_RECEIPT_TEMPLATE,
+  DEFAULT_ADAGU_REMINDER_TEMPLATE,
+  isValidUpiId,
+} from '@shared/adagu/reminders'
 import { getDatabase } from '../db'
 import { clampCopies, parseBooleanSetting, parsePaperSize } from './printOptions'
 
@@ -48,13 +52,16 @@ const SHOP_KEYS = {
   adaguAuctionNoticeDays: 'adagu_auction_notice_days',
   adaguRequireKyc: 'adagu_require_kyc',
   adaguReminderTemplate: 'adagu_reminder_template',
+  adaguReceiptTemplate: 'adagu_receipt_template',
+  upiId: 'upi_id',
+  upiPayeeName: 'upi_payee_name',
   pawnbrokerLicenseNo: 'pawnbroker_license_no',
 } as const
 
 const SETUP_SKIPPED_KEY = 'shop_setup_skipped'
 
 const DEFAULT_PLEDGE_LTV_PCT = 75
-const DEFAULT_ADAGU_INTEREST_PCT = 2.1
+const DEFAULT_ADAGU_INTEREST_PCT = 2
 const DEFAULT_ADAGU_AUCTION_NOTICE_DAYS = 14
 const DEFAULT_ADAGU_REQUIRE_KYC = false
 
@@ -74,6 +81,12 @@ function parseAdaguAuctionNoticeDays(raw: string): number {
   const value = Number.parseInt(raw, 10)
   if (!Number.isFinite(value) || value < 0) return DEFAULT_ADAGU_AUCTION_NOTICE_DAYS
   return Math.min(365, value)
+}
+
+/** A stored UPI ID that no longer validates is treated as unset. */
+function parseUpiId(raw: string): string {
+  const value = raw.trim()
+  return isValidUpiId(value) ? value : ''
 }
 
 function parseAdaguReminderTemplate(raw: string): string {
@@ -178,6 +191,10 @@ export function loadShopSettings(db: ReturnType<typeof getDatabase>): ShopSettin
     adaguReminderTemplate: parseAdaguReminderTemplate(
       getShopSetting(db, SHOP_KEYS.adaguReminderTemplate, DEFAULT_ADAGU_REMINDER_TEMPLATE),
     ),
+    adaguReceiptTemplate:
+      getShopSetting(db, SHOP_KEYS.adaguReceiptTemplate, '').trim() || DEFAULT_ADAGU_RECEIPT_TEMPLATE,
+    upiId: parseUpiId(getShopSetting(db, SHOP_KEYS.upiId, '')),
+    upiPayeeName: getShopSetting(db, SHOP_KEYS.upiPayeeName, '').trim(),
     pawnbrokerLicenseNo: getShopSetting(db, SHOP_KEYS.pawnbrokerLicenseNo, '').trim(),
     setupSkipped: parseBooleanSetting(getShopSetting(db, SETUP_SKIPPED_KEY, '0')),
   }
@@ -237,6 +254,13 @@ export function saveShopSettings(
     SHOP_KEYS.adaguReminderTemplate,
     input.adaguReminderTemplate?.trim() || DEFAULT_ADAGU_REMINDER_TEMPLATE,
   )
+  setShopSetting(
+    db,
+    SHOP_KEYS.adaguReceiptTemplate,
+    input.adaguReceiptTemplate?.trim() || DEFAULT_ADAGU_RECEIPT_TEMPLATE,
+  )
+  setShopSetting(db, SHOP_KEYS.upiId, parseUpiId(input.upiId ?? ''))
+  setShopSetting(db, SHOP_KEYS.upiPayeeName, (input.upiPayeeName ?? '').trim())
   setShopSetting(db, SHOP_KEYS.pawnbrokerLicenseNo, (input.pawnbrokerLicenseNo ?? '').trim())
   for (const field of BILL_TEMPLATE_FIELDS) {
     setShopSetting(db, templateSettingKey(field), input.billTemplate[field])

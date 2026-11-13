@@ -2,7 +2,11 @@ import { mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 export function getDataDir(): string {
-  const override = process.env.JEWELTRACKERPRO_E2E_USER_DATA || process.env.JEWELTRACKERPRO_DATA_DIR
+  // JEWELTRACKERPRO_DATA_DIR is the name used before the PawnDesk rename.
+  const override =
+    process.env.PAWNDESK_E2E_USER_DATA ||
+    process.env.PAWNDESK_DATA_DIR ||
+    process.env.JEWELTRACKERPRO_DATA_DIR
   const dir = override ? resolve(override) : resolve(process.cwd(), 'data')
   mkdirSync(dir, { recursive: true })
   return dir

@@ -10,7 +10,7 @@ src-tauri/gen
 src-tauri/resources/migrations/*.sql
 src-tauri/binaries/*.exe
 src-tauri/binaries/*.node
-src-tauri/binaries/jeweltrackerpro-api-*
+src-tauri/binaries/pawndesk-api-*
 server/uploads
 test-results
 playwright-report

@@ -9,7 +9,7 @@ function displayAppSubtitle(subtitle: string): string {
   if (!GOLD_SAVINGS_VISIBLE && subtitle === DEFAULT_APP_SUBTITLE) return HIDDEN_GOLD_SAVINGS_SUBTITLE
   return subtitle
 }
-export const DEFAULT_WINDOW_TITLE = 'AdaguTrackerPro'
+export const DEFAULT_WINDOW_TITLE = 'PawnDesk'
 
 
 interface ShopBranding {

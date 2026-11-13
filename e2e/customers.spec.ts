@@ -36,10 +36,14 @@ test('customer profile shows Adagu loan and due history', async ({ window }) => 
 
   await expect(window).toHaveURL(/\/customers\/\d+$/)
   await expect(window.getByRole('heading', { name: 'E2E Customer' })).toBeVisible()
-  await expect(window.getByRole('heading', { name: 'Customer Profile' })).toBeVisible()
-  await expect(window.getByText('Total Paid')).toBeVisible()
-  await expect(window.getByText('Outstanding')).toBeVisible()
-  await expect(window.getByText('Active Adagu loans')).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Personal & contact' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'KYC & identity' })).toBeVisible()
+  await expect(window.getByText('Total paid', { exact: true })).toBeVisible()
+  await expect(window.getByText('Outstanding', { exact: true })).toBeVisible()
+  const activeCard = window.getByRole('heading', { name: 'Active Adagu' }).locator('xpath=ancestor::section[1]')
+  await expect(activeCard.getByRole('button', { name: /ADG/ })).toBeVisible()
+  await expect(activeCard.getByRole('button', { name: 'Collect payment' })).toBeVisible()
+  await expect(window.getByText(/^Adagu ADG\S+ opened$/)).toBeVisible()
 
   await window.getByRole('tab', { name: 'Adagu' }).click()
   await expect(window.getByRole('heading', { name: 'Active Adagu loans' })).toBeVisible()
@@ -52,8 +56,10 @@ test('customer profile shows Adagu loan and due history', async ({ window }) => 
   }
 
   await window.getByRole('tab', { name: 'History' }).click()
-  await expect(window.getByRole('heading', { name: 'Payment History' })).toBeVisible()
-  await expect(window.getByRole('heading', { name: 'Due History' })).toBeVisible()
-  await expect(window.getByRole('heading', { name: 'Due History' }).locator('..').getByText(/ADG/)).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Payment history' })).toBeVisible()
+  await expect(window.getByRole('heading', { name: 'Due history' })).toBeVisible()
+  await expect(
+    window.getByRole('heading', { name: 'Due history' }).locator('xpath=ancestor::section[1]').getByText(/ADG/),
+  ).toBeVisible()
   await expect(window.getByText('No payments recorded.')).toBeVisible()
 })

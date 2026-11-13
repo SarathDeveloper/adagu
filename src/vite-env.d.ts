@@ -20,5 +20,5 @@ type DesktopAPI = {
 
 interface Window {
   desktopAPI?: DesktopAPI
-  __JTP_DESKTOP_PRINT__?: boolean
+  __PD_DESKTOP_PRINT__?: boolean
 }

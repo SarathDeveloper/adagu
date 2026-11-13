@@ -67,7 +67,10 @@ fn stop_sidecar(app: &AppHandle) {
 /// Whether this machine asked for the conservative graphics path.
 #[cfg(target_os = "windows")]
 fn safe_graphics_requested() -> bool {
-    match std::env::var("JEWELTRACKERPRO_SAFE_GRAPHICS") {
+    // Machines set up before the rename may still carry the old variable name.
+    match std::env::var("PAWNDESK_SAFE_GRAPHICS")
+        .or_else(|_| std::env::var("JEWELTRACKERPRO_SAFE_GRAPHICS"))
+    {
         Ok(value) => value.trim() == "1" || value.trim().eq_ignore_ascii_case("true"),
         Err(_) => false,
     }
@@ -79,7 +82,7 @@ fn safe_graphics_requested() -> bool {
 /// rasterizer removes both accelerators, which is a known way to end up with
 /// blank pages and dead renderers, especially on low-end laptops. A machine
 /// whose graphics driver misbehaves can opt in with
-/// `JEWELTRACKERPRO_SAFE_GRAPHICS=1` instead of penalising every machine.
+/// `PAWNDESK_SAFE_GRAPHICS=1` instead of penalising every machine.
 #[cfg(target_os = "windows")]
 fn windows_browser_args() -> String {
     let mut args = String::from("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection");
@@ -149,22 +152,26 @@ fn sqlite_addon_name() -> &'static str {
     }
 }
 
-const DATA_DIR_NAME: &str = "AdaguTrackerPro";
-const LEGACY_DATA_DIR_NAME: &str = "JewelTrackerPro Adagu";
+const DATA_DIR_NAME: &str = "PawnDesk";
+/// Folders earlier releases used, newest first. The first one found is moved
+/// to `DATA_DIR_NAME` on launch so a renamed install keeps its shop data.
+const LEGACY_DATA_DIR_NAMES: [&str; 2] = ["AdaguTrackerPro", "JewelTrackerPro Adagu"];
 
 fn resolve_data_dir() -> Result<PathBuf, String> {
     let base = dirs::data_dir()
         .ok_or_else(|| "Could not resolve the application data directory".to_string())?;
     let dir = base.join(DATA_DIR_NAME);
     if !dir.exists() {
-        let legacy = base.join(LEGACY_DATA_DIR_NAME);
-        if legacy.exists() {
-            std::fs::rename(&legacy, &dir).map_err(|error| {
-                format!(
-                    "Could not move shop data from \"{LEGACY_DATA_DIR_NAME}\" to \"{DATA_DIR_NAME}\": {error}"
-                )
-            })?;
-            return Ok(dir);
+        for legacy_name in LEGACY_DATA_DIR_NAMES {
+            let legacy = base.join(legacy_name);
+            if legacy.exists() {
+                std::fs::rename(&legacy, &dir).map_err(|error| {
+                    format!(
+                        "Could not move shop data from \"{legacy_name}\" to \"{DATA_DIR_NAME}\": {error}"
+                    )
+                })?;
+                return Ok(dir);
+            }
         }
     }
     std::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
@@ -233,16 +240,16 @@ fn configure_desktop_env(app: &AppHandle) -> Result<(), String> {
     let migrations = resolve_migrations_dir(&resource_dir, &app_root)?;
     let sqlite_addon = resolve_sqlite_addon(&resource_dir)?;
 
-    std::env::set_var("JEWELTRACKERPRO_SIDECAR", "1");
-    std::env::set_var("JEWELTRACKERPRO_DATA_DIR", &data_dir);
-    std::env::set_var("JEWELTRACKERPRO_APP_ROOT", &app_root);
-    std::env::set_var("JEWELTRACKERPRO_MIGRATIONS_DIR", migrations);
-    std::env::set_var("JEWELTRACKERPRO_SQLITE_ADDON", sqlite_addon);
+    std::env::set_var("PAWNDESK_SIDECAR", "1");
+    std::env::set_var("PAWNDESK_DATA_DIR", &data_dir);
+    std::env::set_var("PAWNDESK_APP_ROOT", &app_root);
+    std::env::set_var("PAWNDESK_MIGRATIONS_DIR", migrations);
+    std::env::set_var("PAWNDESK_SQLITE_ADDON", sqlite_addon);
     Ok(())
 }
 
 fn sidecar_env_pairs() -> Vec<(String, String)> {
-    ["JEWELTRACKERPRO_SIDECAR", "JEWELTRACKERPRO_DATA_DIR", "JEWELTRACKERPRO_APP_ROOT", "JEWELTRACKERPRO_MIGRATIONS_DIR", "JEWELTRACKERPRO_SQLITE_ADDON"]
+    ["PAWNDESK_SIDECAR", "PAWNDESK_DATA_DIR", "PAWNDESK_APP_ROOT", "PAWNDESK_MIGRATIONS_DIR", "PAWNDESK_SQLITE_ADDON"]
         .into_iter()
         .filter_map(|key| std::env::var(key).ok().map(|value| (key.to_string(), value)))
         .collect()
@@ -252,7 +259,7 @@ async fn start_sidecar(app: &AppHandle) -> Result<u16, String> {
     configure_desktop_env(app)?;
     let command = app
         .shell()
-        .sidecar("jeweltrackerpro-api")
+        .sidecar("pawndesk-api")
         .map_err(|error| error.to_string())?
         .envs(sidecar_env_pairs());
     let (mut rx, child) = command.spawn().map_err(|error| error.to_string())?;
@@ -300,7 +307,7 @@ async fn start_sidecar(app: &AppHandle) -> Result<u16, String> {
 fn open_main_window(app: &AppHandle, url: &str, api_port: Option<u16>) -> Result<(), String> {
     let parsed = url.parse().map_err(|error| format!("{error}"))?;
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
-        .title("AdaguTrackerPro")
+        .title("PawnDesk")
         .inner_size(1280.0, 840.0)
         .min_inner_size(1024.0, 700.0)
         .visible(false)
@@ -444,7 +451,7 @@ async fn open_print_window(app: AppHandle, path: String) -> Result<(), String> {
 
     let label = format!("print-{}", PRINT_WINDOW_SEQ.fetch_add(1, Ordering::SeqCst) + 1);
     let script = format!(
-        "window.__JTP_DESKTOP_PRINT__ = true;\n{}",
+        "window.__PD_DESKTOP_PRINT__ = true;\n{}",
         include_str!("desktop_api.js")
     );
     WebviewWindowBuilder::new(&app, label, WebviewUrl::External(parsed))
@@ -517,7 +524,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("failed to build AdaguTrackerPro")
+        .expect("failed to build PawnDesk")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
                 stop_sidecar(app);

@@ -1,7 +1,7 @@
 /**
  * Smoke test against a live server on a fresh data folder.
  *
- * Usage: start the API with a fresh JEWELTRACKERPRO_DATA_DIR and PORT, then
+ * Usage: start the API with a fresh PAWNDESK_DATA_DIR and PORT, then
  *   node scripts/smoke-adagu.mjs http://127.0.0.1:3199
  */
 

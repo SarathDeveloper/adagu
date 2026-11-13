@@ -13,6 +13,7 @@ export function PledgePrintPage() {
   const { id } = useParams()
   const [pledge, setPledge] = useState<Pledge | null>(null)
   const [shop, setShop] = useState<ShopDisplayInfo | null>(null)
+  const [customerPhotoPath, setCustomerPhotoPath] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -28,6 +29,13 @@ export function PledgePrintPage() {
           api.getShopSettings(),
         ])
         if (!active) return
+        // The profile photo is a fallback for loans without their own borrower
+        // photo; staff without Customers access simply print without it.
+        const documents = data.photos.some((photo) => photo.kind === 'customer')
+          ? []
+          : await api.listCustomerDocuments(data.customerId).catch(() => [])
+        if (!active) return
+        setCustomerPhotoPath(documents.find((doc) => doc.kind === 'photo')?.path ?? '')
         setShop(shopSettingsToDisplay(settings))
         applyPaperDataset('a4')
         setPledge(data)
@@ -70,7 +78,7 @@ export function PledgePrintPage() {
       <style>{paperPageCss('a4')}</style>
       {error && <p className="pledge-print-status pledge-print-error">{error}</p>}
       {!error && !pledge && <p className="pledge-print-status">Preparing pledge receipt…</p>}
-      {pledge && <PledgePrint pledge={pledge} shop={shop ?? undefined} />}
+      {pledge && <PledgePrint pledge={pledge} shop={shop ?? undefined} customerPhotoPath={customerPhotoPath} />}
     </div>
   )
 }

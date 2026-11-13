@@ -71,7 +71,7 @@ export function ensureDefaultAdmin(db: Database.Database): void {
   }
 
   // E2E seeds its own admin with must_change_password=0.
-  if (process.env.JEWELTRACKERPRO_E2E === '1') {
+  if (process.env.PAWNDESK_E2E === '1') {
     return
   }
 

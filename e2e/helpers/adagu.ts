@@ -91,11 +91,12 @@ export async function setAdaguInterestPct(page: Page, pct: string) {
 /** Adagu → New Adagu, ready to fill a fresh pledge. */
 export async function openNewAdaguBill(page: Page) {
   await sidebarLink(page, 'Adagu').click()
-  const tab = page.getByRole('tab', { name: 'New Adagu' })
-  await expect(tab).toBeVisible()
-  if ((await tab.getAttribute('aria-selected')) !== 'true') {
-    await tab.click()
-  }
+  // The receipts list hides the module tab bar and has its own "New Adagu"
+  // button in the header (the empty state may show a second one).
+  const newButton = page.getByRole('link', { name: 'New Adagu' }).first()
+  await expect(newButton).toBeVisible()
+  await newButton.click()
+  await expect(page).toHaveURL(/\/adagu\/new$/)
   await expect(page.getByRole('heading', { name: 'Adagu Bill' })).toBeVisible()
 }
 
@@ -166,6 +167,13 @@ export async function sanctionAdaguLoan(page: Page) {
 
 export async function closePrintPreview(page: Page) {
   await dismissDialogs(page)
+}
+
+/** Close the interest receipt preview that follows an interest collection. */
+export async function closePaymentRecorded(page: Page) {
+  const dialog = page.getByRole('dialog', { name: /Interest receipt/ })
+  await dialog.getByRole('button', { name: 'Done' }).click()
+  await dialog.waitFor({ state: 'hidden' })
 }
 
 export async function adaguBillNo(page: Page): Promise<string> {

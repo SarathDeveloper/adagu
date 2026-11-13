@@ -1,0 +1,619 @@
+/*
+ * Adagu (gold loan) receipt, A4. Charcoal ink with one gold accent; every fill
+ * is light enough to stay readable on a black-and-white laser printer.
+ */
+.adr-root {
+  --adr-ink: #1c1917;
+  --adr-muted: #57534e;
+  --adr-faint: #78716c;
+  --adr-line: #d6d3d1;
+  --adr-line-strong: #a8a29e;
+  --adr-gold: #8a5a0b;
+  --adr-gold-soft: #f6efe1;
+  --adr-fill: #f5f5f4;
+  color: var(--adr-ink);
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.4;
+}
+
+.adr-root .adr-sheet {
+  gap: 4mm;
+  padding: 9mm 11mm 8mm;
+}
+
+/* ---------- Header ---------- */
+.adr-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 6mm;
+  padding-bottom: 4mm;
+  border-bottom: 0.6mm solid var(--adr-ink);
+  box-shadow: 0 0.9mm 0 0 var(--adr-gold);
+}
+.adr-brand {
+  display: flex;
+  align-items: center;
+  gap: 4mm;
+  min-width: 0;
+}
+.adr-logo {
+  flex: 0 0 auto;
+  width: 20mm;
+  height: 20mm;
+  object-fit: contain;
+}
+.adr-logo--mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.5mm solid var(--adr-gold);
+  border-radius: 50%;
+  color: var(--adr-gold);
+  font-size: 15pt;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.adr-shop {
+  min-width: 0;
+}
+.adr-shop h1 {
+  margin: 0 0 0.6mm;
+  font-size: 17pt;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+.adr-shop p {
+  margin: 0;
+  color: var(--adr-muted);
+  font-size: 8.5pt;
+}
+.adr-shop .adr-tagline {
+  color: var(--adr-gold);
+  font-weight: 600;
+  font-style: italic;
+}
+.adr-doc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  flex: 0 0 auto;
+  text-align: right;
+}
+.adr-doc-title {
+  font-size: 12pt;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.adr-doc-sub {
+  color: var(--adr-faint);
+  font-size: 8pt;
+  letter-spacing: 0.04em;
+}
+.adr-doc-no {
+  margin-top: 1.5mm;
+  padding: 1mm 3.5mm;
+  border: 0.4mm solid var(--adr-ink);
+  border-radius: 1.2mm;
+  font-size: 14pt;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Meta strip ---------- */
+.adr-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 0.3mm solid var(--adr-line);
+  border-radius: 1.5mm;
+  background: var(--adr-fill);
+}
+.adr-meta > div {
+  display: flex;
+  flex-direction: column;
+  padding: 1.8mm 3mm;
+  min-width: 0;
+}
+.adr-meta > div + div {
+  border-left: 0.3mm solid var(--adr-line);
+}
+.adr-meta span {
+  color: var(--adr-faint);
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.adr-meta strong {
+  font-size: 10pt;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Borrower + loan cards ---------- */
+.adr-parties {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 4mm;
+}
+.adr-card {
+  border: 0.3mm solid var(--adr-line-strong);
+  border-radius: 1.5mm;
+  padding: 3mm 3.5mm;
+  min-width: 0;
+}
+.adr-label {
+  margin: 0 0 2mm;
+  color: var(--adr-gold);
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.adr-borrower-body {
+  display: flex;
+  gap: 3.5mm;
+}
+.adr-borrower-photo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24mm;
+  height: 29mm;
+  border: 0.3mm solid var(--adr-line);
+  border-radius: 1mm;
+  background: var(--adr-fill);
+  overflow: hidden;
+}
+.adr-borrower-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.adr-borrower-photo span {
+  color: var(--adr-line-strong);
+  font-size: 16pt;
+  font-weight: 700;
+}
+.adr-borrower-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.4mm 3mm;
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  align-content: start;
+}
+.adr-borrower-fields > div {
+  min-width: 0;
+}
+.adr-borrower-fields .adr-borrower-name,
+.adr-borrower-fields .adr-wide {
+  grid-column: 1 / -1;
+}
+.adr-borrower-fields dt {
+  color: var(--adr-faint);
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.adr-borrower-fields dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.adr-borrower-name dd {
+  font-size: 13pt;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.adr-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.adr-loan {
+  display: flex;
+  flex-direction: column;
+  background: var(--adr-gold-soft);
+  border-color: var(--adr-gold);
+}
+.adr-loan-amount {
+  font-size: 20pt;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.adr-loan-rows {
+  margin: 2.5mm 0 0;
+}
+.adr-loan-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 3mm;
+  padding: 0.9mm 0;
+  border-top: 0.2mm dashed var(--adr-line-strong);
+  font-size: 9pt;
+}
+.adr-loan-rows dt {
+  color: var(--adr-muted);
+}
+.adr-loan-rows dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.adr-loan-rows .adr-loan-net {
+  border-top-style: solid;
+  border-top-color: var(--adr-ink);
+}
+.adr-loan-rows .adr-loan-net dt {
+  color: var(--adr-ink);
+  font-weight: 700;
+}
+
+/* ---------- Articles ---------- */
+.adr-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4mm;
+  margin: 0 0 1.8mm;
+  padding-bottom: 1mm;
+  border-bottom: 0.3mm solid var(--adr-ink);
+  font-size: 9pt;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.adr-section-title span {
+  color: var(--adr-muted);
+  font-size: 8.5pt;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.adr-articles-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4mm;
+  align-items: start;
+}
+.adr-articles-body.has-photos {
+  grid-template-columns: minmax(0, 1fr) 56mm;
+}
+.adr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+}
+.adr-table th {
+  position: static;
+  padding: 1.6mm 2mm;
+  background: var(--adr-ink);
+  color: #ffffff;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.adr-table td {
+  padding: 1.8mm 2mm;
+  border-bottom: 0.2mm solid var(--adr-line);
+  vertical-align: top;
+}
+.adr-table tbody tr:nth-child(even) td {
+  background: var(--adr-fill);
+}
+.adr-table tfoot td {
+  padding: 1.8mm 2mm;
+  border-top: 0.4mm solid var(--adr-ink);
+  border-bottom: 0.4mm solid var(--adr-ink);
+  font-weight: 800;
+}
+.adr-table .adr-c {
+  text-align: center;
+}
+.adr-table .adr-n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.adr-strong {
+  font-weight: 700;
+}
+.adr-item-name {
+  display: block;
+  font-weight: 600;
+}
+.adr-item-sub {
+  display: block;
+  color: var(--adr-faint);
+  font-size: 8pt;
+}
+
+.adr-photos {
+  display: grid;
+  gap: 1.5mm;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.adr-photos figure {
+  margin: 0;
+  aspect-ratio: 1 / 1;
+  border: 0.3mm solid var(--adr-line-strong);
+  border-radius: 1mm;
+  background: var(--adr-fill);
+  overflow: hidden;
+}
+.adr-photos img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* One photo gets the whole panel, three put the first one across the top. */
+.adr-photos--1 figure {
+  grid-column: 1 / -1;
+  aspect-ratio: 4 / 3;
+}
+.adr-photos--3 figure:first-child {
+  grid-column: 1 / -1;
+  aspect-ratio: 2 / 1;
+}
+.adr-photos-caption {
+  grid-column: 1 / -1;
+  color: var(--adr-faint);
+  font-size: 7pt;
+  text-align: center;
+}
+.adr-released {
+  margin: 2mm 0 0;
+  color: var(--adr-muted);
+  font-size: 8.5pt;
+}
+
+/* ---------- Amount in words ---------- */
+.adr-words {
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+  padding: 2mm 3.5mm;
+  border-left: 1mm solid var(--adr-gold);
+  background: var(--adr-gold-soft);
+}
+.adr-words span {
+  flex: 0 0 auto;
+  color: var(--adr-muted);
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.adr-words strong {
+  font-size: 10pt;
+}
+
+/* ---------- Terms ---------- */
+.adr-terms ol {
+  margin: 0;
+  padding-left: 4.5mm;
+  columns: 2;
+  column-gap: 7mm;
+  color: var(--adr-muted);
+  font-size: 8pt;
+}
+.adr-terms li {
+  margin-bottom: 0.8mm;
+  break-inside: avoid;
+}
+.adr-note {
+  margin: 1.5mm 0 0;
+  font-size: 8.5pt;
+  font-weight: 600;
+}
+
+/* ---------- Signatures ---------- */
+.adr-signatures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10mm;
+  margin-top: auto;
+  padding-top: 12mm;
+  font-size: 8.5pt;
+  font-weight: 600;
+  text-align: center;
+}
+.adr-signatures > div {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.adr-sign-line {
+  display: block;
+  margin-bottom: 1.2mm;
+  border-top: 0.3mm solid var(--adr-ink);
+}
+.adr-sign-img {
+  position: absolute;
+  bottom: 5mm;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 34mm;
+  max-height: 12mm;
+  object-fit: contain;
+}
+.adr-footnote {
+  margin: 0;
+  padding-top: 2mm;
+  border-top: 0.2mm solid var(--adr-line);
+  color: var(--adr-faint);
+  font-size: 7pt;
+  text-align: center;
+}
+
+/* Many items: tighten everything so the receipt still fits one page. */
+.adr-root--dense .adr-sheet {
+  gap: 2.5mm;
+}
+.adr-root--dense .adr-table td {
+  padding: 1mm 2mm;
+}
+
+/* ---------- Half-page (A5) payment receipt ---------- */
+.adr-root--a5 {
+  font-size: 8.5pt;
+}
+.adr-root--a5 .adr-sheet {
+  gap: 3.2mm;
+  padding: 7mm 8mm 6mm;
+}
+.adr-root--a5 .adr-header {
+  padding-bottom: 3mm;
+}
+.adr-root--a5 .adr-logo {
+  width: 14mm;
+  height: 14mm;
+}
+.adr-root--a5 .adr-logo--mark {
+  font-size: 11pt;
+}
+.adr-root--a5 .adr-shop h1 {
+  font-size: 13pt;
+}
+.adr-root--a5 .adr-shop p {
+  font-size: 7.5pt;
+}
+.adr-pay-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4mm;
+  font-size: 11pt;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.adr-pay-no {
+  padding: 0.6mm 2.5mm;
+  border: 0.35mm solid var(--adr-ink);
+  border-radius: 1mm;
+  font-size: 9.5pt;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.adr-meta--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.adr-root--a5 .adr-meta > div {
+  padding: 1.4mm 2.5mm;
+}
+.adr-root--a5 .adr-meta strong {
+  font-size: 9pt;
+}
+.adr-pay-party {
+  display: flex;
+  flex-direction: column;
+}
+.adr-pay-party .adr-label {
+  margin-bottom: 0.5mm;
+}
+.adr-pay-name {
+  font-size: 12pt;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.adr-pay-contact {
+  color: var(--adr-muted);
+  font-size: 8pt;
+}
+.adr-pay-amount {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 4mm;
+  padding: 3mm 3.5mm;
+  border: 0.3mm solid var(--adr-gold);
+  border-radius: 1.5mm;
+  background: var(--adr-gold-soft);
+}
+.adr-pay-amount-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.adr-pay-amount-main .adr-label {
+  margin-bottom: 0.5mm;
+}
+.adr-pay-amount-main strong {
+  font-size: 19pt;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.adr-pay-words {
+  margin-top: 1mm;
+  font-size: 8pt;
+  font-weight: 600;
+}
+.adr-pay-split {
+  margin: 0;
+  align-self: center;
+}
+.adr-pay-split > div:first-child {
+  border-top: 0;
+}
+.adr-pay-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 0.3mm solid var(--adr-line);
+  border-radius: 1.5mm;
+}
+.adr-pay-status > div {
+  display: flex;
+  flex-direction: column;
+  padding: 1.6mm 2.5mm;
+  min-width: 0;
+}
+.adr-pay-status > div:nth-child(n + 4) {
+  border-top: 0.3mm solid var(--adr-line);
+}
+.adr-pay-status > div:not(:nth-child(3n + 1)) {
+  border-left: 0.3mm solid var(--adr-line);
+}
+.adr-pay-status span {
+  color: var(--adr-muted);
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.adr-pay-status strong {
+  font-size: 9pt;
+}
+.adr-pay-status .adr-pay-status-wide {
+  grid-column: 1 / -1;
+  border-left: 0;
+}
+.adr-signatures--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20mm;
+}
+.adr-root--a5 .adr-signatures {
+  padding-top: 12mm;
+  font-size: 8pt;
+}
+.adr-root--a5 .adr-footnote {
+  font-size: 7pt;
+}

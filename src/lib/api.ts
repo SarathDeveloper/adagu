@@ -7,6 +7,9 @@ import type {
   ChangePasswordInput,
   CreateUserInput,
   Customer,
+  CustomerDocument,
+  CustomerDocumentKind,
+  CustomerNote,
   CustomerInput,
   DashboardSearchResult,
   MainDashboard,
@@ -41,6 +44,9 @@ import type {
   PledgeTopupInput,
   PledgeUpdateInput,
   PledgeWhatsAppOpenInput,
+  PledgeReminderSkipInput,
+  PledgePaymentReceipt,
+  WhatsAppReceiptResult,
   ResetPasswordInput,
   RecordCounts,
   ShopSettings,
@@ -160,6 +166,25 @@ export const api = {
   updateCustomer: (id: number, input: CustomerInput) =>
     request<Customer>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   deleteCustomer: (id: number) => request<void>(`/api/customers/${id}`, { method: 'DELETE' }),
+  listCustomerDocuments: (id: number) =>
+    request<CustomerDocument[]>(`/api/customers/${id}/documents`),
+  uploadCustomerDocument: async (id: number, kind: CustomerDocumentKind, file: File) => {
+    const body = new FormData()
+    body.append('kind', kind)
+    // Phone photos of a card are several MB; PDFs pass through untouched.
+    body.append('file', await downscaleImageFile(file, kind === 'photo' ? 512 : 1600))
+    return request<CustomerDocument>(`/api/customers/${id}/documents`, { method: 'POST', body })
+  },
+  deleteCustomerDocument: (id: number, documentId: number) =>
+    request<CustomerDocument>(`/api/customers/${id}/documents/${documentId}`, { method: 'DELETE' }),
+  listCustomerNotes: (id: number) => request<CustomerNote[]>(`/api/customers/${id}/notes`),
+  addCustomerNote: (id: number, body: string) =>
+    request<CustomerNote>(`/api/customers/${id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+  deleteCustomerNote: (id: number, noteId: number) =>
+    request<CustomerNote>(`/api/customers/${id}/notes/${noteId}`, { method: 'DELETE' }),
 
   listDues: (search?: string) => request<DuesLedger>(`/api/dues${qs({ q: search })}`),
   createDueEntry: (input: DueEntryInput) =>
@@ -275,6 +300,21 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  skipPledgeReminder: (input: PledgeReminderSkipInput) =>
+    request<{ ok: boolean }>('/api/system/reminders/skip', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  getPledgePaymentReceipt: (paymentId: number) =>
+    request<PledgePaymentReceipt>(`/api/pledges/payments/${paymentId}/receipt`),
+  sendWhatsAppReceipt: (paymentId: number, pdf: Uint8Array) => {
+    const body = new FormData()
+    body.append('file', new Blob([pdf as BlobPart], { type: 'application/pdf' }), 'receipt.pdf')
+    return request<WhatsAppReceiptResult>(`/api/system/whatsapp-receipt/${paymentId}`, {
+      method: 'POST',
+      body,
+    })
+  },
 
   getShopSettings: () => request<ShopSettings>('/api/settings'),
   getRecordCounts: () => request<RecordCounts>('/api/settings/counts'),
@@ -418,7 +458,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `jeweltrackerpro-backup-${localTodayIso()}.db`
+    link.download = `pawndesk-backup-${localTodayIso()}.db`
     link.click()
     URL.revokeObjectURL(url)
   },
@@ -438,7 +478,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `jeweltrackerpro-full-${localTodayIso()}.zip`
+    link.download = `pawndesk-full-${localTodayIso()}.zip`
     link.click()
     URL.revokeObjectURL(url)
   },
@@ -458,7 +498,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `jeweltrackerpro-tables-${localTodayIso()}.xlsx`
+    link.download = `pawndesk-tables-${localTodayIso()}.xlsx`
     link.click()
     URL.revokeObjectURL(url)
   },

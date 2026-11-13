@@ -299,7 +299,7 @@ function schemaVersionOf(db: Database.Database, tables: Set<string>): number {
 }
 
 /**
- * Rejects anything that is not a healthy AdaguTrackerPro backup this build can
+ * Rejects anything that is not a healthy PawnDesk backup this build can
  * open, before the live database is touched.
  */
 export function assertRestorableBackup(filePath: string): void {
@@ -314,7 +314,7 @@ export function assertRestorableBackup(filePath: string): void {
     const tables = listTableNames(db)
     const missing = RESTORE_REQUIRED_TABLES.filter((table) => !tables.has(table))
     if (missing.length > 0) {
-      throw new HttpError(400, 'This file is not an AdaguTrackerPro backup')
+      throw new HttpError(400, 'This file is not an PawnDesk backup')
     }
     if (schemaVersionOf(db, tables) > latestMigrationVersion()) {
       throw new HttpError(
@@ -494,7 +494,7 @@ async function copyExcelBeside(sourceDbPath: string, destDir: string, now: Date)
     // pre-restore snapshot must not grow an extra workbook here.
     const sourceXlsx = excelPathFor(sourceDbPath)
     if (!existsSync(sourceXlsx)) return
-    const destXlsx = join(destDir, `jeweltrackerpro-${localDateIso(now)}.xlsx`)
+    const destXlsx = join(destDir, `pawndesk-${localDateIso(now)}.xlsx`)
     copyFileSync(sourceXlsx, destXlsx)
   } catch (error) {
     logDiagnostic('backup', 'Off-machine Excel copy failed', error)
@@ -512,7 +512,7 @@ async function runScheduledBackup(now: Date): Promise<void> {
     return
   }
   const dir = getBackupsDir()
-  const destinationPath = join(dir, `jeweltrackerpro-${localDateIso(now)}.db`)
+  const destinationPath = join(dir, `pawndesk-${localDateIso(now)}.db`)
   await backupDatabaseTo(destinationPath, { scheduled: true })
   await writeExcelBeside(destinationPath)
   pruneBackupFiles(dir)
@@ -527,7 +527,7 @@ async function runPeriodicBackup(now: Date): Promise<void> {
   const db = getDatabase()
   if (!dataChangedSinceBackup(db)) return
   const dir = getBackupsDir()
-  const destinationPath = join(dir, `jeweltrackerpro-${localDateIso(now)}.db`)
+  const destinationPath = join(dir, `pawndesk-${localDateIso(now)}.db`)
   await backupDatabaseTo(destinationPath)
   await writeExcelBeside(destinationPath)
   pruneBackupFiles(dir)
@@ -547,7 +547,7 @@ function sourceFingerprint(file: BackupFile): string {
 
 async function ensureLocalSnapshot(now = new Date()): Promise<BackupFile> {
   const dir = getBackupsDir()
-  const destinationPath = join(dir, `jeweltrackerpro-${localDateIso(now)}.db`)
+  const destinationPath = join(dir, `pawndesk-${localDateIso(now)}.db`)
   await backupDatabaseTo(destinationPath)
   await writeExcelBeside(destinationPath)
   pruneBackupFiles(dir)
@@ -592,9 +592,9 @@ async function copyAndProve(sourcePath: string, destDir: string, now: Date): Pro
   }
 
   const date = localDateIso(now)
-  const destPath = join(destDir, `jeweltrackerpro-${date}.db`)
+  const destPath = join(destDir, `pawndesk-${date}.db`)
   // Leading "~$" keeps half-written files out of OneDrive/Drive sync clients.
-  const partialPath = join(destDir, `~$jeweltrackerpro-${date}.db.tmp`)
+  const partialPath = join(destDir, `~$pawndesk-${date}.db.tmp`)
   if (existsSync(partialPath)) {
     unlinkSync(partialPath)
   }
@@ -641,7 +641,7 @@ async function runOffsiteCopy(options: { forceFresh?: boolean }, now: Date): Pro
     const fingerprint = sourceFingerprint(newest)
     const lastSource = getShopSetting(getDatabase(), LAST_OFFSITE_SOURCE_KEY, '')
     if (!options.forceFresh && lastSource === fingerprint) {
-      const destXlsx = join(destDir, `jeweltrackerpro-${localDateIso(now)}.xlsx`)
+      const destXlsx = join(destDir, `pawndesk-${localDateIso(now)}.xlsx`)
       if (!existsSync(destXlsx)) {
         await copyExcelBeside(sourcePath, destDir, now)
       }
@@ -695,7 +695,7 @@ export async function runDayCloseBackup(businessDate: string, metal: string): Pr
     await withBackupLock(async () => {
       const now = new Date()
       const slug = metal.trim().toLowerCase().replace(/[^a-z0-9]+/g, '') || 'metal'
-      const name = `jeweltrackerpro-dayclose-${localDateIso(now)}-${slug}-${localTimeStamp(now)}.db`
+      const name = `pawndesk-dayclose-${localDateIso(now)}-${slug}-${localTimeStamp(now)}.db`
       const dir = getBackupsDir()
       await backupDatabaseTo(join(dir, name))
       pruneBackupFiles(dir)
@@ -726,12 +726,13 @@ async function writePrerestoreSnapshot(): Promise<string> {
 }
 
 /**
- * The app only ever stores PNG and JPEG uploads, and /uploads is served on the
- * app's own origin. Anything else in a backup (an .html or .js file, say) would
- * become a page that runs inside the app, so it is never restored.
+ * The app only ever stores PNG and JPEG uploads (plus PDF customer KYC scans),
+ * and /uploads is served on the app's own origin. Anything else in a backup (an
+ * .html or .js file, say) would become a page that runs inside the app, so it is
+ * never restored.
  */
 export function isRestorableUploadName(name: string): boolean {
-  return /^[^/\\]+\.(png|jpe?g)$/i.test(name) && basename(name) === name
+  return /^[^/\\]+\.(png|jpe?g|pdf)$/i.test(name) && basename(name) === name
 }
 
 function copyNewFiles(sourceDir: string, targetDir: string, logLabel: string): void {
@@ -855,8 +856,11 @@ async function runRestore(sourcePath: string, uploadsDir?: string): Promise<Back
   return getBackupStatus()
 }
 
+/** Database entry in a full backup; older zips (and the full app's) use the second name. */
+export const FULL_BACKUP_DB_NAMES = ['pawndesk.db', 'jeweltrackerpro.db'] as const
+
 export function allowFullBackupEntry(name: string): boolean {
-  if (name === 'manifest.json' || name === 'jeweltrackerpro.db') return true
+  if (name === 'manifest.json' || (FULL_BACKUP_DB_NAMES as readonly string[]).includes(name)) return true
   if (!name.startsWith('uploads/')) return false
   const base = name.slice('uploads/'.length)
   return base.length > 0 && !base.includes('/') && isRestorableUploadName(base)
@@ -882,14 +886,14 @@ export function assertFullBackupDestination(filePath: string): string {
 }
 
 export async function writeFullBackup(destinationPath: string): Promise<void> {
-  const scratch = mkdtempSync(join(tmpdir(), 'jtp-full-'))
+  const scratch = mkdtempSync(join(tmpdir(), 'pd-full-'))
   const partialZip = `${destinationPath}.partial`
   try {
-    const dbPath = join(scratch, 'jeweltrackerpro.db')
+    const dbPath = join(scratch, 'pawndesk.db')
     await writeVerifiedSnapshot(getDatabase(), dbPath)
     const manifest = Buffer.from(
       JSON.stringify({
-        app: 'AdaguTrackerPro',
+        app: 'PawnDesk',
         appVersion: getAppVersion(),
         schemaVersion: latestMigrationVersion(),
         createdAt: new Date().toISOString(),
@@ -897,7 +901,7 @@ export async function writeFullBackup(destinationPath: string): Promise<void> {
     )
     const entries: ZipSource[] = [
       { name: 'manifest.json', data: manifest, compress: true },
-      { name: 'jeweltrackerpro.db', filePath: dbPath, compress: true },
+      { name: 'pawndesk.db', filePath: dbPath, compress: true },
     ]
     const uploadsDir = getUploadsDir()
     if (existsSync(uploadsDir)) {
@@ -958,7 +962,7 @@ export function listBackups(): BackupFile[] {
 
 export async function createManualBackup(): Promise<BackupFile> {
   return withBackupLock(async () => {
-    const name = `jeweltrackerpro-manual-${localNowStamp()}.db`
+    const name = `pawndesk-manual-${localNowStamp()}.db`
     const destinationPath = join(getBackupsDir(), name)
     await backupDatabaseTo(destinationPath)
     await writeExcelBeside(destinationPath)

@@ -76,6 +76,8 @@ export function getMigrations(): { version: number; sql: string; disableForeignK
     { version: 66, sql: loadMigrationSql('066_pledge_item_release.sql') },
     { version: 67, sql: loadMigrationSql('067_pledge_item_release_value.sql') },
     { version: 68, sql: loadMigrationSql('068_pledge_topup_order.sql') },
+    { version: 69, sql: loadMigrationSql('069_customer_documents_notes.sql') },
+    { version: 70, sql: loadMigrationSql('070_reminder_queue_upi.sql') },
   ]
 }
 

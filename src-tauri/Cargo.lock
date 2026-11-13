@@ -1784,22 +1784,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "jeweltrackerpro"
-version = "1.0.0"
-dependencies = [
- "dirs 6.0.0",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-shell",
- "tauri-plugin-single-instance",
- "webview2-com",
- "windows-core",
-]
-
-[[package]]
 name = "jiff"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2480,6 +2464,22 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link",
+]
+
+[[package]]
+name = "pawndesk"
+version = "1.0.0"
+dependencies = [
+ "dirs 6.0.0",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-shell",
+ "tauri-plugin-single-instance",
+ "webview2-com",
+ "windows-core",
 ]
 
 [[package]]

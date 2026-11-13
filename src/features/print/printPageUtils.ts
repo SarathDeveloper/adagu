@@ -31,7 +31,10 @@ async function decodeImage(img: HTMLImageElement): Promise<void> {
 }
 
 const PAGE_HEIGHT_MM = { a4: 297, a5: 210 } as const
-const MAX_FIT_ATTEMPTS = 3
+/** Smallest shrink tried; below this a sheet is unreadable anyway. */
+const MIN_FIT_SCALE = 0.3
+/** Binary-search steps: 10 halvings pin the scale to within 0.1%. */
+const FIT_SEARCH_STEPS = 10
 
 function pageHeightPx(paper: keyof typeof PAGE_HEIGHT_MM): number {
   const probe = document.createElement('div')
@@ -50,10 +53,23 @@ function setImportant(element: HTMLElement, property: string, value: string): vo
   element.style.setProperty(property, value, 'important')
 }
 
+/** Natural height of the sheet when laid out `width` px wide. */
+function sheetHeightAt(sheet: HTMLElement, width: number): number {
+  setImportant(sheet, 'width', `${width}px`)
+  setImportant(sheet, 'height', 'auto')
+  setImportant(sheet, 'max-height', 'none')
+  setImportant(sheet, 'min-height', '0px')
+  setImportant(sheet, 'overflow', 'visible')
+  return sheet.scrollHeight
+}
+
 /**
- * Shrinks an opted-in bill so a long table still lands on one sheet. Widening
- * the sheet by the same factor keeps the table the full page width after the
- * scale, and the raised min-height keeps the signature row at the foot.
+ * Shrinks an opted-in bill so a long table still lands on one sheet. The sheet
+ * is laid out wider by the same factor it is scaled down, so the table still
+ * spans the full page width; because wider text wraps less, the scale is
+ * searched for (the largest one whose reflowed sheet fits) rather than taken
+ * from the first measurement, which would shrink far more than needed. The
+ * raised min-height then keeps the signature row at the foot.
  * Reports omit the attribute and keep paginating.
  */
 export function fitPrintSheetToPage(): void {
@@ -67,26 +83,37 @@ export function fitPrintSheetToPage(): void {
 
   const pageHeight = pageHeightPx(paper)
   if (pageHeight <= 0) return
+  if (sheet.scrollHeight <= pageHeight + 1) return
+  const rootWidth = root.clientWidth
+  if (rootWidth <= 0) return
 
-  let scale = 1
-  for (let attempt = 0; attempt < MAX_FIT_ATTEMPTS; attempt += 1) {
-    const layoutHeight = sheet.scrollHeight
-    if (layoutHeight * scale <= pageHeight + 1) return
-    const rootWidth = root.clientWidth
-    if (rootWidth <= 0) return
-    scale = pageHeight / layoutHeight
-    setImportant(sheet, 'width', `${rootWidth / scale}px`)
-    setImportant(sheet, 'height', 'auto')
-    setImportant(sheet, 'max-height', 'none')
-    setImportant(sheet, 'min-height', `${pageHeight / scale}px`)
-    setImportant(sheet, 'overflow', 'visible')
+  const fits = (scale: number) => sheetHeightAt(sheet, rootWidth / scale) * scale <= pageHeight + 1
+  let low = MIN_FIT_SCALE
+  let high = 1
+  if (fits(high)) {
+    low = high
+  } else {
+    for (let step = 0; step < FIT_SEARCH_STEPS; step += 1) {
+      const middle = (low + high) / 2
+      if (fits(middle)) low = middle
+      else high = middle
+    }
+  }
+  const scale = low
+
+  setImportant(sheet, 'width', `${rootWidth / scale}px`)
+  setImportant(sheet, 'height', 'auto')
+  setImportant(sheet, 'max-height', 'none')
+  setImportant(sheet, 'min-height', `${pageHeight / scale}px`)
+  setImportant(sheet, 'overflow', 'visible')
+  if (scale < 1) {
     setImportant(sheet, 'transform', `scale(${scale})`)
     setImportant(sheet, 'transform-origin', 'top left')
-    setImportant(root, 'height', `${pageHeight}px`)
-    setImportant(root, 'max-height', `${pageHeight}px`)
-    setImportant(root, 'overflow', 'hidden')
-    root.dataset.printFitted = '1'
   }
+  setImportant(root, 'height', `${pageHeight}px`)
+  setImportant(root, 'max-height', `${pageHeight}px`)
+  setImportant(root, 'overflow', 'hidden')
+  root.dataset.printFitted = '1'
 }
 
 export async function waitForPrintLayout(): Promise<void> {

@@ -144,7 +144,7 @@ describe('security fixes', () => {
     it('folds newlines in crash messages so log lines cannot be forged', async () => {
       const res = await newTestAgent()
         .post('/api/diagnostics/host')
-        .send({ message: 'WebView died\n[2026-01-01] JTP-ERR fake entry', fatal: true })
+        .send({ message: 'WebView died\n[2026-01-01] PD-ERR fake entry', fatal: true })
       expect(res.status).toBe(200)
       const pending = await newTestAgent().get('/api/diagnostics/pending')
       expect(pending.body.message).not.toMatch(/\n/)
@@ -163,7 +163,7 @@ describe('security fixes', () => {
       expect((await getTestAgent().get('/api/backup/export')).status).toBe(403)
       expect((await getTestAgent().get('/api/backup/export-excel')).status).toBe(403)
       expect(
-        (await getTestAgent().post('/api/backup/restore-local').send({ name: 'jeweltrackerpro-2026-01-01.db' }))
+        (await getTestAgent().post('/api/backup/restore-local').send({ name: 'pawndesk-2026-01-01.db' }))
           .status,
       ).toBe(403)
       expect(
@@ -206,18 +206,20 @@ describe('security fixes', () => {
       expect(after.n).toBe(before.n)
     })
 
-    it('only restores PNG and JPEG files into uploads', () => {
+    it('only restores PNG, JPEG and PDF files into uploads', () => {
       expect(allowFullBackupEntry('uploads/photo.png')).toBe(true)
       expect(allowFullBackupEntry('uploads/photo.JPG')).toBe(true)
+      expect(allowFullBackupEntry('uploads/aadhaar.pdf')).toBe(true)
+      expect(allowFullBackupEntry('uploads/scan.upload')).toBe(false)
       expect(allowFullBackupEntry('uploads/page.html')).toBe(false)
       expect(allowFullBackupEntry('uploads/script.js')).toBe(false)
       expect(allowFullBackupEntry('uploads/photo.png.html')).toBe(false)
     })
 
     it('recovers the database left aside by an interrupted replace', () => {
-      const dir = mkdtempSync(join(tmpdir(), 'jtp-recover-'))
+      const dir = mkdtempSync(join(tmpdir(), 'pd-recover-'))
       try {
-        const dbPath = join(dir, 'jeweltrackerpro.db')
+        const dbPath = join(dir, 'pawndesk.db')
         writeFileSync(`${dbPath}.replacing`, 'previous data')
         recoverInterruptedReplace(dbPath)
         expect(existsSync(dbPath)).toBe(true)
@@ -251,7 +253,7 @@ describe('security fixes', () => {
       })
       expect(pledge.status).toBe(201)
 
-      process.env.JEWELTRACKERPRO_NO_OPEN = '1'
+      process.env.PAWNDESK_NO_OPEN = '1'
       try {
         const wrongNumber = await getTestAgent()
           .post('/api/system/open-whatsapp')
@@ -271,7 +273,7 @@ describe('security fixes', () => {
           .send({ pledgeId: pledge.body.id, url: 'https://wa.me/919300000001?text=hello' })
         expect(denied.status).toBe(403)
       } finally {
-        delete process.env.JEWELTRACKERPRO_NO_OPEN
+        delete process.env.PAWNDESK_NO_OPEN
       }
     })
   })

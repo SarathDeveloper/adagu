@@ -16,7 +16,9 @@ import { formatCurrency, formatDisplayDate } from '../../lib/format'
 import { api } from '../../lib/api'
 import { AdaguDueDetailDrawer } from '../dues/AdaguDueDetailDrawer'
 import { AuctionModal } from '../dues/AuctionModal'
+import { latestPaymentId } from '../dues/duesHelpers'
 import { InterestCollectionModal } from '../dues/InterestCollectionModal'
+import { PaymentReceiptModal } from '../dues/PaymentReceiptModal'
 import { PLEDGE_COLLECTION_MODES } from '../dues/pledgePaymentModes'
 import { RenewModal } from '../dues/RenewModal'
 import { ShortfallModal } from '../dues/ShortfallModal'
@@ -32,12 +34,15 @@ export function CustomerAdaguLoanActions({
   onViewTargetChange,
   onReload,
   onError,
+  collectRequest = null,
 }: {
   viewTarget: AdaguDueSummary | null
   payments: DueEntry[]
   onViewTargetChange: (summary: AdaguDueSummary | null) => void
   onReload: () => Promise<DuesLedger>
   onError: (message: string | null) => void
+  /** Set to a fresh object to open interest collection for that loan straight away. */
+  collectRequest?: AdaguDueSummary | null
 }) {
   const { showToast } = useToast()
 
@@ -53,6 +58,12 @@ export function CustomerAdaguLoanActions({
   const [billTarget, setBillTarget] = useState<number | null>(null)
   const [releaseTarget, setReleaseTarget] = useState<number | null>(null)
   const [interestTarget, setInterestTarget] = useState<AdaguDueSummary | null>(null)
+  const [receiptPaymentId, setReceiptPaymentId] = useState<number | null>(null)
+  const [handledCollectRequest, setHandledCollectRequest] = useState<AdaguDueSummary | null>(null)
+  if (collectRequest && collectRequest !== handledCollectRequest) {
+    setHandledCollectRequest(collectRequest)
+    setInterestTarget(collectRequest)
+  }
   const [topupTarget, setTopupTarget] = useState<AdaguDueSummary | null>(null)
   const [renewTarget, setRenewTarget] = useState<AdaguDueSummary | null>(null)
   const [shortfallTarget, setShortfallTarget] = useState<AdaguDueSummary | null>(null)
@@ -98,6 +109,8 @@ export function CustomerAdaguLoanActions({
 
   async function reloadAndSyncView(pledgeId: number) {
     const data = await onReload()
+    // An action started from the page (not the drawer) must not open the drawer.
+    if (!viewTarget) return data
     onViewTargetChange(
       (data.adaguDues ?? []).find((row) => row.pledgeId === pledgeId) ?? null,
     )
@@ -117,6 +130,7 @@ export function CustomerAdaguLoanActions({
     amount: number
     collectedDate: string
     mode: PledgePaymentMode
+    reference: string
   }) {
     if (!interestTarget) return
     try {
@@ -127,6 +141,7 @@ export function CustomerAdaguLoanActions({
         collectedDate: input.collectedDate,
         amount: input.amount,
         mode: input.mode,
+        reference: input.reference,
       })
       setInterestTarget(null)
       showToast(
@@ -135,6 +150,7 @@ export function CustomerAdaguLoanActions({
       )
       await reloadAndSyncView(interestTarget.pledgeId)
       if (updated.status === 'redeemed') setReleaseTarget(updated.id)
+      else setReceiptPaymentId(latestPaymentId(updated))
     } catch (err) {
       fail(err instanceof Error ? err.message : 'Failed to collect interest')
     } finally {
@@ -384,6 +400,10 @@ export function CustomerAdaguLoanActions({
           onClose={() => setInterestTarget(null)}
           onSubmit={(input) => void collectInterest(input)}
         />
+      ) : null}
+
+      {receiptPaymentId ? (
+        <PaymentReceiptModal paymentId={receiptPaymentId} onClose={() => setReceiptPaymentId(null)} />
       ) : null}
 
       {topupTarget ? (

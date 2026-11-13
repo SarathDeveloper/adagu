@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 320" role="img" aria-label="PawnDesk">
+  <defs>
+    <linearGradient id="pd-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b4cf6"/>
+      <stop offset="1" stop-color="#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="pd-gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f2b33d"/>
+    </linearGradient>
+  </defs>
+  <!-- Mark, 512 artboard scaled to 256 -->
+  <g transform="translate(32 32) scale(0.5)">
+    <rect width="512" height="512" rx="112" fill="url(#pd-bg)"/>
+    <rect x="104" y="378" width="304" height="26" rx="13" fill="url(#pd-gold)"/>
+    <circle cx="256" cy="272" r="80" fill="none" stroke="url(#pd-gold)" stroke-width="30"/>
+    <polygon points="214,122 298,122 322,152 256,214 190,152" fill="#ffffff"/>
+    <polygon points="214,122 298,122 322,152 190,152" fill="#ede4ff"/>
+    <path d="M190 152 H322 M236 122 L222 152 L256 214 L290 152 L276 122"
+          fill="none" stroke="#7e3af2" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="332" y="196" font-family="'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif"
+        font-size="148" font-weight="700" letter-spacing="-3">
+    <tspan fill="#1f1235">Pawn</tspan><tspan fill="#7e3af2">Desk</tspan>
+  </text>
+  <text x="338" y="256" font-family="'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif"
+        font-size="36" font-weight="500" letter-spacing="6" fill="#6b5b85">GOLD LOANS · SAVINGS · LEDGER</text>
+</svg>

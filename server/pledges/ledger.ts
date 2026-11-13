@@ -29,6 +29,7 @@ export type PledgePaymentDbRow = {
   principal_part: number
   discount: number
   note: string
+  reference?: string | null
   created_at: string
 }
 
@@ -44,6 +45,7 @@ export function mapPledgePayment(row: PledgePaymentDbRow): PledgePayment {
     principalPart: row.principal_part,
     discount: row.discount,
     note: row.note ?? '',
+    reference: row.reference ?? '',
     createdAt: row.created_at,
   }
 }
@@ -93,7 +95,7 @@ export function loadPledgePayments(
   const rows = db
     .prepare(
       `SELECT id, pledge_id, payment_date, kind, mode, amount, interest_part,
-              principal_part, discount, note, created_at
+              principal_part, discount, note, reference, created_at
        FROM pledge_payments
        WHERE pledge_id = ?
        ORDER BY payment_date ASC, id ASC`,

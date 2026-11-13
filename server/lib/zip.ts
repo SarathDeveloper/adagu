@@ -25,7 +25,7 @@ for (let i = 0; i < 256; i++) {
   CRC_TABLE[i] = crc >>> 0
 }
 
-const NOT_A_BACKUP = 'This file is not an AdaguTrackerPro backup'
+const NOT_A_BACKUP = 'This file is not an PawnDesk backup'
 const DAMAGED = 'Backup file is damaged and cannot be used'
 const MAX_ZIP_ENTRY_BYTES = 2 * 1024 * 1024 * 1024
 const FLAG_UTF8_AND_DESCRIPTOR = 0x0808

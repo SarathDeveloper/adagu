@@ -2,11 +2,13 @@ import type { BackupKind } from './types'
 
 export const BACKUP_EXTENSION_RE = /\.db$/i
 
-const DAILY_RE = /^jeweltrackerpro-(\d{4})-(\d{2})-(\d{2})\.db$/
-const MANUAL_RE = /^jeweltrackerpro-manual-(\d{8})-(\d{6})\.db$/
-const DAYCLOSE_RE = /^jeweltrackerpro-dayclose-(\d{4})-(\d{2})-(\d{2})-[a-z]+-(\d{6})\.db$/
-const PRERESTORE_RE = /^jeweltrackerpro-prerestore-(\d{8})-(\d{6})\.db$/
-const PREMIGRATE_RE = /^jeweltrackerpro-premigrate-v(\d+)-(\d{8})-(\d{6})\.db$/
+// Backups made before the PawnDesk rename start with "jeweltrackerpro-"; they
+// keep being listed, restored and pruned like new ones.
+const DAILY_RE = /^(?:pawndesk|jeweltrackerpro)-(\d{4})-(\d{2})-(\d{2})\.db$/
+const MANUAL_RE = /^(?:pawndesk|jeweltrackerpro)-manual-(\d{8})-(\d{6})\.db$/
+const DAYCLOSE_RE = /^(?:pawndesk|jeweltrackerpro)-dayclose-(\d{4})-(\d{2})-(\d{2})-[a-z]+-(\d{6})\.db$/
+const PRERESTORE_RE = /^(?:pawndesk|jeweltrackerpro)-prerestore-(\d{8})-(\d{6})\.db$/
+const PREMIGRATE_RE = /^(?:pawndesk|jeweltrackerpro)-premigrate-v(\d+)-(\d{8})-(\d{6})\.db$/
 
 /** Per-kind caps applied in addition to the daily week/month tiers. */
 export const BACKUP_KIND_CAPS: Record<BackupKind, number> = {

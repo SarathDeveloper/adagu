@@ -8,6 +8,19 @@ const apiPort = process.env.PORT || '3000'
 const apiTarget = `http://127.0.0.1:${apiPort}`
 
 /**
+ * Forward /api and /uploads with the browser's own Host header.
+ *
+ * A bare string target makes Vite set `changeOrigin: true`, which rewrites Host
+ * to the API's port while Origin still names the Vite port. The API's
+ * same-origin write check (server/lib/requestGuards.ts) then refuses every
+ * POST/PUT/DELETE with "Cross-origin request refused".
+ */
+const apiProxy = {
+  '/api': { target: apiTarget, changeOrigin: false },
+  '/uploads': { target: apiTarget, changeOrigin: false },
+}
+
+/**
  * This folder, with the drive letter cased the way the file system reports it.
  *
  * Vite takes its root from process.cwd(), and a Windows terminal opened as
@@ -31,7 +44,7 @@ const projectRoot = realpathSync.native(__dirname)
  */
 function printDocumentPlugin(): Plugin {
   return {
-    name: 'jeweltrackerpro-print-document',
+    name: 'pawndesk-print-document',
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
         const url = req.url ?? ''
@@ -70,17 +83,11 @@ export default defineConfig({
     // Desktop and web dev load http://127.0.0.1:5173 — bind IPv4 explicitly (localhost may be IPv6-only).
     host: '127.0.0.1',
     port: 5173,
-    proxy: {
-      '/api': apiTarget,
-      '/uploads': apiTarget,
-    },
+    proxy: apiProxy,
   },
   preview: {
     host: '127.0.0.1',
     port: 4173,
-    proxy: {
-      '/api': apiTarget,
-      '/uploads': apiTarget,
-    },
+    proxy: apiProxy,
   },
 })

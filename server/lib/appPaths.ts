@@ -26,7 +26,7 @@ function looksLikeAppRoot(dir: string): boolean {
 }
 
 export function getAppRoot(): string {
-  const override = process.env.JEWELTRACKERPRO_APP_ROOT
+  const override = process.env.PAWNDESK_APP_ROOT
   if (override) {
     if (looksLikeAppRoot(override)) {
       return override
@@ -67,7 +67,7 @@ export function getAppVersion(): string {
 }
 
 export function getMigrationsDir(): string {
-  const override = process.env.JEWELTRACKERPRO_MIGRATIONS_DIR
+  const override = process.env.PAWNDESK_MIGRATIONS_DIR
   const appRoot = getAppRoot()
   const here = currentModuleDir()
   const candidates = [

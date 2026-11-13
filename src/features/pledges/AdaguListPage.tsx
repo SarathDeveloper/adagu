@@ -154,18 +154,6 @@ export function AdaguListPage() {
           <p className="page-subtitle muted">Pledge and loan receipts</p>
         </div>
         <div className="toolbar page-header-actions billing-header-tools">
-          <label className="billing-search">
-            <Search size={16} strokeWidth={2} aria-hidden />
-            <input
-              className="input"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                resetPage()
-              }}
-              placeholder="Search receipt, customer, mobile..."
-            />
-          </label>
           <DateInput
             className="input"
             value={selectedDate}
@@ -193,13 +181,15 @@ export function AdaguListPage() {
           header={
             <div className="billing-toolbar">
               <FilterBar
+                className="filter-bar--segmented"
                 value={statusFilter}
                 onChange={(value) => {
                   setStatusFilter(value)
                   resetPage()
                 }}
                 options={[
-                  { value: 'all', label: `All (${totalRows})` },
+                  // The total is for the current filter, so only "All" carries it.
+                  { value: 'all', label: 'All', ...(statusFilter === 'all' ? { count: totalRows } : {}) },
                   { value: 'draft', label: 'Draft' },
                   { value: 'active', label: 'Active' },
                   { value: 'redeemed', label: 'Redeemed' },
@@ -208,10 +198,23 @@ export function AdaguListPage() {
                 ]}
               />
               <div className="billing-toolbar-filters">
-                <label className="billing-filter-field billing-period-field">
-                  <Calendar size={15} strokeWidth={2} aria-hidden />
-                  <select
+                <label className="billing-search adagu-search">
+                  <Search size={16} strokeWidth={2} aria-hidden />
+                  <input
                     className="input"
+                    value={search}
+                    aria-label="Search receipts"
+                    onChange={(event) => {
+                      setSearch(event.target.value)
+                      resetPage()
+                    }}
+                    placeholder="Search receipt, customer, mobile..."
+                  />
+                </label>
+                <label className="adagu-period">
+                  <Calendar size={15} strokeWidth={2} aria-hidden />
+                  <span className="adagu-period-label">Period</span>
+                  <select
                     value={period}
                     aria-label="Period"
                     onChange={(event) => {
@@ -224,7 +227,7 @@ export function AdaguListPage() {
                     <option value="all">All</option>
                   </select>
                 </label>
-                <button type="button" className="btn secondary" onClick={resetFilters}>
+                <button type="button" className="adagu-reset-link" onClick={resetFilters}>
                   Reset
                 </button>
               </div>
@@ -265,17 +268,17 @@ export function AdaguListPage() {
                       className="billing-sort"
                       onClick={() => setDateSort((value) => (value === 'desc' ? 'asc' : 'desc'))}
                     >
-                      Receipt / Date
+                      Receipt
                       <span aria-hidden>{dateSort === 'desc' ? ' ↓' : ' ↑'}</span>
                     </button>
                   </th>
                   <th>Customer</th>
-                  <th className="adagu-col-gold">Pledged gold</th>
+                  <th>Status</th>
+                  <th className="num adagu-col-gold">Pledged gold</th>
                   <th className="num">Loan</th>
                   <th className="num">Balance</th>
                   <th className="adagu-col-due">Due date</th>
-                  <th>Status</th>
-                  <th className="num">Actions</th>
+                  <th className="num" aria-label="Actions" />
                 </tr>
               </thead>
               <tbody>
@@ -325,8 +328,14 @@ export function AdaguListPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="adagu-col-gold adagu-tabular">
-                        <div className="adagu-cell-stack">
+                      <td>
+                        <span className={`adagu-status adagu-status--${status.tone}`}>
+                          <span className="adagu-status-dot" aria-hidden />
+                          {status.label}
+                        </span>
+                      </td>
+                      <td className="num adagu-col-gold adagu-tabular">
+                        <div className="adagu-cell-stack adagu-cell-stack--end">
                           <span className="adagu-cell-primary">
                             {netWeight > 0 ? formatWeight(netWeight, 3) : '—'}
                           </span>
@@ -352,7 +361,7 @@ export function AdaguListPage() {
                               Closed {formatDisplayDate(pledge.redeemedDate)}
                             </span>
                           ) : (
-                            <span className="muted">-</span>
+                            <span className="muted">—</span>
                           )}
                         </div>
                       </td>
@@ -369,14 +378,8 @@ export function AdaguListPage() {
                             ) : null}
                           </div>
                         ) : (
-                          <span className="muted">-</span>
+                          <span className="muted">—</span>
                         )}
-                      </td>
-                      <td>
-                        <span className={`adagu-status adagu-status--${status.tone}`}>
-                          <span className="adagu-status-dot" aria-hidden />
-                          {status.label}
-                        </span>
                       </td>
                       <td className="num" onClick={(event) => event.stopPropagation()}>
                         <div className="row-actions">

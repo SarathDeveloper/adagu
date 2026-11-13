@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Calculator,
@@ -75,7 +75,7 @@ import { roundMoney } from "@shared/billing/pricing";
 type EditorItem = PledgeItemInput & { key: string };
 
 const DEFAULT_PLEDGE_TYPE = "GOLD JEWELLERY";
-const DEFAULT_INTEREST_PCT = 2.1;
+const DEFAULT_INTEREST_PCT = 2;
 const GOLD_PURITIES = ["24K", "22K", "18K", "14K"] as const;
 const SILVER_PURITIES = ["999", "925", "900"] as const;
 
@@ -113,6 +113,8 @@ export function PledgeEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isNew = !id;
+  const [searchParams] = useSearchParams();
+  const presetCustomerId = Number(searchParams.get("customer") ?? 0);
   const { showToast } = useToast();
   const { isAdmin } = useAuth();
 
@@ -233,6 +235,9 @@ export function PledgeEditorPage() {
         setCustomers(list);
         if (isNew) {
           setInterestPct(shop.adaguInterestPct);
+          // Opened from a customer's page ("New Adagu"): start with that borrower.
+          const preset = list.find((c) => c.id === presetCustomerId);
+          if (preset) applyCustomerBorrower(preset);
         }
       } catch (err) {
         if (active) {
@@ -245,6 +250,8 @@ export function PledgeEditorPage() {
     return () => {
       active = false;
     };
+    // Runs once per editor; the preset only seeds a new receipt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew]);
 
   useEffect(() => {

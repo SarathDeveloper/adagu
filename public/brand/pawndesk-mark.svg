@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PawnDesk">
+  <defs>
+    <linearGradient id="pd-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b4cf6"/>
+      <stop offset="1" stop-color="#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="pd-gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f2b33d"/>
+    </linearGradient>
+  </defs>
+  <!-- Tile -->
+  <rect width="512" height="512" rx="112" fill="url(#pd-bg)"/>
+  <!-- Counter (the desk) -->
+  <rect x="104" y="378" width="304" height="26" rx="13" fill="url(#pd-gold)"/>
+  <!-- Ring band resting on the counter -->
+  <circle cx="256" cy="272" r="80" fill="none" stroke="url(#pd-gold)" stroke-width="30"/>
+  <!-- Cut stone set on the ring -->
+  <polygon points="214,122 298,122 322,152 256,214 190,152" fill="#ffffff"/>
+  <polygon points="214,122 298,122 322,152 190,152" fill="#ede4ff"/>
+  <path d="M190 152 H322 M236 122 L222 152 L256 214 L290 152 L276 122"
+        fill="none" stroke="#7e3af2" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

@@ -13,31 +13,36 @@ const ADAGU_TABS = [
  */
 export function AdaguLayout() {
   const location = useLocation()
+  // The receipts list has its own "New Adagu" button, so the tab bar only
+  // shows on the other Adagu screens (as the way back to Receipts).
+  const showTabs = location.pathname !== '/adagu'
 
   return (
     <div className="inventory-shell">
-      <div className="billing-chrome">
-        <div className="billing-chrome-tabs" role="tablist" aria-label="Adagu">
-          {ADAGU_TABS.map((tab) => {
-            const selected = location.pathname === tab.to
-            return (
-              <NavLink
-                key={tab.to}
-                to={tab.to}
-                end
-                role="tab"
-                aria-selected={selected}
-                className={() => `billing-chrome-tab${selected ? ' active' : ''}`}
-              >
-                <span className="billing-chrome-tab-icon" aria-hidden>
-                  <tab.icon size={18} strokeWidth={1.75} />
-                </span>
-                <span className="billing-chrome-tab-label">{tab.label}</span>
-              </NavLink>
-            )
-          })}
+      {showTabs ? (
+        <div className="billing-chrome">
+          <div className="billing-chrome-tabs" role="tablist" aria-label="Adagu">
+            {ADAGU_TABS.map((tab) => {
+              const selected = location.pathname === tab.to
+              return (
+                <NavLink
+                  key={tab.to}
+                  to={tab.to}
+                  end
+                  role="tab"
+                  aria-selected={selected}
+                  className={() => `billing-chrome-tab${selected ? ' active' : ''}`}
+                >
+                  <span className="billing-chrome-tab-icon" aria-hidden>
+                    <tab.icon size={18} strokeWidth={1.75} />
+                  </span>
+                  <span className="billing-chrome-tab-label">{tab.label}</span>
+                </NavLink>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
       <Outlet />
     </div>
   )

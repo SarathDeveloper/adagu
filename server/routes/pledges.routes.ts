@@ -56,6 +56,7 @@ import { loadPledgeAuction } from '../pledges/auctions'
 import { loadPledgeCore, loadPledgePayments } from '../pledges/ledger'
 import { addPledgePhoto, deletePledgePhoto, loadPledgePhotos } from '../pledges/photos'
 import { computePledgePayoff, deleteLatestPledgePayment, recordPledgePayment } from '../pledges/payments'
+import { buildPledgePaymentReceipt } from '../pledges/paymentReceipt'
 import { buildPledgeReminders } from '../pledges/reminders'
 import { loadPledgeTopups } from '../pledges/topups'
 import { getLatestMetalRates } from './metalRates.routes'
@@ -676,6 +677,7 @@ router.post(
         mode: input.mode ?? 'cash',
         kind: interestOnly ? 'interest' : 'part',
         note: interestOnly ? 'Interest collected' : 'Partial collection',
+        reference: input.reference ?? '',
       })
       return mapPledge(db, getPledgeRow(db, id))
     })
@@ -772,6 +774,13 @@ router.delete(
       return mapPledge(db, getPledgeRow(db, id))
     })
     res.json(tx())
+  }),
+)
+
+router.get(
+  '/payments/:paymentId/receipt',
+  asyncHandler((req, res) => {
+    res.json(buildPledgePaymentReceipt(getDatabase(), parseIdParam(req.params.paymentId)))
   }),
 )
 

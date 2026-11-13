@@ -1,6 +1,6 @@
-# AdaguTrackerPro — User Manual
+# PawnDesk — User Manual
 
-This guide is for counter staff and the shop owner. It walks through AdaguTrackerPro the way the screens are laid out: sign in, set up the shop, then run pledge loans and monthly gold savings.
+This guide is for counter staff and the shop owner. It walks through PawnDesk the way the screens are laid out: sign in, set up the shop, then run pledge loans and monthly gold savings.
 
 Dates in the app look like **9 Oct 2026** (day, 3-letter month, year). Gold weights show three decimals.
 
@@ -30,7 +30,7 @@ The 11.300 g in the payout row is 10.800 g accumulated plus a 0.500 g bonus for 
 
 ## 1. What this app does
 
-AdaguTrackerPro runs two parts of the shop:
+PawnDesk runs two parts of the shop:
 
 - **Adagu** — a pledge loan. You record the jewellery, sanction a loan, collect monthly interest, add extra cash, renew, redeem and return the gold, or send the loan to auction.
 - **Gold Savings** — a monthly scheme. The customer pays installments, gold grams accumulate, and at the end you pay the value out in money.
@@ -45,7 +45,7 @@ A new install also asks an administrator to enter the shop name before anyone ca
 
 ### Sign in
 
-1. Open the app. The title is your shop name, or **AdaguTrackerPro** until the shop is set up.
+1. Open the app. The title is your shop name, or **PawnDesk** until the shop is set up.
 2. Enter **Username** and **Password**.
 3. Click **Sign in**.
 

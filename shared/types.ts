@@ -52,6 +52,28 @@ export interface Customer {
   createdAt: string
 }
 
+export type CustomerDocumentKind = 'photo' | 'aadhaar' | 'pan'
+
+export interface CustomerDocument {
+  id: number
+  customerId: number
+  kind: CustomerDocumentKind
+  /** Relative /uploads path the file is served from. */
+  path: string
+  mimeType: string
+  originalName: string
+  createdAt: string
+}
+
+export interface CustomerNote {
+  id: number
+  customerId: number
+  body: string
+  /** Username of whoever wrote it; empty for notes carried over from the old field. */
+  createdBy: string
+  createdAt: string
+}
+
 export interface CustomerInput {
   name: string
   phone: string
@@ -107,6 +129,12 @@ export interface ShopSettings {
   adaguAuctionNoticeDays: number
   adaguRequireKyc: boolean
   adaguReminderTemplate: string
+  /** WhatsApp message sent with an interest receipt PDF. */
+  adaguReceiptTemplate: string
+  /** Shop UPI ID for exact-amount QR codes; empty turns UPI QR off. */
+  upiId: string
+  /** Name shown in the customer's UPI app; defaults to the shop name. */
+  upiPayeeName: string
   pawnbrokerLicenseNo: string
   setupSkipped: boolean
 }
@@ -222,6 +250,14 @@ export interface AdaguDueSummary {
   auctionNoticeDate?: string | null
   auctionDate?: string | null
   topups: PledgeTopup[]
+  /** Repayment due date set on the receipt, if any. */
+  repaymentDueDate?: string | null
+  /** Amount first lent on the receipt (before top-ups and repayments). */
+  loanAmount?: number
+  /** Net weight (g) of the jewels still held on the loan. */
+  goldWeight?: number
+  /** Number of jewels still held on the loan. */
+  itemCount?: number
 }
 
 export interface DuesLedger {
@@ -363,7 +399,37 @@ export interface PledgePayment {
   principalPart: number
   discount: number
   note: string
+  /** UPI / bank transaction reference typed at the counter. */
+  reference: string
   createdAt: string
+}
+
+/** Everything an interest/part-payment receipt prints. */
+export interface PledgePaymentReceipt {
+  payment: PledgePayment
+  pledgeId: number
+  receiptNo: string
+  pledgeDate: string
+  loanAmount: number
+  interestPct: number
+  customerName: string
+  customerPhone: string
+  customerAddress: string
+  guardianName: string
+  /** State of the loan right after this payment. */
+  principalAfter: number
+  interestPaidUpto: string
+  nextInterestDue: string
+  status: PledgeStatus
+}
+
+/** Result of preparing a receipt for WhatsApp. */
+export interface WhatsAppReceiptResult {
+  ok: boolean
+  /** The PDF is on the clipboard, ready to paste into the chat. */
+  copied: boolean
+  /** Where the PDF was saved. */
+  filePath: string
 }
 
 /** Replayed interest state of a pledge at a given date. */
@@ -461,11 +527,22 @@ export interface PledgeReminderEntry {
   lastRemindedAt: string | null
   /** Ready-to-open WhatsApp link built from the shop reminder template. */
   whatsappUrl: string | null
+  /** Morning-queue group: overdue, due today, due this week, or later. */
+  bucket: 'overdue' | 'today' | 'week' | 'later'
+  /** A reminder for this loan was already sent today. */
+  remindedToday: boolean
+  /** It was skipped in today's queue (and not sent since). */
+  skippedToday: boolean
 }
 
 export interface PledgeWhatsAppOpenInput {
   pledgeId: number
   url: string
+  kind?: string
+}
+
+export interface PledgeReminderSkipInput {
+  pledgeId: number
   kind?: string
 }
 
@@ -565,6 +642,8 @@ export interface PledgeCollectInput {
   collectedDate: string
   amount: number
   mode?: PledgePaymentMode
+  /** UPI / bank transaction reference. */
+  reference?: string
 }
 
 export interface PledgeForfeitInput {

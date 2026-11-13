@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { FileDown, Printer } from 'lucide-react'
 import { Modal } from '../../components/Modal'
 import { downloadPrintDocument } from './downloadPrintPdf'
@@ -19,6 +19,9 @@ export function PrintPreviewModal({
   onPrint,
   printLabel = 'Print',
   pdfFilename = 'document.pdf',
+  closeLabel = 'Close',
+  extraActions,
+  notice,
 }: {
   title: string
   path: string
@@ -26,6 +29,11 @@ export function PrintPreviewModal({
   onPrint?: () => void
   printLabel?: string
   pdfFilename?: string
+  closeLabel?: string
+  /** More buttons, shown between Close and Print. */
+  extraActions?: ReactNode
+  /** A message above the preview (e.g. what to do next after sending). */
+  notice?: ReactNode
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const frameWrapRef = useRef<HTMLDivElement>(null)
@@ -180,8 +188,9 @@ export function PrintPreviewModal({
       footer={
         <div className="modal-actions">
           <button type="button" className="btn secondary" onClick={onClose}>
-            Close
+            {closeLabel}
           </button>
+          {extraActions}
           <button type="button" className="btn secondary" disabled={actionsDisabled} onClick={printFrame}>
             <Printer size={16} strokeWidth={1.75} aria-hidden />
             {printLabel}
@@ -194,6 +203,7 @@ export function PrintPreviewModal({
       }
     >
       {error ? <div className="error-banner">{error}</div> : null}
+      {notice}
       {!error && !ready ? <p className="muted">Loading preview…</p> : null}
       <div className="print-preview-frame" ref={frameWrapRef}>
         <div

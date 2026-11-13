@@ -9,6 +9,7 @@ import {
   GsRefundPrintPage,
   PledgeItemReleasePrintPage,
   PledgeNoticePrintPage,
+  PledgePaymentReceiptPrintPage,
   PledgePrintPage,
   PledgeReleasePrintPage,
   SampleAdaguPrintPage,
@@ -32,6 +33,7 @@ export const printRouter = createBrowserRouter([
     children: [
       { path: '/print/pledge/:id', element: <PledgePrintPage /> },
       { path: '/print/pledge-release/:id', element: <PledgeReleasePrintPage /> },
+      { path: '/print/pledge-payment/:id', element: <PledgePaymentReceiptPrintPage /> },
       { path: '/print/pledge-release-item/:pledgeId/:itemId', element: <PledgeItemReleasePrintPage /> },
       { path: '/print/pledge-notice/:id', element: <PledgeNoticePrintPage /> },
       { path: '/print/sample/:kind', element: <SampleAdaguPrintPage /> },

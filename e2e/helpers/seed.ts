@@ -28,8 +28,8 @@ async function apiCall<T>(path: string, init?: RequestInit): Promise<T> {
  * Create a customer and a sanctioned Adagu pledge, then return the pledge id.
  * Used by the customer, dues and print-route specs.
  */
-export async function seedPledge(page: Page): Promise<number> {
-  const pledgeDate = localTodayIso()
+export async function seedPledge(page: Page, options: { pledgeDate?: string } = {}): Promise<number> {
+  const pledgeDate = options.pledgeDate ?? localTodayIso()
   return page.evaluate(async (date) => {
     async function api<T>(path: string, init?: RequestInit): Promise<T> {
       const response = await fetch(path, {

@@ -80,7 +80,7 @@ export function nextReferenceId(now = new Date()): string {
   } catch {
     // keep issuing IDs even if the counter file cannot be written
   }
-  return `JTP-ERR-${date}-${String(state.seq).padStart(3, '0')}`
+  return `PD-ERR-${date}-${String(state.seq).padStart(3, '0')}`
 }
 
 function rotateIfNeeded(filePath: string): void {

@@ -1,14 +1,14 @@
 //! Host-level crash reporting.
 //!
 //! The web layer reports its own problems to the API sidecar, which owns
-//! `logs/` and issues `JTP-ERR-<date>-<seq>` reference IDs. Failures the web
+//! `logs/` and issues `PD-ERR-<date>-<seq>` reference IDs. Failures the web
 //! layer cannot observe — a WebView2 process dying, or the API sidecar exiting
 //! — are seen here instead and forwarded to that same logger, so they land in
 //! `logs/crash.log` next to everything else.
 //!
 //! When the API is unreachable, which is exactly the case once the sidecar has
 //! died, we append to `logs/crash.log` ourselves and issue a
-//! `JTP-HOST-<date>-<seq>` reference ID from a counter file of our own. A
+//! `PD-HOST-<date>-<seq>` reference ID from a counter file of our own. A
 //! separate sequence keeps the two writers from ever issuing the same ID.
 
 use std::fs;
@@ -135,12 +135,12 @@ fn next_host_reference_id(logs: &Path) -> String {
         let _ = fs::create_dir_all(logs);
         let _ = fs::write(&path, text);
     }
-    format!("JTP-HOST-{date}-{:03}", state.seq)
+    format!("PD-HOST-{date}-{:03}", state.seq)
 }
 
 /// Writes a crash line for a failure the API cannot log, because it is down.
 ///
-/// Returns the `JTP-HOST-…` reference ID written with it.
+/// Returns the `PD-HOST-…` reference ID written with it.
 pub fn log_host_crash(data_dir: &Path, message: &str) -> String {
     let logs = logs_dir(data_dir);
     let reference_id = next_host_reference_id(&logs);
@@ -172,7 +172,7 @@ fn post_json(port: u16, path: &str, body: &str) -> Option<String> {
     Some(payload.to_string())
 }
 
-/// Reports a renderer failure to the API so it gets a `JTP-ERR-…` reference ID.
+/// Reports a renderer failure to the API so it gets a `PD-ERR-…` reference ID.
 ///
 /// `fatal` marks a crash the app could not recover from, which the API records
 /// so the next launch can show what happened.

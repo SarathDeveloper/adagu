@@ -1,10 +1,10 @@
 {
-  "name": "jeweltrackerpro",
+  "name": "pawndesk",
   "private": true,
   "version": "1.0.0",
-  "description": "JewelTrackerPro Adagu pledges and gold savings",
-  "author": "JewelTrackerPro",
-  "productName": "JewelTrackerPro Adagu",
+  "description": "PawnDesk pledges and gold savings",
+  "author": "PawnDesk",
+  "productName": "PawnDesk",
   "type": "module",
   "scripts": {
     "dev": "concurrently --names vite,api \"vite\" \"tsx watch --tsconfig tsconfig.server.json server/index.ts\"",

@@ -28,7 +28,7 @@
       return invoke('get_app_version');
     },
     exportDatabase: async function () {
-      var suggested = 'jeweltrackerpro-backup-' + new Date().toISOString().slice(0, 10) + '.db';
+      var suggested = 'pawndesk-backup-' + new Date().toISOString().slice(0, 10) + '.db';
       var path = await invoke('choose_backup_path', {
         defaultFilename: suggested,
         filterName: 'SQLite database',
@@ -46,7 +46,7 @@
       return { canceled: false, filePath: path };
     },
     exportFullBackup: async function () {
-      var suggested = 'jeweltrackerpro-full-' + new Date().toISOString().slice(0, 10) + '.zip';
+      var suggested = 'pawndesk-full-' + new Date().toISOString().slice(0, 10) + '.zip';
       var path = await invoke('choose_backup_path', {
         defaultFilename: suggested,
         filterName: 'Zip archive',
@@ -74,7 +74,7 @@
       return { canceled: false, filePath: path };
     },
     exportExcel: async function () {
-      var suggested = 'jeweltrackerpro-tables-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+      var suggested = 'pawndesk-tables-' + new Date().toISOString().slice(0, 10) + '.xlsx';
       var path = await invoke('choose_backup_path', {
         defaultFilename: suggested,
         filterName: 'Excel workbook',
@@ -117,7 +117,7 @@
   // In a dedicated print window on macOS, render through the native webview
   // print panel. WKWebView does not reliably print an embedded iframe, so
   // PrintPreviewModal opens this window instead.
-  if (window.__JTP_DESKTOP_PRINT__ && isMac) {
+  if (window.__PD_DESKTOP_PRINT__ && isMac) {
     window.print = function () {
       window.desktopAPI.printWebview();
     };

@@ -155,7 +155,7 @@ describe('settings IPC', () => {
   it('persists the Adagu pledge defaults', async () => {
     const current = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_GET)
     expect(current.pledgeLtvPct).toBe(75)
-    expect(current.adaguInterestPct).toBe(2.1)
+    expect(current.adaguInterestPct).toBe(2)
     expect(current.adaguAuctionNoticeDays).toBe(14)
 
     const updated = await ipc<ShopSettings>(IPC_CHANNELS.SETTINGS_UPDATE, {

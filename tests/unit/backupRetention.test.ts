@@ -5,7 +5,7 @@ function dailyName(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
-  return `jeweltrackerpro-${year}-${month}-${day}.db`
+  return `pawndesk-${year}-${month}-${day}.db`
 }
 
 function stamp(date: Date): string {
@@ -27,6 +27,14 @@ function clock(date: Date): string {
 
 describe('backup kind detection', () => {
   it('recognises every kind this app writes', () => {
+    expect(backupKindForName('pawndesk-2026-10-09.db')).toBe('daily')
+    expect(backupKindForName('pawndesk-manual-20261009-120000.db')).toBe('manual')
+    expect(backupKindForName('pawndesk-dayclose-2026-10-09-gold-180000.db')).toBe('dayclose')
+    expect(backupKindForName('pawndesk-prerestore-20261009-120000.db')).toBe('prerestore')
+    expect(backupKindForName('pawndesk-premigrate-v55-20261009-120000.db')).toBe('premigrate')
+  })
+
+  it('still recognises backups named before the PawnDesk rename', () => {
     expect(backupKindForName('jeweltrackerpro-2026-10-09.db')).toBe('daily')
     expect(backupKindForName('jeweltrackerpro-manual-20261009-120000.db')).toBe('manual')
     expect(backupKindForName('jeweltrackerpro-dayclose-2026-10-09-gold-180000.db')).toBe('dayclose')
@@ -35,8 +43,8 @@ describe('backup kind detection', () => {
   })
 
   it('ignores names that are not backups, including half-written copies', () => {
-    expect(backupKindForName('~$jeweltrackerpro-2026-10-09.db.tmp')).toBeNull()
-    expect(backupKindForName('jeweltrackerpro-manual-20261009-120000.xlsx')).toBeNull()
+    expect(backupKindForName('~$pawndesk-2026-10-09.db.tmp')).toBeNull()
+    expect(backupKindForName('pawndesk-manual-20261009-120000.xlsx')).toBeNull()
     expect(backupKindForName('notes.txt')).toBeNull()
   })
 })
@@ -62,20 +70,20 @@ describe('backup retention', () => {
   it('caps manual, day-close, pre-restore and pre-update copies', () => {
     const manual = Array.from(
       { length: 40 },
-      (_, index) => `jeweltrackerpro-manual-${stamp(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
+      (_, index) => `pawndesk-manual-${stamp(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
     )
     const dayclose = Array.from(
       { length: 70 },
       (_, index) =>
-        `jeweltrackerpro-dayclose-2026-10-09-gold-${clock(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
+        `pawndesk-dayclose-2026-10-09-gold-${clock(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
     )
     const prerestore = Array.from(
       { length: 9 },
-      (_, index) => `jeweltrackerpro-prerestore-${stamp(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
+      (_, index) => `pawndesk-prerestore-${stamp(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
     )
     const premigrate = Array.from(
       { length: 9 },
-      (_, index) => `jeweltrackerpro-premigrate-v5${index}-${stamp(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
+      (_, index) => `pawndesk-premigrate-v5${index}-${stamp(new Date(2026, 9, 9, 12, 0, 0 - index))}.db`,
     )
 
     expect(selectBackupsToKeep(manual, now).size).toBe(30)
@@ -86,7 +94,7 @@ describe('backup retention', () => {
 
   it('never selects a name it does not recognise', () => {
     const keep = selectBackupsToKeep(
-      ['~$jeweltrackerpro-2026-10-09.db.tmp', 'notes.txt', 'jeweltrackerpro-2026-10-09.xlsx'],
+      ['~$pawndesk-2026-10-09.db.tmp', 'notes.txt', 'pawndesk-2026-10-09.xlsx'],
       now,
     )
     expect(keep.size).toBe(0)

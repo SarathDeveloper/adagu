@@ -6,6 +6,7 @@ import multer from 'multer'
 import { backupSettingsSchema, exportFullBackupSchema, inspectBackupSchema, restoreBackupNameSchema } from '@shared/schemas'
 import {
   allowFullBackupEntry,
+  FULL_BACKUP_DB_NAMES,
   assertFullBackupDestination,
   backupDatabaseTo,
   copyNewestBackupOffsite,
@@ -111,7 +112,7 @@ router.get(
   '/export',
   adminOnly,
   asyncHandler(async (_req, res) => {
-    const filename = `jeweltrackerpro-backup-${new Date().toISOString().slice(0, 10)}.db`
+    const filename = `pawndesk-backup-${new Date().toISOString().slice(0, 10)}.db`
     const destination = join(tmpdir(), filename)
     await withBackupLock(async () => {
       await backupDatabaseTo(destination)
@@ -124,8 +125,8 @@ router.get(
   '/export-full',
   adminOnly,
   asyncHandler(async (_req, res) => {
-    const filename = `jeweltrackerpro-full-${new Date().toISOString().slice(0, 10)}.zip`
-    const destination = join(tmpdir(), `jeweltrackerpro-full-${Date.now()}.zip`)
+    const filename = `pawndesk-full-${new Date().toISOString().slice(0, 10)}.zip`
+    const destination = join(tmpdir(), `pawndesk-full-${Date.now()}.zip`)
     await withBackupLock(async () => {
       await writeFullBackup(destination)
     })
@@ -150,7 +151,7 @@ router.get(
   '/export-excel',
   adminOnly,
   asyncHandler(async (_req, res) => {
-    const filename = `jeweltrackerpro-tables-${new Date().toISOString().slice(0, 10)}.xlsx`
+    const filename = `pawndesk-tables-${new Date().toISOString().slice(0, 10)}.xlsx`
     const destination = join(tmpdir(), filename)
     await withBackupLock(async () => {
       await writeExcelBackupFromDatabaseYielding(getDatabase(), destination)
@@ -171,16 +172,17 @@ router.post(
     let extracted: string | null = null
     try {
       if (isZipFile(uploaded)) {
-        extracted = mkdtempSync(join(tmpdir(), 'jtp-restore-'))
+        extracted = mkdtempSync(join(tmpdir(), 'pd-restore-'))
         try {
           await extractZipFile(uploaded, extracted, allowFullBackupEntry)
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Backup file could not be opened'
           throw new HttpError(400, message)
         }
-        const dbPath = join(extracted, 'jeweltrackerpro.db')
-        if (!existsSync(dbPath)) {
-          throw new HttpError(400, 'This file is not an AdaguTrackerPro backup')
+        const root = extracted
+        const dbPath = FULL_BACKUP_DB_NAMES.map((name) => join(root, name)).find((path) => existsSync(path))
+        if (!dbPath) {
+          throw new HttpError(400, 'This file is not an PawnDesk backup')
         }
         const status = await restoreDatabaseFrom(dbPath, { uploadsDir: join(extracted, 'uploads') })
         res.json(status)

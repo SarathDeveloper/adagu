@@ -4,5 +4,5 @@
 /icons/ios
 /binaries/*.exe
 /binaries/*.node
-/binaries/jeweltrackerpro-api-*
+/binaries/pawndesk-api-*
 !/binaries/.gitkeep

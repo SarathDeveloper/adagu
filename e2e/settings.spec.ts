@@ -12,7 +12,7 @@ test('settings shows version and database path', async ({ window }) => {
   await expect(window.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
   await expect(window.getByText('Database Location')).toBeVisible()
   await expect(window.locator('.settings-header-chip').getByText(/v\d+\.\d+\.\d+/)).toBeVisible()
-  await expect(window.getByText(/jeweltrackerpro\.db/)).toBeVisible()
+  await expect(window.getByText(/pawndesk\.db/)).toBeVisible()
 })
 
 test('shop details form saves shop name and tagline', async ({ window }) => {

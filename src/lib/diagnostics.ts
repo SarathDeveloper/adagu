@@ -20,7 +20,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T | null> {
 
 /**
  * Reports a fatal error to the API so it is written to `crash.log` with a
- * `JTP-ERR-…` reference ID the user can quote. Runs inside error handling, so
+ * `PD-ERR-…` reference ID the user can quote. Runs inside error handling, so
  * it never throws: if the API cannot be reached it falls back to a local report.
  */
 export async function reportFatal(input: {
@@ -44,7 +44,7 @@ export async function reportFatal(input: {
   }
 
   return {
-    referenceId: 'JTP-ERR-CLIENT',
+    referenceId: 'PD-ERR-CLIENT',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     category: 'crash',

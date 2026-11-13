@@ -61,7 +61,7 @@ describe('database backup and restore', () => {
 
   it('exports a consistent SQLite snapshot that passes integrity_check', async () => {
     await seedCustomer()
-    const destination = join(process.env.JEWELTRACKERPRO_E2E_USER_DATA as string, 'export.db')
+    const destination = join(process.env.PAWNDESK_E2E_USER_DATA as string, 'export.db')
     const status = await ipc<BackupStatus>(IPC_CHANNELS.APP_EXPORT_DB, { destinationPath: destination })
 
     expect(status.lastBackupAt).toBeTruthy()
@@ -84,7 +84,7 @@ describe('database backup and restore', () => {
 
   it('restores a backup and replaces current records', async () => {
     await seedCustomer()
-    const destination = join(process.env.JEWELTRACKERPRO_E2E_USER_DATA as string, 'restore-source.db')
+    const destination = join(process.env.PAWNDESK_E2E_USER_DATA as string, 'restore-source.db')
     await ipc(IPC_CHANNELS.APP_EXPORT_DB, { destinationPath: destination })
 
     await seedCustomer('Later ring')
@@ -102,8 +102,8 @@ describe('database backup and restore', () => {
     await seedCustomer()
     await ensureDailyBackup()
     const today = localDateIso()
-    const dailyPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.db`)
-    const excelPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.xlsx`)
+    const dailyPath = join(getUserDataDir(), 'backups', `pawndesk-${today}.db`)
+    const excelPath = join(getUserDataDir(), 'backups', `pawndesk-${today}.xlsx`)
     expect(existsSync(dailyPath)).toBe(true)
     assertSqliteIntegrity(dailyPath)
     expect(existsSync(excelPath)).toBe(true)
@@ -126,7 +126,7 @@ describe('database backup and restore', () => {
     expect(created.status).toBe(200)
     const backup = created.body as BackupFile
     expect(backup.kind).toBe('manual')
-    expect(backup.name).toMatch(/^jeweltrackerpro-manual-\d{8}-\d{6}\.db$/)
+    expect(backup.name).toMatch(/^pawndesk-manual-\d{8}-\d{6}\.db$/)
     expect(backup.sizeBytes).toBeGreaterThan(0)
     assertSqliteIntegrity(join(getUserDataDir(), 'backups', backup.name))
     const excelPath = join(getUserDataDir(), 'backups', backup.name.replace(/\.db$/, '.xlsx'))
@@ -164,11 +164,11 @@ describe('database backup and restore', () => {
     expect(restore.status).toBe(400)
 
     const missing = await agent.post('/api/backup/restore-local').send({
-      name: 'jeweltrackerpro-manual-19990101-000000.db',
+      name: 'pawndesk-manual-19990101-000000.db',
     })
     expect(missing.status).toBe(404)
 
-    const deleted = await agent.delete(`/api/backup/${encodeURIComponent('../jeweltrackerpro-2026-01-01.db')}`)
+    const deleted = await agent.delete(`/api/backup/${encodeURIComponent('../pawndesk-2026-01-01.db')}`)
     expect(deleted.status).toBe(400)
   })
 
@@ -191,7 +191,7 @@ describe('database backup and restore', () => {
   it('writes a scheduled backup when the last slot was missed and skips when current', async () => {
     const db = getDatabase()
     const today = localDateIso()
-    const dailyPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.db`)
+    const dailyPath = join(getUserDataDir(), 'backups', `pawndesk-${today}.db`)
 
     setShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, new Date(Date.now() - 3 * 86_400_000).toISOString())
     await ensureScheduledBackup()
@@ -237,9 +237,9 @@ describe('database backup and restore', () => {
   it('copies the newest backup off-machine, verifies it, and restores shop data from that file', async () => {
     await seedCustomer()
     const agent = getTestAgent()
-    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-'))
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'pd-offsite-'))
     const today = localDateIso()
-    const offsitePath = join(offsiteDir, `jeweltrackerpro-${today}.db`)
+    const offsitePath = join(offsiteDir, `pawndesk-${today}.db`)
 
     try {
       const saved = await agent.put('/api/backup/settings').send({
@@ -256,10 +256,10 @@ describe('database backup and restore', () => {
       expect(copied.body.lastOffsiteError).toBeNull()
       expect(existsSync(offsitePath)).toBe(true)
       assertSqliteIntegrity(offsitePath)
-      const offsiteExcel = join(offsiteDir, `jeweltrackerpro-${today}.xlsx`)
+      const offsiteExcel = join(offsiteDir, `pawndesk-${today}.xlsx`)
       expect(existsSync(offsiteExcel)).toBe(true)
       expect(readFileSync(offsiteExcel).toString('utf8')).toContain('Test customer')
-      await proveBackupRestores(offsitePath, join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.db`))
+      await proveBackupRestores(offsitePath, join(getUserDataDir(), 'backups', `pawndesk-${today}.db`))
 
       const skipped = await copyNewestBackupOffsite()
       expect(skipped.lastOffsiteAt).toBe(copied.body.lastOffsiteAt)
@@ -281,7 +281,7 @@ describe('database backup and restore', () => {
   it('records a missing off-machine folder without skipping the local backup', async () => {
     await seedCustomer()
     const agent = getTestAgent()
-    const parent = mkdtempSync(join(tmpdir(), 'jtp-offsite-parent-'))
+    const parent = mkdtempSync(join(tmpdir(), 'pd-offsite-parent-'))
     const missing = join(parent, 'not-plugged-in')
 
     try {
@@ -300,8 +300,8 @@ describe('database backup and restore', () => {
       expect(status.body.lastBackupAt).toBeTruthy()
       expect(status.body.lastOffsiteAt).toBeNull()
       expect(status.body.lastOffsiteError).toBe('Off-machine folder was not found')
-      expect(existsSync(join(getUserDataDir(), 'backups', `jeweltrackerpro-${localDateIso()}.db`))).toBe(true)
-      expect(existsSync(join(missing, `jeweltrackerpro-${localDateIso()}.db`))).toBe(false)
+      expect(existsSync(join(getUserDataDir(), 'backups', `pawndesk-${localDateIso()}.db`))).toBe(true)
+      expect(existsSync(join(missing, `pawndesk-${localDateIso()}.db`))).toBe(false)
     } finally {
       rmSync(parent, { recursive: true, force: true })
     }
@@ -309,7 +309,7 @@ describe('database backup and restore', () => {
 
   it('copies off-machine after a scheduled local backup', async () => {
     await seedCustomer()
-    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-tick-'))
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'pd-offsite-tick-'))
     const today = localDateIso()
     const agent = getTestAgent()
 
@@ -322,11 +322,11 @@ describe('database backup and restore', () => {
       setShopSetting(getDatabase(), LAST_BACKUP_AT_KEY, new Date(Date.now() - 3 * 86_400_000).toISOString())
       await tickScheduledBackup()
 
-      const localPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${today}.db`)
-      const offsitePath = join(offsiteDir, `jeweltrackerpro-${today}.db`)
+      const localPath = join(getUserDataDir(), 'backups', `pawndesk-${today}.db`)
+      const offsitePath = join(offsiteDir, `pawndesk-${today}.db`)
       expect(existsSync(localPath)).toBe(true)
       expect(existsSync(offsitePath)).toBe(true)
-      expect(existsSync(join(offsiteDir, `jeweltrackerpro-${today}.xlsx`))).toBe(true)
+      expect(existsSync(join(offsiteDir, `pawndesk-${today}.xlsx`))).toBe(true)
       assertSqliteIntegrity(offsitePath)
 
       const status = await agent.get('/api/backup/status')
@@ -361,21 +361,21 @@ describe('database backup and restore', () => {
     expect(body.toString('utf8')).toContain('pledges')
   })
 
-  it('rejects a file that is not an AdaguTrackerPro backup without touching live data', async () => {
+  it('rejects a file that is not an PawnDesk backup without touching live data', async () => {
     await seedCustomer()
     const agent = getTestAgent()
     const backupsDir = join(getUserDataDir(), 'backups')
     mkdirSync(backupsDir, { recursive: true })
-    const foreignPath = join(backupsDir, 'jeweltrackerpro-2020-01-01.db')
+    const foreignPath = join(backupsDir, 'pawndesk-2020-01-01.db')
     const foreign = new Database(foreignPath)
     foreign.exec('CREATE TABLE foo (id INTEGER PRIMARY KEY)')
     foreign.close()
 
     const response = await agent
       .post('/api/backup/restore-local')
-      .send({ name: 'jeweltrackerpro-2020-01-01.db' })
+      .send({ name: 'pawndesk-2020-01-01.db' })
     expect(response.status).toBe(400)
-    expect(response.body.error).toBe('This file is not an AdaguTrackerPro backup')
+    expect(response.body.error).toBe('This file is not an PawnDesk backup')
     expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(1)
   })
 
@@ -384,7 +384,7 @@ describe('database backup and restore', () => {
     const agent = getTestAgent()
     const backupsDir = join(getUserDataDir(), 'backups')
     mkdirSync(backupsDir, { recursive: true })
-    const target = join(backupsDir, 'jeweltrackerpro-2020-01-02.db')
+    const target = join(backupsDir, 'pawndesk-2020-01-02.db')
     await backupDatabaseTo(target)
     const snapshot = new Database(target)
     snapshot
@@ -396,7 +396,7 @@ describe('database backup and restore', () => {
 
     const response = await agent
       .post('/api/backup/restore-local')
-      .send({ name: 'jeweltrackerpro-2020-01-02.db' })
+      .send({ name: 'pawndesk-2020-01-02.db' })
     expect(response.status).toBe(400)
     expect(response.body.error).toContain('newer version')
     expect(await ipc<Customer[]>(IPC_CHANNELS.CUSTOMERS_LIST)).toHaveLength(1)
@@ -407,7 +407,7 @@ describe('database backup and restore', () => {
     const backupsDir = join(getUserDataDir(), 'backups')
     mkdirSync(backupsDir, { recursive: true })
 
-    const stubPath = join(backupsDir, 'jeweltrackerpro-manual-19990101-000000.db')
+    const stubPath = join(backupsDir, 'pawndesk-manual-19990101-000000.db')
     const stub = new Database(stubPath)
     stub.exec(`
       CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')));
@@ -424,20 +424,20 @@ describe('database backup and restore', () => {
   it('keeps a pre-restore safety copy before replacing data', async () => {
     await seedCustomer()
     const backupsDir = join(getUserDataDir(), 'backups')
-    const destination = join(backupsDir, 'jeweltrackerpro-manual-19990101-000001.db')
+    const destination = join(backupsDir, 'pawndesk-manual-19990101-000001.db')
     mkdirSync(backupsDir, { recursive: true })
     await backupDatabaseTo(destination)
 
     await restoreDatabaseFrom(destination)
 
-    expect(readdirSync(backupsDir).some((name) => name.startsWith('jeweltrackerpro-prerestore-'))).toBe(true)
+    expect(readdirSync(backupsDir).some((name) => name.startsWith('pawndesk-prerestore-'))).toBe(true)
   })
 
   it('writes a safety snapshot before applying pending migrations', () => {
     const backupsDir = join(getUserDataDir(), 'backups')
     mkdirSync(backupsDir, { recursive: true })
     const premigrateFiles = () =>
-      readdirSync(backupsDir).filter((name) => name.startsWith('jeweltrackerpro-premigrate-'))
+      readdirSync(backupsDir).filter((name) => name.startsWith('pawndesk-premigrate-'))
 
     // The fresh database from beforeEach applied every migration, so nothing was written.
     expect(premigrateFiles()).toHaveLength(0)
@@ -450,7 +450,7 @@ describe('database backup and restore', () => {
   it('mirrors shop images off-machine and copies them back on restore', async () => {
     await seedCustomer()
     const agent = getTestAgent()
-    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-media-'))
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'pd-offsite-media-'))
     const uploadsDir = getUploadsDir()
     const imageName = 'logo-test.png'
     writeFileSync(join(uploadsDir, imageName), 'fake-image-bytes')
@@ -464,7 +464,7 @@ describe('database backup and restore', () => {
       expect(existsSync(join(offsiteDir, 'uploads', imageName))).toBe(true)
 
       rmSync(join(uploadsDir, imageName))
-      await restoreDatabaseFrom(join(offsiteDir, `jeweltrackerpro-${localDateIso()}.db`))
+      await restoreDatabaseFrom(join(offsiteDir, `pawndesk-${localDateIso()}.db`))
       expect(existsSync(join(uploadsDir, imageName))).toBe(true)
     } finally {
       rmSync(offsiteDir, { recursive: true, force: true })
@@ -474,9 +474,9 @@ describe('database backup and restore', () => {
   it('detects a tampered off-machine copy', async () => {
     await seedCustomer()
     const agent = getTestAgent()
-    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-tamper-'))
-    const localPath = join(getUserDataDir(), 'backups', `jeweltrackerpro-${localDateIso()}.db`)
-    const offsitePath = join(offsiteDir, `jeweltrackerpro-${localDateIso()}.db`)
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'pd-offsite-tamper-'))
+    const localPath = join(getUserDataDir(), 'backups', `pawndesk-${localDateIso()}.db`)
+    const offsitePath = join(offsiteDir, `pawndesk-${localDateIso()}.db`)
     try {
       await agent
         .put('/api/backup/settings')
@@ -510,7 +510,7 @@ describe('database backup and restore', () => {
   it('removes the temporary export file after a download', async () => {
     await seedCustomer()
     const agent = getTestAgent()
-    const exportPath = join(tmpdir(), `jeweltrackerpro-backup-${new Date().toISOString().slice(0, 10)}.db`)
+    const exportPath = join(tmpdir(), `pawndesk-backup-${new Date().toISOString().slice(0, 10)}.db`)
     const exported = await agent.get('/api/backup/export')
     expect(exported.status).toBe(200)
 
@@ -523,9 +523,9 @@ describe('database backup and restore', () => {
   it('keeps this computer\'s backup settings and off-machine photos when restoring', async () => {
     await seedCustomer()
     const agent = getTestAgent()
-    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-restore-settings-'))
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'pd-restore-settings-'))
     const backupsDir = join(getUserDataDir(), 'backups')
-    const snapshot = join(backupsDir, 'jeweltrackerpro-manual-19990101-000002.db')
+    const snapshot = join(backupsDir, 'pawndesk-manual-19990101-000002.db')
     mkdirSync(backupsDir, { recursive: true })
     await backupDatabaseTo(snapshot)
 
@@ -569,7 +569,7 @@ describe('database backup and restore', () => {
       expect(existsSync(join(getUploadsDir(), imageName))).toBe(true)
       expect(readFileSync(join(getUploadsDir(), imageName)).toString()).toBe('logo-bytes')
 
-      const daily = join(backupsDir, `jeweltrackerpro-${localDateIso()}.db`)
+      const daily = join(backupsDir, `pawndesk-${localDateIso()}.db`)
       const before = existsSync(daily) ? statSync(daily).mtimeMs : null
       await tickScheduledBackup()
       const after = existsSync(daily) ? statSync(daily).mtimeMs : null
@@ -584,10 +584,10 @@ describe('database backup and restore', () => {
     const dir = join(getUserDataDir(), 'backups')
     mkdirSync(dir, { recursive: true })
     const today = localDateIso()
-    const dest = join(dir, `jeweltrackerpro-${today}.db`)
+    const dest = join(dir, `pawndesk-${today}.db`)
     await backupDatabaseTo(dest)
     const before = readFileSync(dest)
-    const partial = join(dir, `~$jeweltrackerpro-${today}.db.tmp`)
+    const partial = join(dir, `~$pawndesk-${today}.db.tmp`)
     const database = getDatabase()
     const originalBackup = database.backup.bind(database)
     database.backup = async () => {
@@ -602,7 +602,7 @@ describe('database backup and restore', () => {
     expect(readFileSync(dest).equals(before)).toBe(true)
     expect(existsSync(partial)).toBe(false)
 
-    const stale = join(dir, '~$jeweltrackerpro-stale.db.tmp')
+    const stale = join(dir, '~$pawndesk-stale.db.tmp')
     writeFileSync(stale, 'partial')
     pruneBackupFiles(dir)
     expect(existsSync(stale)).toBe(false)
@@ -657,7 +657,7 @@ describe('database backup and restore', () => {
     setShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, earlier.toISOString())
     rememberChangeBaseline()
 
-    const daily = join(getUserDataDir(), 'backups', `jeweltrackerpro-${localDateIso(now)}.db`)
+    const daily = join(getUserDataDir(), 'backups', `pawndesk-${localDateIso(now)}.db`)
     await tickScheduledBackup(now)
     expect(existsSync(daily)).toBe(false)
     expect(getShopSetting(db, LAST_SCHEDULED_BACKUP_AT_KEY, '')).toBe(earlier.toISOString())
@@ -673,9 +673,9 @@ describe('database backup and restore', () => {
   it('does not treat an off-machine copy as a reason to back up again', async () => {
     const now = new Date(2026, 9, 13, 10, 0, 0)
     const earlier = new Date(now.getTime() - 4 * 60 * 60 * 1000)
-    const offsiteDir = mkdtempSync(join(tmpdir(), 'jtp-offsite-unchanged-'))
+    const offsiteDir = mkdtempSync(join(tmpdir(), 'pd-offsite-unchanged-'))
     const agent = getTestAgent()
-    const daily = join(getUserDataDir(), 'backups', `jeweltrackerpro-${localDateIso(now)}.db`)
+    const daily = join(getUserDataDir(), 'backups', `pawndesk-${localDateIso(now)}.db`)
 
     try {
       const saved = await agent.put('/api/backup/settings').send({
@@ -697,7 +697,7 @@ describe('database backup and restore', () => {
       expect(statSync(daily).mtimeMs).toBe(before)
       expect(getShopSetting(getDatabase(), LAST_BACKUP_AT_KEY, '')).toBe(earlier.toISOString())
       expect(getShopSetting(getDatabase(), LAST_SCHEDULED_BACKUP_AT_KEY, '')).toBe(earlier.toISOString())
-      expect(existsSync(join(offsiteDir, `jeweltrackerpro-${localDateIso(now)}.db`))).toBe(true)
+      expect(existsSync(join(offsiteDir, `pawndesk-${localDateIso(now)}.db`))).toBe(true)
     } finally {
       rmSync(offsiteDir, { recursive: true, force: true })
     }
@@ -726,13 +726,13 @@ describe('database backup and restore', () => {
     const body = Buffer.isBuffer(exported.body) ? exported.body : Buffer.from(exported.body)
     expect(body.subarray(0, 2).toString()).toBe('PK')
 
-    const zipPath = join(tmpdir(), `jtp-full-${Date.now()}.zip`)
-    const extracted = mkdtempSync(join(tmpdir(), 'jtp-full-extract-'))
+    const zipPath = join(tmpdir(), `pd-full-${Date.now()}.zip`)
+    const extracted = mkdtempSync(join(tmpdir(), 'pd-full-extract-'))
     writeFileSync(zipPath, body)
     try {
       await extractZipFile(zipPath, extracted, allowFullBackupEntry)
       expect(readFileSync(join(extracted, 'uploads', imageName)).toString()).toBe('photo-bytes')
-      expect(existsSync(join(extracted, 'jeweltrackerpro.db'))).toBe(true)
+      expect(existsSync(join(extracted, 'pawndesk.db'))).toBe(true)
 
       const relative = await agent.post('/api/backup/export-full').send({ path: 'relative.zip' })
       expect(relative.status).toBe(400)
@@ -750,7 +750,7 @@ describe('database backup and restore', () => {
       expect(customers[0]?.name).toBe(customer.name)
       expect(readFileSync(join(getUploadsDir(), imageName)).toString()).toBe('photo-bytes')
 
-      const evilPath = join(tmpdir(), `jtp-evil-${Date.now()}.zip`)
+      const evilPath = join(tmpdir(), `pd-evil-${Date.now()}.zip`)
       writeFileSync(evilPath, storedZip([{ name: '../evil', data: Buffer.from('x') }]))
       await seedCustomer('Still here')
       const rejected = await agent.post('/api/backup/restore').attach('file', evilPath)

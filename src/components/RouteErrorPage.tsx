@@ -6,7 +6,7 @@ import { NotFoundPage } from './NotFoundPage'
 function reportFromUnknown(error: unknown): DiagnosticReport {
   if (isRouteErrorResponse(error)) {
     return {
-      referenceId: 'JTP-ERR-ROUTE',
+      referenceId: 'PD-ERR-ROUTE',
       timestamp: new Date().toISOString(),
       version: '1.0.0',
       category: 'crash',
@@ -15,7 +15,7 @@ function reportFromUnknown(error: unknown): DiagnosticReport {
   }
   if (error instanceof Error) {
     return {
-      referenceId: 'JTP-ERR-ROUTE',
+      referenceId: 'PD-ERR-ROUTE',
       timestamp: new Date().toISOString(),
       version: '1.0.0',
       category: 'crash',
@@ -24,7 +24,7 @@ function reportFromUnknown(error: unknown): DiagnosticReport {
     }
   }
   return {
-    referenceId: 'JTP-ERR-ROUTE',
+    referenceId: 'PD-ERR-ROUTE',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     category: 'crash',
@@ -36,7 +36,7 @@ export function RouteErrorPage() {
   const error = useRouteError()
   // A 404 route response means the URL did not match any route. That is a
   // missing page, not a crash, so show the not-found screen without raising a
-  // fatal `JTP-ERR-ROUTE` report.
+  // fatal `PD-ERR-ROUTE` report.
   if (isRouteErrorResponse(error) && error.status === 404) {
     return <NotFoundPage />
   }

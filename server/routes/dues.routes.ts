@@ -188,6 +188,9 @@ type PledgeListRow = {
   customer_phone: string
   auction_notice_date: string | null
   auction_date: string | null
+  repayment_due_date: string | null
+  gold_weight: number | null
+  item_count: number | null
 }
 
 export function buildAdaguDues(
@@ -202,7 +205,12 @@ export function buildAdaguDues(
               p.amount_collected, p.status, p.redeemed_date,
               c.name AS customer_name, c.phone AS customer_phone,
               (SELECT notice_date FROM pledge_auctions WHERE pledge_id = p.id) AS auction_notice_date,
-              (SELECT auction_date FROM pledge_auctions WHERE pledge_id = p.id) AS auction_date
+              (SELECT auction_date FROM pledge_auctions WHERE pledge_id = p.id) AS auction_date,
+              p.repayment_due_date,
+              (SELECT SUM(net_weight) FROM pledge_items
+                WHERE pledge_id = p.id AND released_at IS NULL) AS gold_weight,
+              (SELECT COUNT(*) FROM pledge_items
+                WHERE pledge_id = p.id AND released_at IS NULL) AS item_count
        FROM pledges p
        JOIN customers c ON c.id = p.customer_id
        WHERE p.status IN ('active', 'redeemed', 'forfeited', 'renewed')
@@ -252,6 +260,10 @@ export function buildAdaguDues(
       auctionNoticeDate: pledge.auction_notice_date,
       auctionDate: pledge.auction_date,
       topups: loadPledgeTopups(db, pledge.id),
+      repaymentDueDate: pledge.repayment_due_date,
+      loanAmount: pledge.loan_amount,
+      goldWeight: Math.round((pledge.gold_weight ?? 0) * 1000) / 1000,
+      itemCount: pledge.item_count ?? 0,
     })
   }
 

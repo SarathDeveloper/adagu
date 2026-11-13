@@ -36,7 +36,7 @@ describe('crash reporting endpoints', () => {
     })
 
     expect(response.status).toBe(200)
-    expect(response.body.referenceId).toMatch(/^JTP-ERR-\d{8}-\d{3}$/)
+    expect(response.body.referenceId).toMatch(/^PD-ERR-\d{8}-\d{3}$/)
     expect(response.body.version).toBeTruthy()
 
     const crashLog = readFileSync(categoryLogFile('crash'), 'utf8')

@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Desktop capabilities for JewelTrackerPro",
+  "description": "Desktop capabilities for PawnDesk",
   "windows": ["main", "print-*"],
   "permissions": [
     "core:default",
@@ -15,7 +15,7 @@
       "allow": [
         {
           "args": true,
-          "name": "binaries/jeweltrackerpro-api",
+          "name": "binaries/pawndesk-api",
           "sidecar": true
         }
       ]
@@ -25,7 +25,7 @@
       "allow": [
         {
           "args": true,
-          "name": "binaries/jeweltrackerpro-api",
+          "name": "binaries/pawndesk-api",
           "sidecar": true
         }
       ]

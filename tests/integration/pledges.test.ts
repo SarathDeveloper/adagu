@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { getDatabase } from '../../server/db'
 import { setShopSetting } from '../../server/lib/settingsStore'
@@ -33,7 +34,11 @@ function goldItem(description: string, overrides: Record<string, unknown> = {}) 
   }
 }
 
-async function createDraftPledge(customerId: number, items: Array<Record<string, unknown>>) {
+async function createDraftPledge(
+  customerId: number,
+  items: Array<Record<string, unknown>>,
+  overrides: Record<string, unknown> = {},
+) {
   return getTestAgent().post('/api/pledges').send({
     customerId,
     pledgeDate: '2026-08-01',
@@ -41,6 +46,7 @@ async function createDraftPledge(customerId: number, items: Array<Record<string,
     loanAmount: 20000,
     interestPct: 2,
     items,
+    ...overrides,
   })
 }
 
@@ -1115,7 +1121,7 @@ describe('pledges API', () => {
       .send({ pledgeId, url: 'https://example.com/evil' })
     expect(badUrl.status).toBe(400)
 
-    process.env.JEWELTRACKERPRO_NO_OPEN = '1'
+    process.env.PAWNDESK_NO_OPEN = '1'
     try {
       const opened = await getTestAgent().post('/api/system/open-whatsapp').send({
         pledgeId,
@@ -1125,7 +1131,7 @@ describe('pledges API', () => {
       expect(opened.status).toBe(200)
       expect(opened.body.ok).toBe(true)
     } finally {
-      delete process.env.JEWELTRACKERPRO_NO_OPEN
+      delete process.env.PAWNDESK_NO_OPEN
     }
 
     const after = await getTestAgent().get('/api/pledges/reminders')
@@ -1133,6 +1139,143 @@ describe('pledges API', () => {
       (row: { pledgeId: number }) => row.pledgeId === pledgeId,
     ) as { lastRemindedAt: string | null } | undefined
     expect(reminded?.lastRemindedAt).toBeTruthy()
+  })
+
+  it('runs the reminder queue: buckets, UPI line, send and skip logging', async () => {
+    setShopSetting(getDatabase(), 'upi_id', 'queue.shop@okaxis')
+    try {
+      const customerId = await createPledgeCustomer('Queue Customer', '9000000061')
+      const first = await createDraftPledge(customerId, [goldItem('Chain')])
+      await getTestAgent().post(`/api/pledges/${first.body.id}/sanction`)
+      const second = await createDraftPledge(customerId, [goldItem('Ring')])
+      await getTestAgent().post(`/api/pledges/${second.body.id}/sanction`)
+
+      type Entry = {
+        pledgeId: number
+        bucket: string
+        whatsappUrl: string
+        remindedToday: boolean
+        skippedToday: boolean
+        reason: string
+      }
+      const list = (await getTestAgent().get('/api/pledges/reminders')).body as Entry[]
+      const a = list.find((row) => row.pledgeId === first.body.id)
+      const b = list.find((row) => row.pledgeId === second.body.id)
+      expect(a?.bucket).toBe('overdue')
+      expect(a?.remindedToday).toBe(false)
+      expect(decodeURIComponent(a?.whatsappUrl.split('?text=')[1] ?? '')).toContain(
+        'Pay by UPI: queue.shop@okaxis',
+      )
+
+      process.env.PAWNDESK_NO_OPEN = '1'
+      try {
+        await getTestAgent()
+          .post('/api/system/open-whatsapp')
+          .send({ pledgeId: a?.pledgeId, url: a?.whatsappUrl, kind: a?.reason })
+          .expect(200)
+      } finally {
+        delete process.env.PAWNDESK_NO_OPEN
+      }
+      await getTestAgent()
+        .post('/api/system/reminders/skip')
+        .send({ pledgeId: b?.pledgeId, kind: b?.reason })
+        .expect(200)
+
+      const after = (await getTestAgent().get('/api/pledges/reminders')).body as Entry[]
+      expect(after.find((row) => row.pledgeId === first.body.id)?.remindedToday).toBe(true)
+      const skippedRow = after.find((row) => row.pledgeId === second.body.id)
+      expect(skippedRow?.skippedToday).toBe(true)
+      expect(skippedRow?.remindedToday).toBe(false)
+
+      const log = getDatabase()
+        .prepare(`SELECT status, message, sent_by FROM pledge_reminders WHERE pledge_id = ? ORDER BY id`)
+        .all(first.body.id) as { status: string; message: string; sent_by: string }[]
+      expect(log).toHaveLength(1)
+      expect(log[0].status).toBe('sent')
+      expect(log[0].message).toContain('Queue Customer')
+      expect(log[0].sent_by).toBe('admin')
+    } finally {
+      setShopSetting(getDatabase(), 'upi_id', '')
+    }
+  })
+
+  it('stores a UPI reference and sends the payment receipt PDF on WhatsApp', async () => {
+    const customerId = await createPledgeCustomer('Receipt Customer', '9000000062')
+    const created = await createDraftPledge(customerId, [goldItem('Bangle')])
+    const pledgeId = created.body.id
+    await getTestAgent().post(`/api/pledges/${pledgeId}/sanction`)
+
+    const badRef = await getTestAgent()
+      .post(`/api/pledges/${pledgeId}/collect`)
+      .send({ collectedDate: '2026-10-01', amount: 400, mode: 'upi', reference: 'abc<script>' })
+    expect(badRef.status).toBe(400)
+
+    const collected = await getTestAgent()
+      .post(`/api/pledges/${pledgeId}/collect`)
+      .send({ collectedDate: '2026-10-01', amount: 400, mode: 'upi', reference: '432198765012' })
+    expect(collected.status).toBe(200)
+    const payment = (collected.body.payments as { id: number; reference: string }[]).at(-1)
+    expect(payment?.reference).toBe('432198765012')
+
+    const receipt = await getTestAgent().get(`/api/pledges/payments/${payment?.id}/receipt`)
+    expect(receipt.status).toBe(200)
+    expect(receipt.body.receiptNo).toBe(collected.body.receiptNo)
+    expect(receipt.body.payment.amount).toBe(400)
+    expect(receipt.body.payment.mode).toBe('upi')
+    expect(receipt.body.principalAfter).toBe(20000)
+    expect(receipt.body.status).toBe('active')
+
+    const notPdf = await getTestAgent()
+      .post(`/api/system/whatsapp-receipt/${payment?.id}`)
+      .attach('file', Buffer.from('<html></html>'), { filename: 'r.pdf', contentType: 'application/pdf' })
+    expect(notPdf.status).toBe(400)
+
+    process.env.PAWNDESK_NO_OPEN = '1'
+    try {
+      const sent = await getTestAgent()
+        .post(`/api/system/whatsapp-receipt/${payment?.id}`)
+        .attach('file', Buffer.from('%PDF-1.4\n%%EOF\n', 'latin1'), {
+          filename: 'receipt.pdf',
+          contentType: 'application/pdf',
+        })
+      expect(sent.status).toBe(200)
+      expect(sent.body.ok).toBe(true)
+      expect(sent.body.copied).toBe(true)
+      expect(existsSync(sent.body.filePath)).toBe(true)
+      expect(readFileSync(sent.body.filePath, 'latin1').startsWith('%PDF-')).toBe(true)
+    } finally {
+      delete process.env.PAWNDESK_NO_OPEN
+    }
+
+    const log = getDatabase()
+      .prepare(`SELECT kind, payment_id, message FROM pledge_reminders WHERE pledge_id = ?`)
+      .all(pledgeId) as { kind: string; payment_id: number; message: string }[]
+    expect(log).toEqual([
+      expect.objectContaining({ kind: 'receipt', payment_id: payment?.id }),
+    ])
+    expect(log[0].message).toContain('Rs.400.00')
+    expect(log[0].message).toContain('1 Oct 2026')
+
+    // A receipt send is not an interest reminder: the loan still needs one today.
+    const reminders = (await getTestAgent().get('/api/pledges/reminders')).body as {
+      pledgeId: number
+      remindedToday: boolean
+    }[]
+    expect(reminders.find((row) => row.pledgeId === pledgeId)?.remindedToday ?? false).toBe(false)
+  })
+
+  it('rejects an invalid shop UPI ID', async () => {
+    const current = { ...(await getTestAgent().get('/api/settings')).body, shopName: 'Sri Jewels' }
+    const bad = await getTestAgent()
+      .put('/api/settings')
+      .send({ ...current, upiId: 'not a upi id' })
+    expect(bad.status).toBe(400)
+    const good = await getTestAgent()
+      .put('/api/settings')
+      .send({ ...current, upiId: 'shop@okaxis', upiPayeeName: 'Sri Jewels' })
+    expect(good.status).toBe(200)
+    expect(good.body.upiId).toBe('shop@okaxis')
+    await getTestAgent().put('/api/settings').send({ ...current, upiId: '' }).expect(200)
   })
 
   it('leaves the renewal principal transfer out of collection totals', async () => {
@@ -1187,7 +1330,8 @@ describe('pledges API', () => {
 
   it('closes a renewal on the renewal date and keeps collection totals clean', async () => {
     const customerId = await createPledgeCustomer('Renew Close', '9000000061')
-    const created = await createDraftPledge(customerId, [goldItem('Ring')])
+    // Off the shop default (2%) so the renewal's rate shows where it came from.
+    const created = await createDraftPledge(customerId, [goldItem('Ring')], { interestPct: 2.5 })
     const oldId = created.body.id
     await getTestAgent().post(`/api/pledges/${oldId}/sanction`)
 
@@ -1199,7 +1343,7 @@ describe('pledges API', () => {
     expect(renewed.status).toBe(201)
     expect(renewed.body.notes).toMatch(/^Renewed from ADG/)
     // The new ticket keeps the shop's current rate rather than the old ticket's.
-    expect(renewed.body.interestPct).toBe(2.1)
+    expect(renewed.body.interestPct).toBe(2)
 
     const oldTicket = await getTestAgent().get(`/api/pledges/${oldId}`)
     expect(oldTicket.body.status).toBe('renewed')

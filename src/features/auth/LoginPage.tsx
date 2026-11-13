@@ -44,7 +44,7 @@ export function LoginPage() {
       <form className="card padded auth-card" data-entry="" onSubmit={(event) => void onSubmit(event)}>
         <div className="auth-brand">
           {logoSrc ? <img src={logoSrc} alt="" className="auth-logo" /> : null}
-          <h1>{shopName || 'AdaguTrackerPro'}</h1>
+          <h1>{shopName || 'PawnDesk'}</h1>
           <p className="muted">Sign in to continue</p>
         </div>
         <label>
