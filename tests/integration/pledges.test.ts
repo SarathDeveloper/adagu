@@ -1241,6 +1241,8 @@ describe('pledges API', () => {
       expect(sent.status).toBe(200)
       expect(sent.body.ok).toBe(true)
       expect(sent.body.copied).toBe(true)
+      // Tests never drive the WhatsApp window.
+      expect(sent.body.autoPasted).toBe(false)
       expect(existsSync(sent.body.filePath)).toBe(true)
       expect(readFileSync(sent.body.filePath, 'latin1').startsWith('%PDF-')).toBe(true)
     } finally {

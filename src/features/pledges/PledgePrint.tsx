@@ -283,10 +283,10 @@ export function PledgePrint({
         <section className="adr-terms">
           <h2 className="adr-section-title">Terms &amp; conditions</h2>
           <ol>
-            <li>Bring this original receipt to pay interest or to redeem the jewellery.</li>
+            <li>Bring this original receipt to pay interest or to get the jewellery released.</li>
             <li>Interest is {pledge.interestPct}% per month; a part month is charged as a full month.</li>
             <li>Interest is payable every month. Unpaid interest is added when the loan is closed.</li>
-            <li>If not redeemed by the due date, the jewellery may be auctioned after written notice.</li>
+            <li>If the jewellery is not released by the due date, it may be auctioned after written notice.</li>
             <li>The weights above were checked in the borrower&apos;s presence and accepted as correct.</li>
             <li>I declare that the pledged articles are my own property and free of any claim.</li>
           </ol>

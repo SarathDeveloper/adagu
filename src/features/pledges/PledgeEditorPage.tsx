@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -778,7 +778,7 @@ export function PledgeEditorPage() {
       setRedeeming(true);
       setError(null);
       const targetId = pledge?.id ?? Number(id);
-      if (!targetId) throw new Error("Sanction the loan before redeeming");
+      if (!targetId) throw new Error("Sanction the loan before releasing the gold");
       const updated = await api.redeemPledge({
         id: targetId,
         redeemedDate: redeemDate,
@@ -788,9 +788,9 @@ export function PledgeEditorPage() {
       });
       setPledge(updated);
       setRedeemOpen(false);
-      showToast("Pledge redeemed", "success");
+      showToast("Loan closed and gold released", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to redeem pledge");
+      setError(err instanceof Error ? err.message : "Failed to release the gold");
     } finally {
       setRedeeming(false);
     }
@@ -812,7 +812,7 @@ export function PledgeEditorPage() {
       setRedeemOpen(false);
       showToast(
         updated.status === "redeemed"
-          ? "Pledge fully redeemed"
+          ? "Loan closed and gold released"
           : "Partial collection recorded",
         "success",
       );
@@ -919,7 +919,7 @@ export function PledgeEditorPage() {
 
   const statusLabel =
     pledge?.status === "redeemed"
-      ? "Redeemed"
+      ? "Released"
       : pledge?.status === "forfeited"
         ? "Forfeited"
         : pledge?.status === "renewed"
@@ -1112,7 +1112,7 @@ export function PledgeEditorPage() {
                   setRedeemOpen(true);
                 }}
               >
-                <Check size={16} strokeWidth={2} aria-hidden /> Collect / Redeem
+                <Check size={16} strokeWidth={2} aria-hidden /> Collect / Release
               </button>
             </>
           ) : null}
@@ -1301,6 +1301,7 @@ export function PledgeEditorPage() {
               <thead>
                 <tr>
                   <th className="adagu-col-index">#</th>
+                  <th className="adagu-col-item-name">Item name</th>
                   <th className="adagu-col-metal">Metal</th>
                   <th className="adagu-col-purity">Purity</th>
                   <th className="adagu-col-weight">Gross Wt. (gms)</th>
@@ -1322,9 +1323,25 @@ export function PledgeEditorPage() {
                     (row) => String(row.id) === item.key,
                   );
                   return (
-                    <Fragment key={item.key}>
-                      <tr data-item={index + 1}>
+                      <tr key={item.key} data-item={index + 1}>
                         <td className="adagu-col-index">{index + 1}</td>
+                        <td className="adagu-col-item-name" data-label="Item name">
+                          <div className="adagu-input-with-icon">
+                            <input
+                              type="text"
+                              maxLength={200}
+                              disabled={!canEdit || busy}
+                              aria-label={`Jewel ${index + 1} item name`}
+                              value={item.description}
+                              onChange={(event) =>
+                                updateItem(item.key, {
+                                  description: event.target.value,
+                                })
+                              }
+                              placeholder="e.g. Gold chain"
+                            />
+                          </div>
+                        </td>
                         <td className="adagu-col-metal" data-label="Metal">
                           <div className="adagu-metal-switch">
                             <button
@@ -1450,25 +1467,6 @@ export function PledgeEditorPage() {
                           ) : null}
                         </td>
                       </tr>
-                      <tr>
-                        <td colSpan={9} className="adagu-item-description-cell">
-                          <div className="adagu-input-with-icon adagu-item-description">
-                            <textarea
-                              rows={1}
-                              disabled={!canEdit || busy}
-                              aria-label={`Jewel ${index + 1} description`}
-                              value={item.description}
-                              onChange={(event) =>
-                                updateItem(item.key, {
-                                  description: event.target.value,
-                                })
-                              }
-                              placeholder="Description of jewels"
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    </Fragment>
                   );
                 })}
               </tbody>
@@ -1480,7 +1478,9 @@ export function PledgeEditorPage() {
               photos={photos}
               kind="item"
               label="Item photos"
-              editable={canEdit}
+              // Photos can still be added to a sanctioned (active) loan; the
+              // server allows draft and active loans.
+              editable={canEdit || isActiveLoan}
               busy={busy}
               onChanged={setPhotos}
               ensurePledgeId={ensurePledgeIdForPhotos}
@@ -1723,7 +1723,7 @@ export function PledgeEditorPage() {
 
       {redeemOpen ? (
         <Modal
-          title="Collect / Redeem"
+          title="Collect / Release"
           entry
           onClose={() => setRedeemOpen(false)}
           footer={
@@ -1750,7 +1750,7 @@ export function PledgeEditorPage() {
                 disabled={busy}
                 onClick={() => void redeemFull()}
               >
-                Full redeem
+                Full release
               </button>
             </div>
           }
@@ -1847,7 +1847,7 @@ export function PledgeEditorPage() {
           <p className="muted">
             Collect {formatCurrency(numericFieldToNumber(amountCollected))} and write
             off {formatCurrency(numericFieldToNumber(redeemDiscount))} to close.
-            Discount applies to full redeem only.
+            Discount applies to full release only.
           </p>
           <button
             type="button"

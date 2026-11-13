@@ -632,7 +632,7 @@ router.post(
     const input = parseBody(pledgeRedeemInputSchema, { ...req.body, id }) as PledgeRedeemInput
     // A discount is money the shop gives up, so only an admin can grant it.
     if ((input.discount ?? 0) > EPSILON && !isAdmin(req)) {
-      throw new HttpError(403, 'Only an admin can give a discount on redeem')
+      throw new HttpError(403, 'Only an admin can give a discount on release')
     }
     const db = getDatabase()
     const tx = db.transaction(() => {

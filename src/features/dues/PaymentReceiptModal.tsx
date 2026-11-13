@@ -11,14 +11,14 @@ import { printPreviewPaths } from '../print/printPreviewPaths'
 /**
  * Opens after every Adagu interest collection: the half-page (A5) interest
  * receipt, ready to print, save as PDF or send on WhatsApp. Sending renders the
- * PDF, copies it to the clipboard and opens the customer's chat in WhatsApp
- * Desktop; staff paste with Ctrl+V and press Enter.
+ * PDF, copies it to the clipboard, opens the customer's chat in WhatsApp
+ * Desktop and (on Windows) pastes the PDF in; staff check it and press Enter.
  */
 export function PaymentReceiptModal({ paymentId, onClose }: { paymentId: number; onClose: () => void }) {
   const { showToast } = useToast()
   const [receipt, setReceipt] = useState<PledgePaymentReceipt | null>(null)
   const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState<{ copied: boolean; filePath: string } | null>(null)
+  const [sent, setSent] = useState<{ copied: boolean; autoPasted: boolean; filePath: string } | null>(null)
 
   useEffect(() => {
     let active = true
@@ -38,7 +38,7 @@ export function PaymentReceiptModal({ paymentId, onClose }: { paymentId: number;
       setSending(true)
       const pdf = await renderPrintPdfBytes(printPreviewPaths.pledgePayment(paymentId))
       const result = await api.sendWhatsAppReceipt(paymentId, pdf)
-      setSent({ copied: result.copied, filePath: result.filePath })
+      setSent({ copied: result.copied, autoPasted: result.autoPasted, filePath: result.filePath })
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not send the receipt', 'error')
     } finally {
@@ -54,7 +54,17 @@ export function PaymentReceiptModal({ paymentId, onClose }: { paymentId: number;
   const notice = sent ? (
     <div className="payment-receipt-next">
       <strong>WhatsApp is open with the message.</strong>
-      {sent.copied ? (
+      {sent.autoPasted ? (
+        <ol>
+          <li>The receipt PDF attaches to the chat by itself in a few seconds. Don&apos;t click other windows meanwhile.</li>
+          <li>
+            Check the PDF and message, then press <kbd>Enter</kbd> in WhatsApp to send.
+          </li>
+          <li>
+            No PDF after 10 seconds? Click in the chat and press <kbd>Ctrl</kbd> + <kbd>V</kbd>.
+          </li>
+        </ol>
+      ) : sent.copied ? (
         <ol>
           <li>
             Click in the chat and press <kbd>Ctrl</kbd> + <kbd>V</kbd> to attach the receipt PDF.

@@ -56,7 +56,7 @@ export function quotePledgeItemRelease(input: ReleaseQuoteInput): ReleaseQuote {
   }
   const held = input.items.filter((item) => !item.released)
   if (held.length < 2) {
-    throw new Error('The last jewel is a full redeem, not a partial release')
+    throw new Error('The last jewel is a full release that closes the loan, not a partial release')
   }
   const item = held.find((row) => row.id === input.itemId)
   if (!item) {
@@ -83,7 +83,7 @@ export function quotePledgeItemRelease(input: ReleaseQuoteInput): ReleaseQuote {
   const requiredPrincipal = roundMoney(share + extra)
 
   if (requiredPrincipal + EPSILON >= principal && principal > EPSILON) {
-    throw new Error('Releasing this jewel would clear the loan. Use full redeem.')
+    throw new Error('Releasing this jewel would clear the loan. Use full release.')
   }
 
   return {
@@ -105,6 +105,6 @@ export function assertReleaseAmount(quote: ReleaseQuote, amount: number): void {
     throw new Error(`Amount must be at least ${quote.requiredTotal.toFixed(2)}`)
   }
   if (paid + EPSILON >= quote.payoff) {
-    throw new Error('That amount would close the loan. Use full redeem.')
+    throw new Error('That amount would close the loan. Use full release.')
   }
 }

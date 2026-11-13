@@ -53,7 +53,7 @@ function paymentSplitNote(payment: PledgePayment) {
 }
 
 function statusLabel(status: PledgeStatus) {
-  if (status === 'redeemed') return 'Redeemed'
+  if (status === 'redeemed') return 'Released'
   if (status === 'forfeited') return 'Forfeited'
   if (status === 'renewed') return 'Renewed'
   if (status === 'draft') return 'Draft'
@@ -696,7 +696,7 @@ export function AdaguDueDetailDrawer({
                         ? 'This pledge was closed without gold release.'
                         : settled
                           ? 'This loan has been completely paid.'
-                          : 'Collect interest or redeem to settle this loan.'}
+                          : 'Collect interest or release the gold to settle this loan.'}
                     </p>
                   </div>
                 </div>
@@ -714,7 +714,7 @@ export function AdaguDueDetailDrawer({
                 </dl>
                 {activeLoan ? (
                   <button type="button" className="btn" disabled={busy} onClick={onRedeem}>
-                    Collect / Redeem
+                    Collect / Release
                   </button>
                 ) : null}
                 {summary.status === 'forfeited' && summary.remaining > 0 && onCollectShortfall ? (

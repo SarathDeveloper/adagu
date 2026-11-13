@@ -122,7 +122,7 @@ export async function fillPledgeItem(
   await itemRow.locator('.adagu-col-weight input').nth(0).fill(values.grossWeight)
   await itemRow.locator('.adagu-col-weight input').nth(1).fill(values.stoneWeight)
   await itemRow.locator('.adagu-col-weight input').nth(1).blur()
-  await table.locator('textarea').fill(values.description)
+  await itemRow.locator('.adagu-col-item-name input').fill(values.description)
 }
 
 export async function recoverFromFatalError(page: Page) {

@@ -8216,22 +8216,12 @@ label {
 .adagu-net-weight-input input {
   font-weight: 600;
 }
-.adagu-item-description-cell {
-  padding-top: 0;
-  padding-bottom: 0.2rem;
+.adagu-col-item-name {
+  width: auto;
 }
-.adagu-item-description {
-  align-items: center;
-  height: 1.75rem;
-  min-height: 1.75rem;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.adagu-item-description textarea {
-  font-size: 0.75rem;
-  max-height: 1.75rem;
-  resize: none;
-  overflow: hidden;
+.adagu-col-item-name input {
+  font-weight: 500;
+  text-overflow: ellipsis;
 }
 .adagu-jewellery-summary {
   display: flex;
@@ -9908,8 +9898,12 @@ label {
   text-align: right;
 }
 .sale-bill-editor .adagu-jewellery-table--pledge {
-  min-width: 0;
+  /* Below this the item name column gets too narrow; the wrap scrolls instead. */
+  min-width: 46rem;
   width: 100%;
+}
+.sale-bill-editor .adagu-jewellery-table--pledge .adagu-col-value {
+  width: 5.5rem;
 }
 .sale-bill-editor .adagu-jewellery-table--pledge .adagu-col-index {
   width: 2.75rem;
@@ -9919,7 +9913,7 @@ label {
   width: 6.75rem;
 }
 .sale-bill-editor .adagu-jewellery-table--pledge .adagu-col-purity {
-  width: 4rem;
+  width: 4.75rem;
 }
 .sale-bill-editor .adagu-jewellery-table--pledge .adagu-col-weight {
   width: 4.75rem;
@@ -10532,10 +10526,6 @@ label.check-row input[type='checkbox'] {
 }
 .customer-card-link:hover {
   background: var(--brand-soft);
-}
-.customer-card-note {
-  color: var(--text-muted);
-  font-size: 0.75rem;
 }
 .customer-muted {
   color: var(--text-muted);

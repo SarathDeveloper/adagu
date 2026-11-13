@@ -428,6 +428,8 @@ export interface WhatsAppReceiptResult {
   ok: boolean
   /** The PDF is on the clipboard, ready to paste into the chat. */
   copied: boolean
+  /** The app is pasting the PDF into WhatsApp Desktop by itself (Windows). */
+  autoPasted: boolean
   /** Where the PDF was saved. */
   filePath: string
 }

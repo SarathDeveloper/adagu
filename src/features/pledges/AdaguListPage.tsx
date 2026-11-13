@@ -22,7 +22,7 @@ type Period = 'today' | 'month' | 'all'
 type DueTone = 'ok' | 'soon' | 'overdue'
 
 function statusOf(pledge: Pledge): { tone: PledgeStatus; label: string } {
-  if (pledge.status === 'redeemed') return { tone: 'redeemed', label: 'Redeemed' }
+  if (pledge.status === 'redeemed') return { tone: 'redeemed', label: 'Released' }
   if (pledge.status === 'renewed') return { tone: 'renewed', label: 'Renewed' }
   if (pledge.status === 'forfeited') return { tone: 'forfeited', label: 'Forfeited' }
   if (pledge.status === 'draft') return { tone: 'draft', label: 'Draft' }
@@ -192,7 +192,7 @@ export function AdaguListPage() {
                   { value: 'all', label: 'All', ...(statusFilter === 'all' ? { count: totalRows } : {}) },
                   { value: 'draft', label: 'Draft' },
                   { value: 'active', label: 'Active' },
-                  { value: 'redeemed', label: 'Redeemed' },
+                  { value: 'redeemed', label: 'Released' },
                   { value: 'forfeited', label: 'Forfeited' },
                   { value: 'renewed', label: 'Renewed' },
                 ]}

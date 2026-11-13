@@ -15,7 +15,7 @@ import type { WhatsAppReceiptResult } from '@shared/types'
 import { requireAuth, requireFeature } from '../auth/middleware'
 import { getDatabase } from '../db'
 import { asyncHandler, HttpError, parseBody, parseIdParam } from '../lib/http'
-import { copyFileToClipboard, openExternalUrl } from '../lib/openExternal'
+import { autoPasteIntoWhatsApp, copyFileToClipboard, openExternalUrl } from '../lib/openExternal'
 import { getDataDir } from '../lib/paths'
 import { buildPledgePaymentReceipt } from '../pledges/paymentReceipt'
 import { loadShopSettings } from '../lib/settingsStore'
@@ -134,8 +134,8 @@ router.post(
 
 /**
  * Send a payment receipt on WhatsApp: save the PDF the app rendered, put it on
- * the clipboard as a file, then open the customer's chat with a short message.
- * Staff press Ctrl+V in the chat to attach the PDF.
+ * the clipboard as a file, open the customer's chat with a short message, then
+ * paste the PDF into it (Windows). Staff check the attachment and press Enter.
  */
 router.post(
   '/whatsapp-receipt/:paymentId',
@@ -177,6 +177,8 @@ router.post(
     // Clipboard first, so the file is ready by the time the chat opens.
     const copied = copyFileToClipboard(filePath)
     openExternalUrl(url)
+    // With the PDF on the clipboard, paste it into the chat once it is open.
+    const autoPasted = copied && autoPasteIntoWhatsApp()
     insertReminderLog({
       pledgeId: receipt.pledgeId,
       kind: 'receipt',
@@ -186,7 +188,7 @@ router.post(
       paymentId: receipt.payment.id,
     })
 
-    const result: WhatsAppReceiptResult = { ok: true, copied, filePath }
+    const result: WhatsAppReceiptResult = { ok: true, copied, autoPasted, filePath }
     res.json(result)
   }),
 )

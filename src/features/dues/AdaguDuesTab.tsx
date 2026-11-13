@@ -675,7 +675,7 @@ export function AdaguDuesTab({
                 disabled={busy || !activeRedeemPayoff}
                 onClick={() => void redeemFull()}
               >
-                {redeemAction === 'full' ? 'Closing…' : 'Full redeem'}
+                {redeemAction === 'full' ? 'Closing…' : 'Full release'}
               </button>
             </div>
           }
@@ -755,7 +755,7 @@ export function AdaguDuesTab({
           </div>
           <p className="muted">
             Collect {formatCurrency(redeemAmount)} and write off {formatCurrency(redeemDiscount)} to close. Discount
-            applies to full redeem only.
+            applies to full release only.
           </p>
           <button
             type="button"

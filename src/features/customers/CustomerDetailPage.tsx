@@ -65,7 +65,7 @@ function isOpenGsAccount(account: GoldSavingAccount) {
 }
 
 function adaguStatusOf(status: PledgeStatus): { tone: PledgeStatus; label: string } {
-  if (status === 'redeemed') return { tone: 'redeemed', label: 'Redeemed' }
+  if (status === 'redeemed') return { tone: 'redeemed', label: 'Released' }
   if (status === 'renewed') return { tone: 'renewed', label: 'Renewed' }
   if (status === 'forfeited') return { tone: 'forfeited', label: 'Forfeited' }
   if (status === 'draft') return { tone: 'draft', label: 'Draft' }
@@ -687,12 +687,7 @@ function KycCard({
 }) {
   const [showAadhaar, setShowAadhaar] = useState(false)
   return (
-    <ProfileCard
-      title="KYC & identity"
-      action={
-        customer.idProofType ? <span className="customer-card-note">ID proof: {customer.idProofType}</span> : null
-      }
-    >
+    <ProfileCard title="KYC & identity">
       <dl className="customer-fields">
         <Field
           label="Aadhaar"
@@ -711,7 +706,6 @@ function KycCard({
         />
         <Field label="PAN" value={customer.pan} />
         <Field label="GSTIN" value={customer.gstin} />
-        <Field label="ID proof type" value={customer.idProofType} />
       </dl>
       <div className="customer-doc-grid">
         <DocumentTile

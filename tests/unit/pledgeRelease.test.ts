@@ -102,7 +102,7 @@ describe('quotePledgeItemRelease', () => {
         items: [item(1, 30000, 20, true), item(2, 10000, 8)],
         itemId: 2,
       }),
-    ).toThrow(/full redeem/)
+    ).toThrow(/full release/)
   })
 
   it('rejects a release that would clear the loan', () => {

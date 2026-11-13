@@ -188,22 +188,6 @@ export function CustomerFormModal({
             aria-label="PAN"
           />
         </label>
-        <label>
-          <span className="field-label">ID proof type</span>
-          <select
-            className="input"
-            value={form.idProofType ?? ''}
-            onChange={(e) => setForm({ ...form, idProofType: e.target.value })}
-            aria-label="ID proof type"
-          >
-            <option value="">Not recorded</option>
-            <option value="Aadhaar">Aadhaar</option>
-            <option value="PAN">PAN</option>
-            <option value="Voter ID">Voter ID</option>
-            <option value="Driving Licence">Driving Licence</option>
-            <option value="Other">Other</option>
-          </select>
-        </label>
         <label className="full">
           <span className="field-label">
             Address <span className="req" aria-hidden="true">*</span>

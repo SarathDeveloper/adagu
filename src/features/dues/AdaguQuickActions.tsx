@@ -99,7 +99,7 @@ export function AdaguQuickActions({
             onClick={onRedeem}
           >
             {panel ? <Handshake size={16} strokeWidth={1.75} aria-hidden /> : null}
-            Redeem
+            Release
           </button>
           {onRenew ? (
             <button

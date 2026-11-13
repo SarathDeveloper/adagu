@@ -242,7 +242,7 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     await expect(historyRow).toContainText(inr(2_400))
     await expect(historyRow).toContainText('Cash')
 
-    await redeemDrawer.getByRole('button', { name: 'Redeem', exact: true }).click()
+    await redeemDrawer.getByRole('button', { name: 'Release', exact: true }).click()
     const redeem = window.getByRole('dialog', { name: new RegExp(`Close Adagu loan · ${receiptNo}`) })
     await expect(redeem).toBeVisible()
     await expect(redeem.getByLabel('Amount collected')).toHaveValue('122000')
@@ -293,10 +293,10 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     await expect(afterInterest.locator('td').nth(8)).toHaveText(inr(50_000))
 
     const redeemDrawer = await openAdaguDueDrawer(window, receiptNo, customerName)
-    await redeemDrawer.getByRole('button', { name: 'Redeem', exact: true }).click()
+    await redeemDrawer.getByRole('button', { name: 'Release', exact: true }).click()
     const redeem = window.getByRole('dialog', { name: new RegExp(`Close Adagu loan · ${receiptNo}`) })
     await expect(redeem.getByLabel('Amount collected')).toHaveValue('50000')
-    await redeem.getByRole('button', { name: 'Full redeem' }).click()
+    await redeem.getByRole('button', { name: 'Full release' }).click()
     await expect(window.getByText('Adagu loan closed')).toBeVisible()
     await closePrintPreview(window)
     const closed = await adaguDueRow(window, customerName)
@@ -323,14 +323,14 @@ test.describe('Adagu billing — live Tauri scenarios', () => {
     const receiptNo = await receiptNoFromDueRow(row)
 
     const drawer = await openAdaguDueDrawer(window, receiptNo, customerName)
-    await drawer.getByRole('button', { name: 'Redeem', exact: true }).click()
+    await drawer.getByRole('button', { name: 'Release', exact: true }).click()
     const redeem = window.getByRole('dialog', { name: new RegExp(`Close Adagu loan · ${receiptNo}`) })
     await expect(redeem).toBeVisible()
     // The discount applies to interest first and the rest still has to cover the payoff.
     await redeem.getByLabel('Discount').fill('100')
     await expect(redeem.getByLabel('Amount collected')).toHaveValue('50900')
     await redeem.getByLabel('Mode').selectOption('upi')
-    await redeem.getByRole('button', { name: 'Full redeem' }).click()
+    await redeem.getByRole('button', { name: 'Full release' }).click()
     await expect(window.getByText('Adagu loan closed')).toBeVisible()
     await closePrintPreview(window)
 
