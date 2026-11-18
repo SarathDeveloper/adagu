@@ -1,6 +1,6 @@
 .gs-call-list-root {
-  --gs-magenta: #9b1b6f;
-  --gs-gold: #c9a227;
+  --gs-magenta: #000;
+  --gs-gold: #000;
   box-sizing: border-box;
   width: 210mm;
   min-height: 148mm;
@@ -71,21 +71,21 @@
 }
 .gs-call-list-table th,
 .gs-call-list-table td {
-  border: 0.4pt solid #b9a97f;
+  border: 0.4pt solid #999;
   padding: 1.3mm 1.2mm;
   text-align: left;
   vertical-align: top;
   font-size: 8.5pt;
 }
 .gs-call-list-table thead th {
-  background: #f4ecd8;
+  background: #eee;
   font-size: 8pt;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 .gs-call-list-table .num { text-align: right; white-space: nowrap; }
 .gs-call-list-table tfoot th {
-  background: #faf6ea;
+  background: #f7f7f7;
   text-align: right;
 }
 .gs-call-list-notes { min-width: 42mm; }

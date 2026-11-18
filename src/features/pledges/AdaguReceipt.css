@@ -1,16 +1,16 @@
 /*
- * Adagu (gold loan) receipt, A4. Charcoal ink with one gold accent; every fill
- * is light enough to stay readable on a black-and-white laser printer.
+ * Adagu (gold loan) receipt, A4. Black and white only: black ink, neutral grey
+ * lines and fills light enough to stay readable on a laser printer.
  */
 .adr-root {
-  --adr-ink: #1c1917;
-  --adr-muted: #57534e;
-  --adr-faint: #78716c;
-  --adr-line: #d6d3d1;
-  --adr-line-strong: #a8a29e;
-  --adr-gold: #8a5a0b;
-  --adr-gold-soft: #f6efe1;
-  --adr-fill: #f5f5f4;
+  --adr-ink: #000;
+  --adr-muted: #444;
+  --adr-faint: #666;
+  --adr-line: #ccc;
+  --adr-line-strong: #999;
+  --adr-gold: #000;
+  --adr-gold-soft: #f2f2f2;
+  --adr-fill: #f5f5f5;
   color: var(--adr-ink);
   font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
   font-size: 9.5pt;

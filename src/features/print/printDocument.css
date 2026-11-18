@@ -48,8 +48,8 @@
   font-size: 46pt;
   font-weight: 800;
   letter-spacing: 0.3em;
-  color: rgba(178, 34, 34, 0.16);
-  border: 3pt solid rgba(178, 34, 34, 0.16);
+  color: rgba(0, 0, 0, 0.16);
+  border: 3pt solid rgba(0, 0, 0, 0.16);
   border-radius: 4mm;
   padding: 2mm 8mm;
   white-space: nowrap;

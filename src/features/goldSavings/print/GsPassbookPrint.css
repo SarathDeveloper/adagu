@@ -1,11 +1,11 @@
 .gs-passbook-root {
-  --gs-magenta: #9b1b6f;
-  --gs-magenta-deep: #6d1152;
-  --gs-purple: #7e1a8a;
-  --gs-gold: #e6c34a;
-  --gs-gold-dark: #c9a227;
-  --gs-cream: #fff8e8;
-  --gs-yellow: #ffe566;
+  --gs-magenta: #000;
+  --gs-magenta-deep: #000;
+  --gs-purple: #000;
+  --gs-gold: #fff;
+  --gs-gold-dark: #000;
+  --gs-cream: #fff;
+  --gs-yellow: #fff;
   box-sizing: border-box;
   width: 210mm;
   min-height: 297mm;
@@ -34,7 +34,7 @@
 .gs-passbook-header {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #c2185b 0%, var(--gs-magenta) 42%, var(--gs-purple) 100%);
+  background: var(--gs-magenta);
   color: #fff;
   padding: 3.5mm 4mm 4mm;
   border-radius: 2mm 2mm 0 0;
@@ -237,7 +237,7 @@
 }
 .gs-passbook-form-top strong {
   min-height: 6mm;
-  border-bottom: 0.7pt dotted #7a5a2b;
+  border-bottom: 0.7pt dotted #555;
   font-size: 9.5pt;
   padding-bottom: 0.6mm;
 }
@@ -262,7 +262,7 @@
 .gs-passbook-form-fields dd {
   margin: 0;
   min-height: 6.5mm;
-  border-bottom: 0.7pt dotted #7a5a2b;
+  border-bottom: 0.7pt dotted #555;
   font-weight: 700;
   font-size: 9.5pt;
   padding-bottom: 0.6mm;
