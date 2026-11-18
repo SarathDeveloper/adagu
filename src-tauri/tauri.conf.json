@@ -49,7 +49,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDMUE2NDY2NjMwODIxNTcKUldSWElRaGpabVFhZkdNZ2Uza3Z2dmowejJrMVpwbGNZZ210M3pZY1pTUllWcnM3S1EzSTVxaGsK",
       "endpoints": [
         "https://github.com/SarathDeveloper/adagu/releases/latest/download/latest.json"
       ],
