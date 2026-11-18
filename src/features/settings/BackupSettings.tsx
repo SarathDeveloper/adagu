@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Archive, Download, FileSpreadsheet, FolderOpen, ShieldAlert, ShieldCheck, Upload } from 'lucide-react'
 import type { BackupFile, BackupInspection, BackupKind, BackupStatus } from '@shared/types'
 import { CHANGE_BACKUP_INTERVAL_HOURS } from '@shared/backupSchedule'
+import { BACKUP_LOCKED_MESSAGE } from '@shared/backupRetention'
+import { BackupEncryptionCard } from './BackupEncryptionCard'
 import { BACKUP_STATUS_EVENT, daysSinceBackup, healthTitle, healthTone, offsiteCopyCurrent } from '@shared/backupHealth'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { Modal } from '../../components/Modal'
@@ -51,6 +53,10 @@ export function BackupSettings() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [inspection, setInspection] = useState<BackupInspection | null>(null)
+  const [unlockFile, setUnlockFile] = useState<File | null>(null)
+  const [unlockSecret, setUnlockSecret] = useState('')
+  const [unlockWithRecovery, setUnlockWithRecovery] = useState(false)
+  const [unlockError, setUnlockError] = useState<string | null>(null)
   const canBrowse = Boolean(window.desktopAPI?.chooseBackupFolder)
 
   function applyStatus(status: BackupStatus) {
@@ -230,7 +236,17 @@ export function BackupSettings() {
         await refresh()
         showToast('Backup deleted', 'success')
       } else if (action.type === 'restore-file') {
-        await api.restoreDatabase(action.file)
+        try {
+          await api.restoreDatabase(action.file)
+        } catch (err) {
+          if (err instanceof Error && err.message === BACKUP_LOCKED_MESSAGE) {
+            setUnlockFile(action.file)
+            setUnlockSecret('')
+            setUnlockError(null)
+            return
+          }
+          throw err
+        }
         showToast('Database restored. Reloading…', 'success')
         window.location.reload()
         return
@@ -245,6 +261,27 @@ export function BackupSettings() {
       const message = err instanceof Error ? err.message : 'Action failed'
       setError(message)
       showToast(message, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function restoreEncrypted() {
+    if (!unlockFile || !unlockSecret.trim()) {
+      setUnlockError(unlockWithRecovery ? 'Enter the recovery key' : 'Enter the backup password')
+      return
+    }
+    setBusy(true)
+    try {
+      await api.restoreDatabase(
+        unlockFile,
+        unlockWithRecovery ? { recoveryKey: unlockSecret } : { password: unlockSecret },
+      )
+      setUnlockFile(null)
+      showToast('Database restored. Reloading…', 'success')
+      window.location.reload()
+    } catch (err) {
+      setUnlockError(err instanceof Error ? err.message : 'Restore failed')
     } finally {
       setBusy(false)
     }
@@ -315,7 +352,7 @@ export function BackupSettings() {
               Restore from File
               <input
                 type="file"
-                accept=".db,.zip"
+                accept=".db,.zip,.pdenc"
                 hidden
                 disabled={busy}
                 onChange={(event) => {
@@ -333,6 +370,8 @@ export function BackupSettings() {
           </p>
         </div>
       </div>
+
+      <BackupEncryptionCard onChanged={() => void refresh()} />
 
       <div className="card padded backup-schedule" data-entry="">
         <div className="settings-card-head">
@@ -532,6 +571,56 @@ export function BackupSettings() {
           onConfirm={() => void confirmPending()}
           onCancel={() => setPending(null)}
         />
+      )}
+      {unlockFile && (
+        <Modal
+          title="Encrypted backup"
+          busy={busy}
+          onClose={() => setUnlockFile(null)}
+          footer={
+            <>
+              <button type="button" className="btn secondary" disabled={busy} onClick={() => setUnlockFile(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn" disabled={busy} onClick={() => void restoreEncrypted()}>
+                Unlock and restore
+              </button>
+            </>
+          }
+        >
+          <p className="muted">
+            {unlockFile.name} was encrypted with a backup password. Enter it, or the printed recovery key,
+            to restore. The current database will be replaced.
+          </p>
+          {unlockError && <div className="error-banner">{unlockError}</div>}
+          <label className="backup-offsite-path-label">
+            {unlockWithRecovery ? 'Recovery key' : 'Backup password'}
+            <input
+              className="input"
+              type={unlockWithRecovery ? 'text' : 'password'}
+              autoComplete="off"
+              autoFocus
+              value={unlockSecret}
+              disabled={busy}
+              onChange={(event) => setUnlockSecret(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void restoreEncrypted()
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={busy}
+            onClick={() => {
+              setUnlockWithRecovery((value) => !value)
+              setUnlockSecret('')
+              setUnlockError(null)
+            }}
+          >
+            {unlockWithRecovery ? 'Use the backup password instead' : 'Forgot it? Use the recovery key'}
+          </button>
+        </Modal>
       )}
       {inspection && (
         <Modal title="Backup check" onClose={() => setInspection(null)}>

@@ -3,25 +3,38 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Router } from 'express'
 import multer from 'multer'
-import { backupSettingsSchema, exportFullBackupSchema, inspectBackupSchema, restoreBackupNameSchema } from '@shared/schemas'
+import {
+  backupSettingsSchema,
+  changeBackupPasswordSchema,
+  enableBackupEncryptionSchema,
+  exportFullBackupSchema,
+  inspectBackupSchema,
+  restoreBackupNameSchema,
+} from '@shared/schemas'
 import {
   allowFullBackupEntry,
   FULL_BACKUP_DB_NAMES,
   assertFullBackupDestination,
-  backupDatabaseTo,
   copyNewestBackupOffsite,
   createManualBackup,
+  decryptBackupToTemp,
   deleteBackup,
+  exportsEncrypted,
   getBackupStatus,
   getOffsiteDir,
   inspectBackup,
+  isEncryptedFile,
   listBackups,
+  removeDecryptedTemp,
   restoreBackupByName,
   restoreDatabaseFrom,
   updateBackupSchedule,
   withBackupLock,
+  writeDatabaseExport,
   writeFullBackup,
 } from '../db/backup'
+import { changeBackupPassword, enableBackupEncryption, getBackupEncryptionStatus } from '../db/backupKey'
+import { ENCRYPTED_SUFFIX } from '../lib/backupCrypto'
 import { extractZipFile, isZipFile } from '../lib/zip'
 import { writeExcelBackupFromDatabaseYielding } from '../db/excelBackup'
 import { getDatabase, getDbPath } from '../db'
@@ -59,6 +72,36 @@ router.get(
   '/status',
   asyncHandler((_req, res) => {
     res.json(getBackupStatus())
+  }),
+)
+
+router.get(
+  '/encryption',
+  asyncHandler((_req, res) => {
+    res.json(getBackupEncryptionStatus())
+  }),
+)
+
+/** Turns encryption on and returns the recovery key. It is shown once and never stored. */
+router.post(
+  '/encryption',
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const { password } = parseBody(enableBackupEncryptionSchema, req.body)
+    res.json(await enableBackupEncryption(password))
+  }),
+)
+
+router.put(
+  '/encryption/password',
+  adminOnly,
+  asyncHandler(async (req, res) => {
+    const input = parseBody(changeBackupPasswordSchema, req.body)
+    await changeBackupPassword(
+      { password: input.currentPassword, recoveryKey: input.recoveryKey },
+      input.newPassword,
+    )
+    res.json(getBackupEncryptionStatus())
   }),
 )
 
@@ -112,10 +155,11 @@ router.get(
   '/export',
   adminOnly,
   asyncHandler(async (_req, res) => {
-    const filename = `pawndesk-backup-${new Date().toISOString().slice(0, 10)}.db`
-    const destination = join(tmpdir(), filename)
+    const encrypted = exportsEncrypted()
+    const filename = `pawndesk-backup-${new Date().toISOString().slice(0, 10)}.db${encrypted ? ENCRYPTED_SUFFIX : ''}`
+    const destination = join(tmpdir(), `pd-export-${Date.now()}-${filename}`)
     await withBackupLock(async () => {
-      await backupDatabaseTo(destination)
+      await writeDatabaseExport(destination)
     })
     res.download(destination, filename, () => removeTempFile(destination))
   }),
@@ -125,8 +169,9 @@ router.get(
   '/export-full',
   adminOnly,
   asyncHandler(async (_req, res) => {
-    const filename = `pawndesk-full-${new Date().toISOString().slice(0, 10)}.zip`
-    const destination = join(tmpdir(), `pawndesk-full-${Date.now()}.zip`)
+    const suffix = exportsEncrypted() ? `.zip${ENCRYPTED_SUFFIX}` : '.zip'
+    const filename = `pawndesk-full-${new Date().toISOString().slice(0, 10)}${suffix}`
+    const destination = join(tmpdir(), `pawndesk-full-${Date.now()}${suffix}`)
     await withBackupLock(async () => {
       await writeFullBackup(destination)
     })
@@ -143,7 +188,7 @@ router.post(
     await withBackupLock(async () => {
       await writeFullBackup(destination)
     })
-    res.json({ ok: true })
+    res.json({ ok: true, path: destination })
   }),
 )
 
@@ -168,9 +213,23 @@ router.post(
     if (!req.file) {
       throw new HttpError(400, 'Backup file is required')
     }
-    const uploaded = req.file.path
+    const original = req.file.path
+    let uploaded = original
+    let decrypted: string | null = null
+    let adoptKey: (() => void) | undefined
     let extracted: string | null = null
     try {
+      if (isEncryptedFile(original)) {
+        const body = (req.body ?? {}) as { password?: unknown; recoveryKey?: unknown }
+        const password = typeof body.password === 'string' ? body.password : ''
+        const recoveryKey = typeof body.recoveryKey === 'string' ? body.recoveryKey : ''
+        // Without a password this only opens backups made with this computer's
+        // key; otherwise it answers BACKUP_LOCKED_MESSAGE and the screen asks.
+        const opened = await decryptBackupToTemp(original, { password, recoveryKey })
+        decrypted = opened.path
+        adoptKey = opened.adopt
+        uploaded = decrypted
+      }
       if (isZipFile(uploaded)) {
         extracted = mkdtempSync(join(tmpdir(), 'pd-restore-'))
         try {
@@ -184,14 +243,20 @@ router.post(
         if (!dbPath) {
           throw new HttpError(400, 'This file is not an PawnDesk backup')
         }
-        const status = await restoreDatabaseFrom(dbPath, { uploadsDir: join(extracted, 'uploads') })
+        const status = await restoreDatabaseFrom(dbPath, {
+          uploadsDir: join(extracted, 'uploads'),
+          beforeImages: adoptKey,
+        })
         res.json(status)
         return
       }
-      const status = await restoreDatabaseFrom(uploaded)
+      const status = await restoreDatabaseFrom(uploaded, { beforeImages: adoptKey })
       res.json(status)
     } finally {
-      removeTempFile(uploaded)
+      removeTempFile(original)
+      if (decrypted) {
+        removeDecryptedTemp(decrypted)
+      }
       if (extracted) {
         rmSync(extracted, { recursive: true, force: true })
       }

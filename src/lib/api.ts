@@ -3,6 +3,7 @@ import type {
   AuthUser,
   BackupFile,
   BackupInspection,
+  BackupEncryptionStatus,
   BackupStatus,
   ChangePasswordInput,
   CreateUserInput,
@@ -111,6 +112,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T
+}
+
+/** File name the server chose (exports gain `.pdenc` when encryption is on). */
+function downloadName(response: Response, fallback: string): string {
+  const header = response.headers.get('content-disposition') ?? ''
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header)
+  return match?.[1] ? decodeURIComponent(match[1]) : fallback
 }
 
 function asPaged<T>(payload: unknown): PagedList<T> {
@@ -458,7 +466,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `pawndesk-backup-${localTodayIso()}.db`
+    link.download = downloadName(response, `pawndesk-backup-${localTodayIso()}.db`)
     link.click()
     URL.revokeObjectURL(url)
   },
@@ -478,7 +486,7 @@ export const api = {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `pawndesk-full-${localTodayIso()}.zip`
+    link.download = downloadName(response, `pawndesk-full-${localTodayIso()}.zip`)
     link.click()
     URL.revokeObjectURL(url)
   },
@@ -502,9 +510,23 @@ export const api = {
     link.click()
     URL.revokeObjectURL(url)
   },
-  restoreDatabase: async (file: File) => {
+  restoreDatabase: async (file: File, secret?: { password?: string; recoveryKey?: string }) => {
     const body = new FormData()
+    // Text fields first, so they are parsed before the (possibly large) file.
+    if (secret?.password) body.append('password', secret.password)
+    if (secret?.recoveryKey) body.append('recoveryKey', secret.recoveryKey)
     body.append('file', file)
     return request<BackupStatus>('/api/backup/restore', { method: 'POST', body })
   },
+  getBackupEncryption: () => request<BackupEncryptionStatus>('/api/backup/encryption'),
+  enableBackupEncryption: (password: string) =>
+    request<{ recoveryKey: string }>('/api/backup/encryption', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  changeBackupPassword: (input: { currentPassword?: string; recoveryKey?: string; newPassword: string }) =>
+    request<BackupEncryptionStatus>('/api/backup/encryption/password', {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }),
 }

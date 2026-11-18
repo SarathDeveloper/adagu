@@ -287,6 +287,13 @@ export interface BackupStatus {
   lastOffsiteAt: string | null
   lastOffsiteError: string | null
   lastBackupError: string | null
+  /** Off-machine copies and backup exports are encrypted with the backup password. */
+  encrypted: boolean
+}
+
+export interface BackupEncryptionStatus {
+  enabled: boolean
+  createdAt: string | null
 }
 
 export type BackupKind = 'daily' | 'manual' | 'dayclose' | 'prerestore' | 'premigrate'

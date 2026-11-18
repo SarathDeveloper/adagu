@@ -17,6 +17,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder}
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 /// Paths the person picked in this app's own save dialog. `write_backup_file`
 /// only writes to one of these, once, so a page that reaches the command
@@ -347,6 +348,93 @@ fn get_app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// The update found by the last check, kept so "Install" installs exactly the
+/// version the person was shown.
+#[derive(Default)]
+struct PendingUpdate(Mutex<Option<Update>>);
+
+/// Set when `plugins.updater` carries a real public key. Builds without one
+/// (local and test builds) run with updates switched off instead of failing.
+#[derive(Default)]
+struct UpdaterEnabled(AtomicBool);
+
+fn updater_configured(app: &AppHandle) -> bool {
+    app.config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|config| config.get("pubkey"))
+        .and_then(|key| key.as_str())
+        .map(|key| !key.trim().is_empty())
+        .unwrap_or(false)
+}
+
+#[derive(Serialize)]
+struct UpdateInfo {
+    version: String,
+    #[serde(rename = "currentVersion")]
+    current_version: String,
+    notes: Option<String>,
+    date: Option<String>,
+}
+
+/// Returns the newer published version, or None when this one is current or
+/// updates are not configured in this build.
+#[tauri::command]
+async fn check_for_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
+    if !app.state::<UpdaterEnabled>().0.load(Ordering::SeqCst) {
+        return Ok(None);
+    }
+    let update = app
+        .updater()
+        .map_err(|error| error.to_string())?
+        .check()
+        .await
+        .map_err(|error| format!("Could not check for updates: {error}"))?;
+    let info = update.as_ref().map(|update| UpdateInfo {
+        version: update.version.clone(),
+        current_version: update.current_version.clone(),
+        notes: update.body.clone(),
+        date: update.date.map(|date| date.to_string()),
+    });
+    *app
+        .state::<PendingUpdate>()
+        .0
+        .lock()
+        .map_err(|error| error.to_string())? = update;
+    Ok(info)
+}
+
+/// Downloads and verifies the update first, so a failed download leaves the
+/// running app untouched. Only then is the API stopped (the installer replaces
+/// its executable) and the installer started. The database is not touched
+/// here: the next launch takes a safety snapshot before any migration runs.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    let update = app
+        .state::<PendingUpdate>()
+        .0
+        .lock()
+        .map_err(|error| error.to_string())?
+        .take()
+        .ok_or_else(|| "Check for updates first".to_string())?;
+    let bytes = update
+        .download(|_chunk, _total| {}, || {})
+        .await
+        .map_err(|error| format!("The update could not be downloaded: {error}"))?;
+    stop_sidecar(&app);
+    if let Err(error) = update.install(bytes) {
+        let data_dir = resolve_data_dir().unwrap_or_else(|_| PathBuf::from("."));
+        host_log::log_host_crash(&data_dir, &format!("Update install failed: {error}"));
+        // The API was stopped for the installer; relaunch so the shop is not
+        // left with a dead window.
+        app.restart();
+    }
+    // Windows: the installer has taken over and exits this process itself.
+    // macOS: the new bundle is in place, so start it.
+    app.restart();
+}
+
 #[tauri::command]
 async fn choose_backup_folder(app: AppHandle) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -493,8 +581,12 @@ fn main() {
         .manage(Lifecycle::default())
         .manage(ApprovedSavePaths::default())
         .manage(recovery::RendererGuard::default())
+        .manage(PendingUpdate::default())
+        .manage(UpdaterEnabled::default())
         .invoke_handler(tauri::generate_handler![
             get_app_version,
+            check_for_update,
+            install_update,
             choose_backup_path,
             choose_backup_folder,
             write_backup_file,
@@ -502,6 +594,11 @@ fn main() {
             print_webview
         ])
         .setup(|app| {
+            if updater_configured(app.handle()) {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.state::<UpdaterEnabled>().0.store(true, Ordering::SeqCst);
+            }
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let (url, api_port) = if cfg!(debug_assertions) {

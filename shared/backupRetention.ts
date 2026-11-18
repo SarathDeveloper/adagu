@@ -21,7 +21,18 @@ export const BACKUP_KIND_CAPS: Record<BackupKind, number> = {
 
 export const DAILY_TIER = { recent: 14, weeks: 8, months: 12 }
 
-export function backupKindForName(name: string): BackupKind | null {
+/** Encrypted off-machine copies add this suffix; they keep their backup's kind and date. */
+export const ENCRYPTED_BACKUP_SUFFIX = '.pdenc'
+
+/** Server answer when an encrypted backup needs the password; the restore screen watches for it. */
+export const BACKUP_LOCKED_MESSAGE = 'This backup is encrypted. Enter the backup password or recovery key.'
+
+function plainName(name: string): string {
+  return name.endsWith(ENCRYPTED_BACKUP_SUFFIX) ? name.slice(0, -ENCRYPTED_BACKUP_SUFFIX.length) : name
+}
+
+export function backupKindForName(encodedName: string): BackupKind | null {
+  const name = plainName(encodedName)
   if (DAILY_RE.test(name)) return 'daily'
   if (MANUAL_RE.test(name)) return 'manual'
   if (DAYCLOSE_RE.test(name)) return 'dayclose'
@@ -31,6 +42,9 @@ export function backupKindForName(name: string): BackupKind | null {
 }
 
 export function backupExcelName(name: string): string {
+  if (name.endsWith(ENCRYPTED_BACKUP_SUFFIX)) {
+    return `${plainName(name).replace(BACKUP_EXTENSION_RE, '.xlsx')}${ENCRYPTED_BACKUP_SUFFIX}`
+  }
   return name.replace(BACKUP_EXTENSION_RE, '.xlsx')
 }
 
@@ -43,7 +57,8 @@ function pad2(value: string): number {
  * pairs and `YYYY-MM-DD` dates both parse; the day is anchored at noon so a
  * timezone shift cannot move it across a day boundary.
  */
-function stampFromName(name: string, kind: BackupKind): number | null {
+function stampFromName(encodedName: string, kind: BackupKind): number | null {
+  const name = plainName(encodedName)
   if (kind === 'daily') {
     const match = DAILY_RE.exec(name)
     if (!match) return null

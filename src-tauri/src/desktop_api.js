@@ -18,6 +18,19 @@
     });
   }
 
+  // With backup encryption on, exports are `.pdenc` files rather than a plain
+  // .db or .zip, so the save dialog has to offer the right extension.
+  async function exportsEncrypted() {
+    try {
+      var response = await fetch('/api/backup/status', { credentials: 'same-origin' });
+      if (!response.ok) return false;
+      var status = await response.json();
+      return Boolean(status && status.encrypted);
+    } catch (_error) {
+      return false;
+    }
+  }
+
   var platform = navigator.platform || navigator.userAgent || 'unknown';
   var isMac = /Mac/i.test(platform);
 
@@ -27,12 +40,20 @@
     getAppVersion: function () {
       return invoke('get_app_version');
     },
+    checkForUpdate: function () {
+      return invoke('check_for_update');
+    },
+    installUpdate: function () {
+      return invoke('install_update');
+    },
     exportDatabase: async function () {
-      var suggested = 'pawndesk-backup-' + new Date().toISOString().slice(0, 10) + '.db';
+      var encrypted = await exportsEncrypted();
+      var suggested =
+        'pawndesk-backup-' + new Date().toISOString().slice(0, 10) + (encrypted ? '.db.pdenc' : '.db');
       var path = await invoke('choose_backup_path', {
         defaultFilename: suggested,
-        filterName: 'SQLite database',
-        extension: 'db',
+        filterName: encrypted ? 'Encrypted PawnDesk backup' : 'SQLite database',
+        extension: encrypted ? 'pdenc' : 'db',
       });
       if (!path) {
         return { canceled: true };
@@ -46,11 +67,13 @@
       return { canceled: false, filePath: path };
     },
     exportFullBackup: async function () {
-      var suggested = 'pawndesk-full-' + new Date().toISOString().slice(0, 10) + '.zip';
+      var encryptedFull = await exportsEncrypted();
+      var suggested =
+        'pawndesk-full-' + new Date().toISOString().slice(0, 10) + (encryptedFull ? '.zip.pdenc' : '.zip');
       var path = await invoke('choose_backup_path', {
         defaultFilename: suggested,
-        filterName: 'Zip archive',
-        extension: 'zip',
+        filterName: encryptedFull ? 'Encrypted PawnDesk backup' : 'Zip archive',
+        extension: encryptedFull ? 'pdenc' : 'zip',
       });
       if (!path) {
         return { canceled: true };
@@ -71,7 +94,14 @@
         }
         throw new Error(message);
       }
-      return { canceled: false, filePath: path };
+      var written = path;
+      try {
+        var result = await response.json();
+        if (result && result.path) written = result.path;
+      } catch (_error) {
+        // Older API: the file is where the dialog put it.
+      }
+      return { canceled: false, filePath: written };
     },
     exportExcel: async function () {
       var suggested = 'pawndesk-tables-' + new Date().toISOString().slice(0, 10) + '.xlsx';

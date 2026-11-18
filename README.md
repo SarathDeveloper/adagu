@@ -108,6 +108,24 @@ xattr -cr "/Applications/PawnDesk.app"
 
 If the window ever goes blank, what happened is written to `logs/crash.log` in that folder and reported with a `PD-ERR-…` reference ID the user can quote. The log folder is also shown under **Settings → Data**.
 
+## Releasing an update
+
+Installed desktop apps check `latest.json` on this repository's newest **published** GitHub release every six hours, and offer an admin **Install and restart**. Updates are signed with a Tauri updater key, separate from code-signing certificates. The app refuses an update whose signature does not match the public key built into it.
+
+One-time setup:
+
+1. Generate the key pair **outside the repository**: `npx tauri signer generate -w ~/.tauri/pawndesk-updater.key`. Choose a password.
+2. Paste the contents of `pawndesk-updater.key.pub` into `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` and commit it. Builds with an empty key run with updates switched off.
+3. Add repository secrets `TAURI_SIGNING_PRIVATE_KEY` (the private key file's contents) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Keep an offline copy of the private key: losing it means installed apps can never accept another update.
+
+Each release:
+
+1. Set the same version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, and commit.
+2. `git tag v1.0.1 && git push origin v1.0.1`. The **Release** workflow tests, builds Windows and macOS, and creates a **draft** release with the installers and `latest.json`.
+3. Install the draft on a test PC. Publish the release only when it is good; shops see it from then on.
+
+Only versions built after step 2 of the setup carry the key, so shops on an older build need one manual install of a keyed version first.
+
 ## Production (localhost web)
 
 ```bash
@@ -123,6 +141,7 @@ The Express server serves the built SPA from `dist/` plus the JSON API on `http:
 - Desktop: same file name inside the app's own user-data folder above
 - Shop images: `uploads/` under the data directory
 - Use **Settings → Backup** to download or restore a `.db` file
+- With backup encryption on, off-machine copies and exports are AES-256-GCM `.pdenc` files. The data key is in `backup-key.json` in the data directory (never inside a backup); each file carries it wrapped by the backup password and by the recovery key, so either opens it on any computer
 - A daily backup is written to `backups/` under the data directory
 - A backup from the full JewelTrackerPro app restores here: the required tables (`customers`, `pledges`, `gold_saving_accounts`) are present and the unused tables are simply ignored
 

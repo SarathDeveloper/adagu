@@ -458,6 +458,20 @@ export const exportFullBackupSchema = z.object({
   path: z.string().trim().min(1).max(1024),
 })
 
+export const enableBackupEncryptionSchema = z.object({
+  password: z.string().min(8, 'The backup password must be at least 8 characters').max(200),
+})
+
+export const changeBackupPasswordSchema = z
+  .object({
+    currentPassword: z.string().max(200).optional(),
+    recoveryKey: z.string().max(100).optional(),
+    newPassword: z.string().min(8, 'The backup password must be at least 8 characters').max(200),
+  })
+  .refine((value) => Boolean(value.currentPassword || value.recoveryKey), {
+    message: 'Enter the current backup password or the recovery key',
+  })
+
 export const backupSettingsSchema = z.object({
   frequency: z.enum(['daily', 'weekly']),
   time: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Time must be HH:mm'),

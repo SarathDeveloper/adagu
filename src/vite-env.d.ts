@@ -5,7 +5,17 @@ type DesktopExportResult = {
   filePath?: string
 }
 
+type DesktopUpdateInfo = {
+  version: string
+  currentVersion: string
+  notes?: string | null
+  date?: string | null
+}
+
 type DesktopAPI = {
+  /** Missing in older desktop builds. Resolves null when up to date or updates are off. */
+  checkForUpdate?: () => Promise<DesktopUpdateInfo | null>
+  installUpdate?: () => Promise<void>
   exportDatabase: () => Promise<DesktopExportResult>
   exportFullBackup: () => Promise<DesktopExportResult>
   exportExcel: () => Promise<DesktopExportResult>

@@ -30,7 +30,7 @@ import { getShopSetting, setShopSetting } from '../lib/settingsStore'
 import { getBackupsDir, getDataDir, getUploadsDir } from '../lib/paths'
 import { sqliteNativeOptions } from '../lib/sqliteNative'
 import { HttpError } from '../lib/http'
-import { logDiagnostic } from '../lib/logger'
+import { logDiagnostic, logInfo } from '../lib/logger'
 import { closeDatabase, getDatabase, getDbPath, initDatabase } from './index'
 import { excelPathFor, writeExcelBackupFromSqliteFile } from './excelBackup'
 import { getAppVersion } from '../lib/appPaths'
@@ -39,6 +39,15 @@ import { isSameOrInside, offsiteDirError } from './offsitePath'
 import { clearAllSessions } from '../auth/session'
 import { prerestoreSnapshotName, pruneBackupFiles, removeBackupSiblings } from './snapshot'
 import { writeZipFile, type ZipSource } from '../lib/zip'
+import {
+  BackupSecretError,
+  type BackupSecret,
+  decryptFile,
+  ENCRYPTED_SUFFIX,
+  encryptFile,
+  isEncryptedFile,
+} from '../lib/backupCrypto'
+import { adoptBackupKey, loadBackupKey } from './backupKey'
 
 export const LAST_BACKUP_AT_KEY = 'last_backup_at'
 export const LAST_SCHEDULED_BACKUP_AT_KEY = 'last_scheduled_backup_at'
@@ -172,8 +181,91 @@ export function getBackupStatus(now = new Date()): BackupStatus {
     lastOffsiteAt: settingOrNull(LAST_OFFSITE_AT_KEY),
     lastOffsiteError: settingOrNull(LAST_OFFSITE_ERROR_KEY),
     lastBackupError: settingOrNull(LAST_BACKUP_ERROR_KEY),
+    encrypted: backupKeyOrNull() !== null,
   }
 }
+
+/** This computer's backup key, or null when encryption is off (or its key file is unreadable). */
+function backupKeyOrNull() {
+  try {
+    return loadBackupKey()
+  } catch (error) {
+    logDiagnostic('backup', 'Backup key could not be read', error)
+    return null
+  }
+}
+
+/**
+ * Encryption must never silently fall back to writing plain copies, so a
+ * damaged key file stops off-machine copies and exports with an error instead.
+ */
+function requireBackupKeyState() {
+  return loadBackupKey()
+}
+
+function encryptedName(name: string, encrypted: boolean): string {
+  return encrypted ? `${name}${ENCRYPTED_SUFFIX}` : name
+}
+
+/**
+ * Decrypts an uploaded or exported `.pdenc` file into a temp file. Uses this
+ * computer's key when it made the file, else the password or recovery key.
+ */
+export async function decryptBackupToTemp(
+  sourcePath: string,
+  secret: BackupSecret,
+): Promise<{ path: string; adopt: () => void }> {
+  const scratch = mkdtempSync(join(tmpdir(), 'pd-decrypt-'))
+  const target = join(scratch, 'backup.bin')
+  try {
+    const unlocked = await decryptFile(sourcePath, target, { material: backupKeyOrNull(), secret })
+    return {
+      path: target,
+      adopt: () => {
+        if (adoptBackupKey(unlocked.dek, unlocked.wraps)) {
+          logInfo('backup', "Adopted the restored backup's encryption key on this computer")
+        }
+      },
+    }
+  } catch (error) {
+    rmSync(scratch, { recursive: true, force: true })
+    if (error instanceof BackupSecretError) {
+      throw new HttpError(400, error.message)
+    }
+    throw new HttpError(400, error instanceof Error ? error.message : 'Encrypted backup could not be opened')
+  }
+}
+
+/** True when exports and off-machine copies are written encrypted. Throws if the key file is damaged. */
+export function exportsEncrypted(): boolean {
+  return requireBackupKeyState() !== null
+}
+
+/**
+ * Database-only export. With encryption on, the snapshot is encrypted and the
+ * plain one removed before anything is handed out.
+ */
+export async function writeDatabaseExport(destinationPath: string): Promise<void> {
+  const key = requireBackupKeyState()
+  if (!key) {
+    await backupDatabaseTo(destinationPath)
+    return
+  }
+  const scratch = mkdtempSync(join(tmpdir(), 'pd-export-'))
+  try {
+    const plain = join(scratch, 'pawndesk.db')
+    await backupDatabaseTo(plain)
+    await encryptFile(plain, destinationPath, key)
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+export function removeDecryptedTemp(path: string): void {
+  rmSync(dirname(path), { recursive: true, force: true })
+}
+
+export { isEncryptedFile }
 
 function totalChanges(db: Database.Database): number {
   return (db.prepare('SELECT total_changes() AS n').get() as { n: number }).n
@@ -488,14 +580,25 @@ async function writeExcelBeside(dbPath: string): Promise<void> {
   }
 }
 
+function offsiteExcelPath(destDir: string, now: Date, encrypted: boolean): string {
+  return join(destDir, encryptedName(`pawndesk-${localDateIso(now)}.xlsx`, encrypted))
+}
+
 async function copyExcelBeside(sourceDbPath: string, destDir: string, now: Date): Promise<void> {
   try {
     // Excel is written only for daily and manual snapshots. A day-close or
     // pre-restore snapshot must not grow an extra workbook here.
     const sourceXlsx = excelPathFor(sourceDbPath)
     if (!existsSync(sourceXlsx)) return
-    const destXlsx = join(destDir, `pawndesk-${localDateIso(now)}.xlsx`)
-    copyFileSync(sourceXlsx, destXlsx)
+    const key = requireBackupKeyState()
+    const destXlsx = offsiteExcelPath(destDir, now, key !== null)
+    if (key) {
+      await encryptFile(sourceXlsx, destXlsx, key)
+      // A plain workbook written earlier the same day would leave today's data readable.
+      rmSync(offsiteExcelPath(destDir, now, false), { force: true })
+    } else {
+      copyFileSync(sourceXlsx, destXlsx)
+    }
   } catch (error) {
     logDiagnostic('backup', 'Off-machine Excel copy failed', error)
   }
@@ -540,9 +643,11 @@ function newestLocalBackup(): BackupFile | null {
   return listBackups().find((file) => OFFSITE_SOURCE_KINDS.includes(file.kind)) ?? null
 }
 
-function sourceFingerprint(file: BackupFile): string {
+function sourceFingerprint(file: BackupFile, keyId: string | null): string {
   const mtimeMs = statSync(join(getBackupsDir(), file.name)).mtimeMs
-  return `${file.name}|${mtimeMs}`
+  // Turning encryption on (or changing key) must re-copy, or the plain copy
+  // already off the machine would count as current.
+  return keyId ? `${file.name}|${mtimeMs}|${keyId}` : `${file.name}|${mtimeMs}`
 }
 
 async function ensureLocalSnapshot(now = new Date()): Promise<BackupFile> {
@@ -558,7 +663,7 @@ async function ensureLocalSnapshot(now = new Date()): Promise<BackupFile> {
   return newest
 }
 
-function mirrorUploads(destDir: string): void {
+async function mirrorUploads(destDir: string): Promise<void> {
   const sourceDir = getUploadsDir()
   if (!existsSync(sourceDir)) return
 
@@ -570,16 +675,38 @@ function mirrorUploads(destDir: string): void {
     return
   }
 
+  // Customer photos and Aadhaar/PAN scans live here, so they are encrypted too.
+  const key = requireBackupKeyState()
   for (const name of readdirSync(sourceDir)) {
     try {
       const source = join(sourceDir, name)
       if (!statSync(source).isFile()) continue
-      const target = join(targetDir, name)
+      const target = join(targetDir, encryptedName(name, key !== null))
       if (existsSync(target)) continue
-      copyFileSync(source, target)
+      if (key) {
+        await encryptFile(source, target, key)
+        // A plain mirror written before encryption was turned on would leave the
+        // Aadhaar/PAN scan readable. The original is still in this computer's
+        // uploads folder, so removing the plain copy loses nothing.
+        rmSync(join(targetDir, name), { force: true })
+      } else {
+        copyFileSync(source, target)
+      }
     } catch (error) {
       logDiagnostic('backup', 'Shop image could not be mirrored', error)
     }
+  }
+}
+
+/** Decrypts the encrypted copy to a temp file and proves it equals the source, byte for byte. */
+async function proveEncryptedCopy(encryptedPath: string, sourcePath: string): Promise<void> {
+  const scratch = mkdtempSync(join(tmpdir(), 'pd-prove-'))
+  try {
+    const plain = join(scratch, 'copy.db')
+    await decryptFile(encryptedPath, plain, { material: requireBackupKeyState() })
+    await proveBackupRestores(plain, sourcePath)
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
   }
 }
 
@@ -592,20 +719,35 @@ async function copyAndProve(sourcePath: string, destDir: string, now: Date): Pro
   }
 
   const date = localDateIso(now)
-  const destPath = join(destDir, `pawndesk-${date}.db`)
+  const key = requireBackupKeyState()
+  const plainDest = join(destDir, `pawndesk-${date}.db`)
+  const destPath = encryptedName(plainDest, key !== null)
   // Leading "~$" keeps half-written files out of OneDrive/Drive sync clients.
-  const partialPath = join(destDir, `~$pawndesk-${date}.db.tmp`)
+  const partialPath = join(destDir, `~$${basename(destPath)}.tmp`)
   if (existsSync(partialPath)) {
     unlinkSync(partialPath)
   }
 
-  copyFileSync(sourcePath, partialPath)
   try {
-    await proveBackupRestores(partialPath, sourcePath)
+    if (key) {
+      // encryptFile writes through its own "~$…tmp" partial; the result lands
+      // here so it can be proven before it replaces today's copy.
+      await encryptFile(sourcePath, partialPath, key)
+      await proveEncryptedCopy(partialPath, sourcePath)
+    } else {
+      copyFileSync(sourcePath, partialPath)
+      await proveBackupRestores(partialPath, sourcePath)
+    }
     if (existsSync(destPath)) {
       unlinkSync(destPath)
     }
     renameSync(partialPath, destPath)
+    // Opening the partial to prove it can leave SQLite -wal/-shm files beside it.
+    removeSidecarFiles(partialPath)
+    if (key && existsSync(plainDest)) {
+      // Today's plain copy, written before encryption was turned on, is superseded.
+      unlinkSync(plainDest)
+    }
   } catch (error) {
     if (existsSync(partialPath)) {
       unlinkSync(partialPath)
@@ -615,7 +757,7 @@ async function copyAndProve(sourcePath: string, destDir: string, now: Date): Pro
 
   pruneBackupFiles(destDir)
   await copyExcelBeside(sourcePath, destDir, now)
-  mirrorUploads(destDir)
+  await mirrorUploads(destDir)
   return destPath
 }
 
@@ -638,14 +780,14 @@ async function runOffsiteCopy(options: { forceFresh?: boolean }, now: Date): Pro
       newest = await ensureLocalSnapshot(now)
     }
     const sourcePath = join(getBackupsDir(), newest.name)
-    const fingerprint = sourceFingerprint(newest)
+    const key = requireBackupKeyState()
+    const fingerprint = sourceFingerprint(newest, key?.keyId ?? null)
     const lastSource = getShopSetting(getDatabase(), LAST_OFFSITE_SOURCE_KEY, '')
     if (!options.forceFresh && lastSource === fingerprint) {
-      const destXlsx = join(destDir, `pawndesk-${localDateIso(now)}.xlsx`)
-      if (!existsSync(destXlsx)) {
+      if (!existsSync(offsiteExcelPath(destDir, now, key !== null))) {
         await copyExcelBeside(sourcePath, destDir, now)
       }
-      mirrorUploads(destDir)
+      await mirrorUploads(destDir)
       return getBackupStatus()
     }
     await copyAndProve(sourcePath, destDir, now)
@@ -735,26 +877,35 @@ export function isRestorableUploadName(name: string): boolean {
   return /^[^/\\]+\.(png|jpe?g|pdf)$/i.test(name) && basename(name) === name
 }
 
-function copyNewFiles(sourceDir: string, targetDir: string, logLabel: string): void {
+async function copyNewFiles(sourceDir: string, targetDir: string, logLabel: string): Promise<void> {
   if (!existsSync(sourceDir)) return
   mkdirSync(targetDir, { recursive: true })
+  const key = backupKeyOrNull()
   for (const name of readdirSync(sourceDir)) {
     try {
       const source = join(sourceDir, name)
       if (!statSync(source).isFile()) continue
-      if (!isRestorableUploadName(name)) continue
-      const target = join(targetDir, name)
+      const encrypted = name.endsWith(ENCRYPTED_SUFFIX)
+      const plainName = encrypted ? name.slice(0, -ENCRYPTED_SUFFIX.length) : name
+      if (!isRestorableUploadName(plainName)) continue
+      const target = join(targetDir, plainName)
       if (existsSync(target)) continue
-      copyFileSync(source, target)
+      if (encrypted) {
+        // Only files made with this computer's key (or the one adopted from the
+        // restored backup) can be opened here; others are skipped and logged.
+        await decryptFile(source, target, { material: key })
+      } else {
+        copyFileSync(source, target)
+      }
     } catch (error) {
       logDiagnostic('backup', logLabel, error)
     }
   }
 }
 
-function restoreShopImages(offsiteDir: string): void {
+async function restoreShopImages(offsiteDir: string): Promise<void> {
   if (!offsiteDir) return
-  copyNewFiles(join(offsiteDir, 'uploads'), getUploadsDir(), 'Shop image could not be restored')
+  await copyNewFiles(join(offsiteDir, 'uploads'), getUploadsDir(), 'Shop image could not be restored')
 }
 
 function readBackupState(): Map<string, string> {
@@ -779,9 +930,9 @@ function writeBackupState(state: Map<string, string>): void {
 
 export async function restoreDatabaseFrom(
   sourcePath: string,
-  options: { uploadsDir?: string } = {},
+  options: { uploadsDir?: string; beforeImages?: () => void } = {},
 ): Promise<BackupStatus> {
-  return withBackupLock(() => runRestore(sourcePath, options.uploadsDir))
+  return withBackupLock(() => runRestore(sourcePath, options.uploadsDir, options.beforeImages))
 }
 
 /**
@@ -802,7 +953,11 @@ function assertBackupHasActiveAdmin(filePath: string): void {
   }
 }
 
-async function runRestore(sourcePath: string, uploadsDir?: string): Promise<BackupStatus> {
+async function runRestore(
+  sourcePath: string,
+  uploadsDir?: string,
+  beforeImages?: () => void,
+): Promise<BackupStatus> {
   assertRestorableBackup(sourcePath)
   assertBackupHasActiveAdmin(sourcePath)
 
@@ -845,9 +1000,17 @@ async function runRestore(sourcePath: string, uploadsDir?: string): Promise<Back
       logDiagnostic('backup', 'Could not reset the backup change baseline', baselineError)
     }
   }
-  restoreShopImages(offsiteDir)
+  if (beforeImages) {
+    try {
+      // e.g. adopt the restored backup's key, so encrypted off-machine photos open.
+      beforeImages()
+    } catch (error) {
+      logDiagnostic('backup', 'Could not keep the restored backup key', error)
+    }
+  }
+  await restoreShopImages(offsiteDir)
   if (uploadsDir) {
-    copyNewFiles(uploadsDir, getUploadsDir(), 'Backup photo could not be restored')
+    await copyNewFiles(uploadsDir, getUploadsDir(), 'Backup photo could not be restored')
   }
   // Sessions hold user ids from the old database. In the restored one the same
   // id may be someone else, or the same person with a different role, so
@@ -870,8 +1033,16 @@ export function assertFullBackupDestination(filePath: string): string {
   if (!isAbsolute(filePath)) {
     throw new HttpError(400, 'Choose a .zip file path')
   }
-  const resolved = resolve(filePath)
-  if (!resolved.toLowerCase().endsWith('.zip')) {
+  let resolved = resolve(filePath)
+  const lower = resolved.toLowerCase()
+  if (!lower.endsWith('.zip') && !lower.endsWith(ENCRYPTED_SUFFIX)) {
+    throw new HttpError(400, 'Choose a .zip file path')
+  }
+  // An encrypted backup is not a zip any more; name it so nobody tries to open
+  // it with an archive tool, and so Restore recognises it.
+  if (exportsEncrypted() && !lower.endsWith(ENCRYPTED_SUFFIX)) {
+    resolved = `${resolved}${ENCRYPTED_SUFFIX}`
+  } else if (!exportsEncrypted() && !lower.endsWith('.zip')) {
     throw new HttpError(400, 'Choose a .zip file path')
   }
   // path.relative ignores case on Windows, so c:\users\… cannot slip past.
@@ -913,7 +1084,15 @@ export async function writeFullBackup(destinationPath: string): Promise<void> {
       }
     }
     await writeZipFile(partialZip, entries)
-    commitPartialFile(partialZip, destinationPath)
+    const key = requireBackupKeyState()
+    if (key) {
+      // The zip holds Aadhaar/PAN scans and password hashes, so it never lands
+      // outside this folder unencrypted.
+      await encryptFile(partialZip, destinationPath, key)
+      rmSync(partialZip, { force: true })
+    } else {
+      commitPartialFile(partialZip, destinationPath)
+    }
     markBackupCompleted()
   } catch (error) {
     rmSync(partialZip, { force: true })

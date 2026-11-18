@@ -19,6 +19,7 @@ import { useAuth } from '../../features/auth/authContext'
 import { useShopBranding } from '../../features/settings/shopBrandingContext'
 import { shopInitials } from '../../features/settings/shopInitials'
 import { BackupHealthBanner } from '../../features/settings/BackupHealthBanner'
+import { UpdateBanner } from '../../features/settings/UpdateBanner'
 import { localImageSrc } from '../../features/print/mapShopDisplay'
 import { LoadingState } from '../../components/LoadingState'
 import { GOLD_SAVINGS_VISIBLE } from '../../features/goldSavings/visibility'
@@ -179,6 +180,7 @@ export function AppLayout() {
         </div>
       </aside>
       <main className="content">
+        <UpdateBanner />
         <BackupHealthBanner />
         {/* Pages load on demand, so keep the sidebar and the module tabs in
             place while a page chunk arrives instead of blanking the shell. */}

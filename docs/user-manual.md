@@ -414,6 +414,13 @@ This tab has two cards.
 
 **Automatic backup** can be **Daily** or **Weekly**, at a time you choose. The app makes that copy when it is open, and catches up on the next launch if it was closed at the scheduled time. You can also point an extra copy at a USB drive or another folder so one copy is not only on this computer.
 
+**Backup encryption** (administrator) locks every backup that leaves this computer with a backup password: the off-machine copy (database, Excel workbook and customer photos), **Export Copy** and **Full Backup**. Turn it on once:
+
+1. Enter a backup password of at least 8 characters, twice, and choose **Turn on encryption**.
+2. A **recovery key** appears, eight groups of four letters and numbers. **Print it or write it down** and keep it away from the backup drive. It is shown only once. If the backup password is forgotten, the recovery key is the only other way to open an encrypted backup.
+
+After that, encrypted files end in `.pdenc`. **Restore from File** on this computer opens them without asking. On a new computer it asks for the backup password or the recovery key. **Change backup password** needs the current password or the recovery key; older backups still open with the old password or the recovery key. **Export Excel** stays readable so it can be opened in Excel, so keep that file safe.
+
 ### Data
 
 **Data** shows the app version, where the log folder is, and how many records are stored.

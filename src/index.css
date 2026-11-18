@@ -498,6 +498,37 @@ button {
 .backup-offsite-actions .settings-save-btn {
   margin-top: 0;
 }
+.backup-encryption .settings-card-head {
+  margin-bottom: 0.85rem;
+}
+.backup-encryption .settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.backup-encryption > .muted,
+.backup-encryption > .backup-schedule-grid,
+.backup-encryption > .backup-offsite-path-label,
+.backup-encryption > .btn.ghost {
+  margin-bottom: 0.75rem;
+}
+.backup-recovery-key {
+  font: 600 1.125rem/1.6 ui-monospace, Consolas, monospace;
+  letter-spacing: 0.05em;
+  word-break: break-all;
+  border: 2px dashed currentColor;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  user-select: all;
+}
+.backup-recovery-confirm {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
 @media (max-width: 800px) {
   .backup-schedule-grid {
     grid-template-columns: 1fr;
@@ -599,6 +630,13 @@ label.btn {
   background: var(--warning-soft);
   color: var(--text);
   border-left: 4px solid var(--warning);
+}
+.update-banner {
+  background: var(--info-soft);
+  border-left-color: var(--info);
+}
+.update-banner .btn {
+  padding-block: 0.3rem;
 }
 .backup-banner-text {
   flex: 1;
@@ -3937,6 +3975,7 @@ label {
 .confirm-dialog-copy {
   margin: 0 0 0.25rem;
   color: var(--text-secondary);
+  white-space: pre-line;
 }
 .drawer-backdrop {
   position: fixed;
