@@ -1,6 +1,6 @@
 [package]
 name = "pawndesk"
-version = "1.0.0"
+version = "1.0.1"
 description = "PawnDesk — pledges and gold savings"
 authors = ["PawnDesk"]
 edition = "2021"
