@@ -18,6 +18,7 @@ import { createApp } from '../server/app'
 import { createSession, SESSION_COOKIE } from '../server/auth/session'
 import { getDatabase, initDatabase } from '../server/db/index'
 import { getDbPath } from '../server/db/index'
+import { countSeededGoldSavingAccounts, seedSampleGoldSavingsIfEmpty } from '../server/db/sampleGoldSavings'
 import { addDaysIso } from '../shared/billing/pledgeMath'
 import { localTodayIso } from '../shared/localDate'
 
@@ -414,6 +415,11 @@ await scenario('Staff login with limited access', async () => {
     throw new Error(res.body?.error ?? res.text)
   }
   return res.status >= 400 ? 'already there' : 'staff / staff123'
+})
+
+await scenario('Gold Savings: two schemes, five accounts at different stages', async () => {
+  if (!seedSampleGoldSavingsIfEmpty(db)) return 'skipped, gold savings accounts already exist'
+  return `${countSeededGoldSavingAccounts(db)} accounts`
 })
 
 console.log(failures === 0 ? '\nSample data added.' : `\nDone with ${failures} failed scenario(s).`)
