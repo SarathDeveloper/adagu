@@ -1,0 +1,106 @@
+# Builds signed installers and the auto-update manifest for a version tag.
+#
+#   1. Set the same version in package.json, src-tauri/tauri.conf.json and
+#      src-tauri/Cargo.toml, commit, then push a tag:  git tag v1.0.1 && git push origin v1.0.1
+#   2. This workflow tests, builds Windows and macOS, and creates a DRAFT release.
+#   3. Install the draft's installer on a test PC. When it is good, publish the
+#      release. Shops only see an update once it is published.
+#
+# Needs repository secrets TAURI_SIGNING_PRIVATE_KEY and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD (the update signing key, not an
+# Authenticode/Apple certificate).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc -p tsconfig.app.json --noEmit
+      - run: npx tsc -p tsconfig.server.json --noEmit
+      - run: npm run test:integration
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            script: release:win
+            target: x86_64-pc-windows-msvc
+            bundles: |
+              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe.sig
+          - os: macos-14
+            script: release:mac
+            target: aarch64-apple-darwin
+            bundles: |
+              src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+              src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
+              src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.target }}
+          path: ${{ matrix.bundles }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Write latest.json
+        run: node scripts/make-latest-json.mjs assets "${{ github.repository }}" "${{ github.ref_name }}"
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" assets/* \
+            --draft \
+            --title "PawnDesk ${{ github.ref_name }}" \
+            --notes "Install the draft on a test PC first. Publishing this release offers it to every shop."
